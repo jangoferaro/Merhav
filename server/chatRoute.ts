@@ -1,7 +1,8 @@
 import type { Express, Request, Response } from "express";
-import { streamLLM, type Message } from "./_core/llm";
+import { invokeLLM, streamLLM, type Message } from "./_core/llm";
 import {
   ACUTE_SAFETY_DIRECTIVE,
+  CONTEXTUAL_STARTERS_PROMPT,
   ELEVATED_SAFETY_DIRECTIVE,
   RECAP_DIRECTIVE,
   SYSTEM_PROMPT,
@@ -320,5 +321,60 @@ export function registerChatRoute(app: Express) {
 
     const updated = await extractMemory(existing, turns);
     res.status(200).json({ memory: updated ?? existing });
+  });
+
+  /**
+   * הצעות תגובה קצרות ורלוונטיות אחרי recap — במקום כפתורי הפתיחה
+   * הגנריים. נכשל בשקט (מחזיר מערך ריק) כי זה שיפור, לא הכרחי.
+   */
+  app.post("/api/journey/starters", async (req: Request, res: Response) => {
+    const ip =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.socket.remoteAddress ||
+      "unknown";
+
+    if (isRateLimited(ip)) {
+      res.status(429).json({ error: "יש רגע להמתין." });
+      return;
+    }
+
+    const body = (req.body || {}) as Record<string, unknown>;
+    const recapText =
+      typeof body.recapText === "string" ? body.recapText.trim() : "";
+
+    if (recapText.length === 0) {
+      res.status(200).json({ starters: [] });
+      return;
+    }
+
+    try {
+      const prompt = CONTEXTUAL_STARTERS_PROMPT.replace(
+        "{{RECAP_TEXT}}",
+        recapText.slice(0, 1000)
+      );
+      const response = await invokeLLM({
+        model: process.env.MEMORY_MODEL || "claude-haiku-4-5-20251001",
+        max_tokens: 300,
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const raw = response.choices?.[0]?.message?.content;
+      const text = typeof raw === "string" ? raw : "";
+      const cleaned = text.replace(/```json|```/g, "").trim();
+      const parsed: unknown = JSON.parse(cleaned);
+
+      const starters = Array.isArray(parsed)
+        ? parsed
+            .filter((s): s is string => typeof s === "string")
+            .map(s => s.trim().slice(0, 60))
+            .filter(s => s.length > 0)
+            .slice(0, 3)
+        : [];
+
+      res.status(200).json({ starters });
+    } catch (error) {
+      console.error("[chatRoute] contextual starters failed:", error);
+      res.status(200).json({ starters: [] });
+    }
   });
 }

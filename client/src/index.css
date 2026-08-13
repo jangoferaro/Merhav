@@ -267,17 +267,38 @@
     .merhav-fade {
       animation: merhav-fade 700ms var(--ease-out-soft) both;
     }
+
+    .merhav-chunk-fade {
+      display: inline;
+      animation: merhav-chunk-breathe 650ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .merhav-rise,
     .merhav-fade,
-    .merhav-breathe {
+    .merhav-breathe,
+    .merhav-chunk-fade {
       animation: none;
     }
 
     .merhav-breathe {
       opacity: 0.7;
+    }
+  }
+
+  @keyframes merhav-chunk-breathe {
+    0% {
+      opacity: 0;
+      filter: blur(3px);
+    }
+    60% {
+      opacity: 1;
+      filter: blur(0);
+    }
+    100% {
+      opacity: 1;
+      filter: blur(0);
     }
   }
 

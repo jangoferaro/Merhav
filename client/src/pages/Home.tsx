@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Streamdown } from "streamdown";
 import { ArrowUp, Route, Square } from "lucide-react";
 import BreathMark from "@/components/BreathMark";
 import Disclaimer from "@/components/Disclaimer";
@@ -14,12 +13,44 @@ import {
   isMemoryEmpty,
 } from "@shared/merhav";
 
+/**
+ * מציג טקסט עם חשיפה עדינה "כמו נשימה": החלק שכבר "התיישב" הוא טקסט
+ * רגיל, והמקטע האחרון שנחשף עטוף ב-span עם fade משלו. ה-key על ה-span
+ * הוא ה-chunkStart — כשהוא משתנה, ריאקט יוצר אלמנט חדש (לא מעדכן קיים),
+ * מה שמפעיל את האנימציה מחדש על כל מקטע חדש בנפרד, בלי לגעת בטקסט
+ * שכבר הוצג.
+ */
+function StreamingText({
+  content,
+  chunkStart,
+}: {
+  content: string;
+  chunkStart?: number;
+}) {
+  if (chunkStart === undefined || chunkStart >= content.length) {
+    return <p className="whitespace-pre-wrap">{content}</p>;
+  }
+
+  const settled = content.slice(0, chunkStart);
+  const fresh = content.slice(chunkStart);
+
+  return (
+    <p className="whitespace-pre-wrap">
+      {settled}
+      <span key={chunkStart} className="merhav-chunk-fade">
+        {fresh}
+      </span>
+    </p>
+  );
+}
+
 export default function Home() {
   const {
     messages,
     isStreaming,
     error,
     lastFailedMessage,
+    contextualStarters,
     send,
     retryLast,
     stop,
@@ -236,7 +267,10 @@ export default function Home() {
                     <div className="flex flex-col gap-3">
                       <div className="merhav-fade merhav-prose max-w-[95%] text-foreground/95 sm:max-w-[85%]">
                         {message.content.length > 0 ? (
-                          <Streamdown>{message.content}</Streamdown>
+                          <StreamingText
+                            content={message.content}
+                            chunkStart={message.lastChunkStart}
+                          />
                         ) : (
                           <span className="flex items-center gap-1.5 py-1">
                             {[0, 1, 2].map(dot => (
@@ -271,16 +305,22 @@ export default function Home() {
                 או פשוט לגעת באחד מאלה
               </p>
               <div className="flex flex-wrap gap-2">
-                {CONVERSATION_STARTERS.map((starter, index) => (
-                  <button
-                    key={starter}
-                    type="button"
-                    onClick={() => submit(starter)}
-                    style={{ animationDelay: `${index * 55}ms` }}
-                    className="merhav-rise rounded-full border border-border bg-card/50 px-3.5 py-2 text-[0.84rem] text-muted-foreground transition-all duration-200 hover:border-primary/35 hover:bg-primary/[0.06] hover:text-foreground active:scale-[0.97]">
-                    {starter}
-                  </button>
-                ))}
+                {[
+                  ...(contextualStarters.length > 0
+                    ? contextualStarters
+                    : CONVERSATION_STARTERS),
+                  "בוא נשנה נושא רגע",
+                ].map((starter, index) => (
+                    <button
+                      key={starter}
+                      type="button"
+                      onClick={() => submit(starter)}
+                      style={{ animationDelay: `${index * 55}ms` }}
+                      className="merhav-rise rounded-full border border-border bg-card/50 px-3.5 py-2 text-[0.84rem] text-muted-foreground transition-all duration-200 hover:border-primary/35 hover:bg-primary/[0.06] hover:text-foreground active:scale-[0.97]">
+                      {starter}
+                    </button>
+                  )
+                )}
               </div>
             </div>
           ) : null}

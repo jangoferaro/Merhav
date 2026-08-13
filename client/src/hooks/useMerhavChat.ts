@@ -31,6 +31,8 @@ export type ChatMessage = {
   sessionStart?: boolean;
   /** מסמן שזו ההודעה הפותחת של recap אוטומטי, כדי להציג צ'יפים אחריה */
   isRecap?: boolean;
+  /** האינדקס שבו מתחיל המקטע האחרון שנחשף — לאנימציית הכניסה שלו */
+  lastChunkStart?: number;
 };
 
 function createId() {
@@ -127,6 +129,7 @@ export function useMerhavChat() {
   );
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contextualStarters, setContextualStarters] = useState<string[]>([]);
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(
     null
   );
@@ -281,10 +284,15 @@ export function useMerhavChat() {
           // חושף כחמישית מהפער שנשאר בכל טיק (מינימום תו אחד) —
           // עקומת האטה טבעית במקום קצב קבוע ומכני.
           const step = Math.max(1, Math.min(4, Math.ceil(gap / 22)));
+          const chunkStart = revealedLength;
           revealedLength = Math.min(accumulated.length, revealedLength + step);
           const shown = accumulated.slice(0, revealedLength);
           setMessages(prev =>
-            prev.map(m => (m.id === assistantId ? { ...m, content: shown } : m))
+            prev.map(m =>
+              m.id === assistantId
+                ? { ...m, content: shown, lastChunkStart: chunkStart }
+                : m
+            )
           );
         }
         if (revealedLength >= accumulated.length) {
@@ -376,6 +384,7 @@ export function useMerhavChat() {
 
       setError(null);
       setLastFailedMessage(null);
+      setContextualStarters([]);
 
       const now = Date.now();
       const previousVisit = journeyRef.current.lastVisitAt;
@@ -475,6 +484,25 @@ export function useMerhavChat() {
    */
   const hasCheckedRecapRef = useRef(false);
 
+  const fetchContextualStarters = useCallback(async (recapText: string) => {
+    try {
+      const response = await fetch("/api/journey/starters", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ recapText }),
+      });
+      if (!response.ok) return;
+      const data = (await response.json()) as { starters?: unknown };
+      if (Array.isArray(data.starters)) {
+        setContextualStarters(
+          data.starters.filter((s): s is string => typeof s === "string")
+        );
+      }
+    } catch {
+      // כשל שקט — כפתורי הפתיחה הגנריים ישמשו כברירת מחדל במקום
+    }
+  }, []);
+
   const maybeSendRecap = useCallback(async () => {
     if (isStreaming) return;
 
@@ -515,9 +543,12 @@ export function useMerhavChat() {
 
       if (streamError || accumulated.trim().length === 0) {
         setMessages(prev => prev.filter(m => m.id !== assistantId));
+      } else {
+        // הצלחה: לא מרעננים זיכרון על recap (לא נאמר בו שום דבר חדש
+        // מהמשתמש, אין מה לחלץ) — אבל כן מביאים הצעות תגובה רלוונטיות
+        // להודעה הזו, במקום כפתורי הפתיחה הגנריים.
+        void fetchContextualStarters(accumulated);
       }
-      // בהצלחה: לא מרעננים זיכרון על recap — לא נאמר בו שום דבר חדש
-      // מהמשתמש, אין מה לחלץ.
     } catch {
       if (revealTimerRef.current) {
         clearInterval(revealTimerRef.current);
@@ -562,6 +593,7 @@ export function useMerhavChat() {
     isStreaming,
     error,
     lastFailedMessage,
+    contextualStarters,
     send,
     retryLast,
     stop,
