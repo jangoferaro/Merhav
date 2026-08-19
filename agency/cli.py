@@ -87,8 +87,11 @@ def cmd_run(args, cfg):
 
     rev, cost = store.totals()
     by_source = store.revenue_by_source()
+    split = store.revenue_split()
     print(paint("-" * len(header), "d"))
-    print(f"\n  gross revenue {paint(f'${rev:,.2f}', 'g')}   total cost "
+    print("\n  operating revenue " + paint(f"${split['operating']:,.2f}", "g") +
+          "   capital events " + paint(f"${split['capital']:,.2f}", "c"))
+    print(f"  gross revenue {paint(f'${rev:,.2f}', 'g')}   total cost "
           f"{paint(f'${cost:,.2f}', 'y')}   profit "
           f"{paint(f'${rev - cost:,.2f}', 'g' if rev >= cost else 'r')}   "
           f"cash {paint(f'${company.ctx.ledger.cash:,.2f}', 'b')}")
@@ -111,6 +114,9 @@ def cmd_status(args, cfg):
     print(f"  revenue / cost  ${rev:,.2f} / ${cost:,.2f}  ({paint(f'{rev - cost:+,.2f}', 'g' if rev >= cost else 'r')})")
     print("  real money      " + paint(f"${by_source.get('real', 0.0):,.2f}", "b") +
           "   ·  modelled " + paint(f"${by_source.get('modelled', 0.0):,.2f}", "d"))
+    nav = store.nav(cfg.start_capital)
+    print("  NAV             " + paint(f"${nav['nav']:,.2f}", "b") +
+          f"   (cash ${nav['cash']:,.0f} + branches ${nav['holdings']:,.0f})")
     print(f"  roster          {len([p for p in personas if p.status == 'active'])} active "
           f"/ {len(personas)} total")
     print(f"  published       {posts} posts")
@@ -201,6 +207,73 @@ def cmd_audit(args, cfg):
           f"{'' if not failed else paint('  — GATE IS NOT SOUND', 'r')}\n")
     store.close()
     return 1 if failed else 0
+
+
+def cmd_market(args, cfg):
+    """The deal book: what the holding company owns, bought, sold and passed on."""
+    import csv as _csv
+    import json as _json
+
+    from .core.models import Persona as _P
+    store, company = _open(cfg)
+
+    if args.file:                       # import real listings for evaluation
+        n = 0
+        with open(args.file, newline="", encoding="utf-8") as fh:
+            for row in _csv.DictReader(fh):
+                row["day"] = int(store.get_meta("last_day", 0))
+                row["status"] = "open"
+                row["source"] = "import"
+                row["flags"] = [f.strip() for f in (row.get("flags") or "").split("|") if f.strip()]
+                for key in ("followers", "monthly_revenue", "monthly_profit", "asking_price",
+                            "age_months", "email_list"):
+                    row[key] = float(row.get(key) or 0)
+                row.setdefault("id", f"lst_import_{n}")
+                store.save_listing(row)
+                n += 1
+        store.commit()
+        print(f"\n  imported {n} listings — they are evaluated on the next scan\n")
+        store.close()
+        return 0
+
+    nav = store.nav(cfg.start_capital)
+    vals = store.latest_valuations()
+    print(paint(f"\n{cfg.company} — holdings\n", "b"))
+    print(f"  NAV            {paint(f'${nav[chr(110) + chr(97) + chr(118)]:,.2f}', 'b')}")
+    print(f"    cash         ${nav['cash']:,.2f}")
+    print(f"    branches     ${nav['holdings']:,.2f}")
+    print(f"    deployed     ${nav['capital_deployed']:,.2f} into acquisitions")
+
+    owned = [p for p in store.personas(_P, status="active")]
+    if owned:
+        print(paint("\n  branches", "c"))
+        for p in sorted(owned, key=lambda x: vals.get(x.id, 0), reverse=True)[:12]:
+            row = store.query("SELECT data FROM valuations WHERE persona_id=? "
+                              "ORDER BY day DESC LIMIT 1", (p.id,))
+            data = _json.loads(row[0]["data"]) if row else {}
+            flag = data.get("note", "")
+            print(f"    @{p.handle:<20} {p.origin:<6} ${vals.get(p.id, 0):>11,.0f}"
+                  f"  {data.get('multiple', 0):>4.0f}x  ${data.get('monthly_profit', 0):>8,.0f}/mo")
+            if flag:
+                print(f"      {paint('! ' + flag, 'y')}")
+
+    deals = store.deals()
+    if deals:
+        print(paint("\n  deal book", "c"))
+        for d in deals:
+            colour = "g" if d["kind"] == "sell" else "c"
+            print(f"    day {d['day']:>3}  {paint(d['kind'].upper().ljust(4), colour)} "
+                  f"${d['price']:>10,.0f} @{d['multiple']:>4.0f}x  {d['rationale'][:70]}")
+
+    passed = [l for l in store.listings() if l.get("verdict") and not l["verdict"].get("buy")]
+    if passed:
+        print(paint(f"\n  passed on {len(passed)} listings", "c"))
+        for l in passed[:8]:
+            print(f"    ${l.get('asking_price', 0):>10,.0f}  {str(l.get('kind'))[:22]:<24} "
+                  f"{paint(l['verdict'].get('reason', '')[:70], 'd')}")
+    print()
+    store.close()
+    return 0
 
 
 def cmd_funnel(args, cfg):
@@ -318,6 +391,10 @@ def main(argv=None) -> int:
     d = sub.add_parser("report", help="render the HTML dashboard")
     d.add_argument("--out", default=None)
     d.set_defaults(fn=cmd_report)
+    mk = sub.add_parser("market", help="holdings, deal book, and acquisition listings")
+    mk.add_argument("--import", dest="file", default=None,
+                    help="csv of real listings to evaluate (Flippa/Acquire export)")
+    mk.set_defaults(fn=cmd_market)
     fn = sub.add_parser("funnel", help="render the link-in-bio pages")
     fn.add_argument("--out", default=None)
     fn.set_defaults(fn=cmd_funnel)

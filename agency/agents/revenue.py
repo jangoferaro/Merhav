@@ -34,6 +34,14 @@ class MonetizationAgent(Agent):
             if world is None:
                 continue
             trust = min(1.0, 0.45 + (day - p.created_day) / 60 + p.quality * 0.3)
+            if p.origin == "bought":
+                # The people in an acquired audience followed the previous
+                # owner, for the previous owner's content. Re-earning them takes
+                # months, and assuming otherwise is what makes roll-up models
+                # look better on paper than they turn out in practice.
+                months = max(0.0, (day - p.acquired_day) / 30.0)
+                penalty = float(self.ctx.config.get("holding.inherited_conversion", 0.3))
+                trust *= min(1.0, penalty + months * 0.15)
             new_subs = world.convert_subscribers(p.id, clicks, p.price, trust)
             subs = world.sub_count(p.id)
 

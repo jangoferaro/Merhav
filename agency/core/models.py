@@ -112,6 +112,10 @@ class Persona:
     slots: int = 2                  # posts produced per day, scaled by the CEO
     voice_id: str = "v-default"
     age: int = 25
+    origin: str = "built"           # built | bought
+    acquired_price: float = 0.0     # what the holding company paid for it
+    acquired_day: int = 0
+    inherited_profit: float = 0.0   # monthly profit it was producing at purchase
 
 
 @dataclass

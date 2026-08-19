@@ -47,7 +47,7 @@ class World:
     def __init__(self, seed: int, audience_cap: float = 120_000.0,
                  cold_start: dict | None = None, follow_rate: dict | None = None,
                  click_rate: dict | None = None, luck_sigma: float = 0.65,
-                 viral_chance: float = 0.04):
+                 viral_chance: float = 0.04, sub_ceiling_share: float = 0.005):
         self.rng = random.Random(seed)
         self.cap = float(audience_cap)
         self.cold_start = cold_start or {}
@@ -55,6 +55,11 @@ class World:
         self.click_rate = click_rate or {}
         self.luck_sigma = float(luck_sigma)
         self.viral_chance = float(viral_chance)
+        # What share of a following will ever pay for anything. This is the
+        # single most abusable number in the model: at 5% it turns any audience
+        # into a fortune. Realistic paid conversion of a social following is a
+        # fraction of one percent.
+        self.sub_ceiling_share = float(sub_ceiling_share)
         self.posts: dict[str, PostState] = {}
         self.followers: dict[tuple[str, str], float] = {}   # (persona, platform) -> count
         self.subs: dict[str, float] = {}                    # persona -> paying subscribers
@@ -71,7 +76,8 @@ class World:
                    follow_rate=config.get("simulation.follow_rate", {}) or {},
                    click_rate=config.get("simulation.click_rate", {}) or {},
                    luck_sigma=float(config.get("simulation.luck_sigma", 0.65)),
-                   viral_chance=float(config.get("simulation.viral_chance", 0.04)))
+                   viral_chance=float(config.get("simulation.viral_chance", 0.04)),
+                   sub_ceiling_share=float(config.get("simulation.sub_ceiling_share", 0.005)))
 
     # -- publishing ---------------------------------------------------------
     def register_post(self, external_id: str, persona_id: str, platform: str, day: int,
@@ -129,6 +135,13 @@ class World:
         for pid in list(self.subs):
             self.subs[pid] *= 0.97
 
+    def seed_audience(self, persona_id: str, platform: str, followers: float,
+                      subs: float = 0.0) -> None:
+        """An acquired branch does not start from zero — that is what was paid for."""
+        self.followers[(persona_id, platform)] = float(followers)
+        if subs:
+            self.subs[persona_id] = self.subs.get(persona_id, 0.0) + float(subs)
+
     # -- reads --------------------------------------------------------------
     def metrics_for(self, external_id: str) -> dict:
         st = self.posts.get(external_id)
@@ -177,7 +190,8 @@ class World:
         # convert early, and the pool of remaining willing buyers thins out.
         already = self.subs.get(persona_id, 0.0)
         audience = max(1.0, self.total_followers(persona_id))
-        thinning = max(0.15, 1.0 - (already / (audience * 0.05 + 1.0)))
+        ceiling = audience * self.sub_ceiling_share + 1.0
+        thinning = max(0.02, 1.0 - already / ceiling)
         base = 0.045 * trust * (9.99 / max(price, 1.0)) ** 0.6 * thinning
         new = 0
         for _ in range(min(clicks, 4000)):

@@ -237,6 +237,8 @@ def render(store, cfg, path: str) -> str:
     kpis = [
         ("cash on hand", _money(final_cash), f"opened at {_money(cfg.start_capital)}",
          "pos" if final_cash >= cfg.start_capital else "neg"),
+        ("net asset value", _money(store.nav(cfg.start_capital)["nav"]),
+         "cash plus what the branches are worth", ""),
         ("real money banked", _money(real_money),
          "settled receipts + imported payouts" if real_money else "nothing has settled yet",
          "pos" if real_money else "amb"),
@@ -337,6 +339,43 @@ def render(store, cfg, path: str) -> str:
         portfolio_rows[-1] += f'<td class="num">{_money(rev)}</td></tr>'
     culled = sum(1 for v in verdicts.values() if v["kind"] == "cull_persona")
     kept = sum(1 for v in verdicts.values() if v["kind"] == "survives_cull")
+
+    # ---- holdings: the company as a balance sheet, not a content feed ------
+    nav = store.nav(cfg.start_capital)
+    vals = store.latest_valuations()
+    deals = store.deals()
+    split = store.revenue_split()
+    owned = [p for p in personas if p.status == "active"]
+    holding_rows, flags = [], []
+    for p in sorted(owned, key=lambda x: vals.get(x.id, 0), reverse=True)[:12]:
+        row = store.query("SELECT data FROM valuations WHERE persona_id=? ORDER BY day DESC "
+                          "LIMIT 1", (p.id,))
+        vd = json.loads(row[0]["data"]) if row else {}
+        note = vd.get("note", "")
+        if note and vals.get(p.id, 0) > 100:
+            flags.append((p.handle, note))
+        holding_rows.append(
+            f'<tr><td>@{_esc(p.handle)}</td>'
+            f'<td><span class="chip {"amb" if p.origin == "bought" else ""}">'
+            f'{_esc(p.origin)}</span></td>'
+            f'<td class="num">{_money(p.acquired_price) if p.acquired_price else "—"}</td>'
+            f'<td class="num">{_money(vd.get("monthly_profit", 0))}</td>'
+            f'<td class="num">{vd.get("multiple", 0):.0f}x</td>'
+            f'<td class="num">{_money(vals.get(p.id, 0))}</td></tr>')
+    deal_rows = "".join(
+        f'<tr><td class="num">{d["day"]}</td>'
+        f'<td><span class="chip {"pos" if d["kind"] == "sell" else "amb"}">{_esc(d["kind"])}</span></td>'
+        f'<td class="num">{_money(d["price"])}</td><td class="num">{d["multiple"]:.0f}x</td>'
+        f'<td>{_esc(d["rationale"])}</td></tr>' for d in deals) or \
+        '<tr><td colspan="5" class="who">no deals yet</td></tr>'
+    passed = [l for l in store.listings() if l.get("verdict") and not l["verdict"].get("buy")]
+    passed_rows = "".join(
+        f'<tr><td class="num">{_money(l.get("asking_price", 0))}</td>'
+        f'<td>{_esc(l.get("kind", ""))}</td>'
+        f'<td class="who">{_esc(l["verdict"].get("reason", ""))}</td></tr>'
+        for l in passed[:6])
+    flag_html = "".join(
+        f'<div class="banner"><b>@{_esc(h)}</b> {_esc(n)}</div>' for h, n in flags[:3])
 
     # ---- pipeline ---------------------------------------------------------
     routes = {}
@@ -458,6 +497,27 @@ def render(store, cfg, path: str) -> str:
       <div class="head"><h2>runtime interventions</h2></div>
       <div class="log">{comp_html}</div>
     </div>
+  </section>
+
+  <section class="panel">
+    <div class="head"><h2>the balance sheet</h2>
+      <span class="who">NAV {_money(nav["nav"])} = cash {_money(nav["cash"])} +
+      branches {_money(nav["holdings"])} · {_money(nav["capital_deployed"])} deployed into
+      acquisitions</span></div>
+    <p class="who" style="margin:0">Operating revenue {_money(split["operating"])} and capital
+    events {_money(split["capital"])} are shown apart on purpose: selling a branch is not a month
+    of trading, and adding them into one headline would flatter the business into meaninglessness.</p>
+    {flag_html}
+    <div class="scroll"><table>
+      <thead><tr><th>branch</th><th>origin</th><th>paid</th><th>monthly profit</th>
+      <th>multiple</th><th>value</th></tr></thead>
+      <tbody>{"".join(holding_rows) or '<tr><td colspan="6" class="who">no branches</td></tr>'}</tbody>
+    </table></div>
+    <div class="head"><h2>deal book</h2></div>
+    <div class="scroll"><table>
+      <thead><tr><th>day</th><th></th><th>price</th><th>multiple</th><th>reasoning</th></tr></thead>
+      <tbody>{deal_rows}</tbody></table></div>
+    {'<div class="head"><h2>passed on</h2><span class="who">' + str(len(passed)) + ' listings reviewed and declined</span></div><div class="scroll"><table><thead><tr><th>ask</th><th>asset</th><th>why not</th></tr></thead><tbody>' + passed_rows + '</tbody></table></div>' if passed_rows else ''}
   </section>
 
   <section class="panel">

@@ -35,6 +35,34 @@ adult     = ["fanvue"]     # age-gated only, and only when the adult tier is ena
 funnel    = ["fanvue"]     # subscription destination every persona funnels into
 subreddit = "test"
 
+[holding]
+# The company is a capital allocator with branches, not a content studio. It can
+# build a branch from zero, buy one, or sell one — whichever the numbers favour.
+#
+# Multiples here are ASSUMPTIONS about a market that moves. Content businesses
+# have traded roughly 20x-45x monthly profit depending on the year, the niche
+# and how clean the earnings are. Put the comps you actually believe here.
+enabled            = true
+valuation_window   = 30      # days of trailing performance a valuation reads
+base_multiple      = 26.0    # x monthly profit, before adjustments
+value_per_follower = 0.02    # fallback basis for a branch with no profit yet
+transferable_subs  = 50      # recurring subscribers that make an asset sellable
+maturity_days      = 90      # below this age, the multiple is discounted
+scan_every         = 7       # days between acquisition scans
+min_discount       = 0.78    # never bid above this share of our own valuation
+max_ticket         = 0.40    # most of the cash one acquisition may consume
+cash_reserve       = 400.0   # floor the buyer may never breach
+exit_multiple      = 30.0    # sell into an offer at or above this multiple
+exit_flat_growth   = 0.06    # ...once growth has fallen below this
+credible_uplift    = 3.0     # how much more we believe we can earn from an
+                             # acquired audience than its seller did. Above this,
+                             # the valuation is flagged as an untested assumption
+                             # rather than reported as a number.
+inherited_conversion = 0.30  # how well an acquired audience converts on day one,
+                             # relative to one you built. Recovers ~15pp a month.
+                             # This is the assumption the whole roll-up thesis
+                             # rests on, and it is the one to argue with first.
+
 [simulation]
 # ---------------------------------------------------------------------------
 # These are ASSUMPTIONS, not measurements. They are the only thing standing
@@ -46,6 +74,10 @@ subreddit = "test"
 audience_cap = 120000.0    # addressable followers per persona per platform
 luck_sigma   = 0.65        # spread of the per-post lottery (log-normal)
 viral_chance = 0.04        # probability a post breaks out of its follower base
+sub_ceiling_share = 0.005  # share of a following that will EVER pay for anything.
+                           # The most abusable number in the model: at 5% every
+                           # audience becomes a fortune. Half a percent is already
+                           # generous for a cold social following.
 
 [simulation.cold_start]    # median impressions a post gets with no following
 tiktok = 350

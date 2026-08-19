@@ -240,6 +240,63 @@ def gen_interactions(prompt, rng):
     return {"comments": [{"id": f"c{rng.randrange(10**6)}", "text": _pick(rng, COMMENTS)} for _ in range(n)]}
 
 
+ASSET_KINDS = [
+    ("faceless youtube channel", 0.9, True),
+    ("niche newsletter", 1.25, True),
+    ("instagram meme page", 0.65, False),
+    ("tiktok clip account", 0.55, False),
+    ("content site + list", 1.35, True),
+    ("AI persona brand", 0.8, True),
+]
+
+
+def gen_market_scan(prompt, rng):
+    """Acquisition listings, the way a marketplace actually looks: mostly
+    overpriced, a few fairly priced, occasionally something mispriced because
+    the owner is tired. Risk flags are what a buyer would actually find in
+    diligence."""
+    p = _payload(prompt)
+    k = int(p.get("k", 5))
+    out = []
+    for _ in range(k):
+        kind, quality, transferable = _pick(rng, ASSET_KINDS)
+        niche = _pick(rng, NICHES)[0]
+        followers = int(rng.lognormvariate(9.6, 0.9))          # ~2k .. ~120k
+        # Revenue per follower has to sit in the same range our own monetization
+        # can reach, otherwise every listing is underpriced by construction and
+        # the buy-side agent prints money against an assumption we wrote.
+        monthly_revenue = round(followers * rng.uniform(0.008, 0.05) * quality, 2)
+        margin = rng.uniform(0.45, 0.85)
+        monthly_profit = round(monthly_revenue * margin, 2)
+        # Sellers anchor high; the spread is where the work is. A minority are
+        # motivated — burnt out, moving on, or holding an asset they have
+        # stopped operating — and that is where acquisitions actually happen.
+        motivated = rng.random() < 0.22
+        ask_multiple = round(rng.uniform(11, 20) if motivated else rng.uniform(18, 46), 1)
+        flags = ["owner has stopped posting"] if motivated else []
+        if rng.random() < 0.35:
+            flags.append("single platform")
+        if rng.random() < 0.30:
+            flags.append("no email list")
+        if rng.random() < 0.22:
+            flags.append("engagement looks bought")
+        if rng.random() < 0.18:
+            flags.append("owner is the face — not transferable")
+        if not transferable:
+            flags.append("account transfer breaches platform terms")
+        out.append({
+            "id": f"lst_{rng.randrange(10**6):06d}",
+            "kind": kind, "niche": niche, "followers": followers,
+            "monthly_revenue": monthly_revenue, "monthly_profit": monthly_profit,
+            "asking_price": round(monthly_profit * ask_multiple, 2),
+            "ask_multiple": ask_multiple,
+            "age_months": rng.randrange(4, 48),
+            "email_list": int(followers * rng.uniform(0.0, 0.08)) if transferable else 0,
+            "flags": flags,
+        })
+    return {"listings": out}
+
+
 def gen_rationale(prompt, rng):
     return {"text": _pick(rng, [
         "Reallocating toward proven CPM and retention, away from flat cohorts.",

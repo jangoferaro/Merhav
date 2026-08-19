@@ -16,6 +16,7 @@ class Ledger:
     cash: float
     daily_budget: float
     spent_today: float = 0.0
+    invested: float = 0.0          # lifetime capital deployed into acquisitions
 
     def can_spend(self, amount: float) -> bool:
         return amount <= self.cash and (self.spent_today + amount) <= self.daily_budget
@@ -25,6 +26,17 @@ class Ledger:
             return False
         self.cash -= amount
         self.spent_today += amount
+        return True
+
+    def invest(self, amount: float, reserve: float = 0.0) -> bool:
+        """Capital expenditure. Buying a branch is not marketing spend: it does
+        not compete with the daily operating budget and is not capped by it. It
+        is capped by the balance sheet and by the reserve the company refuses
+        to breach."""
+        if amount <= 0 or amount > (self.cash - reserve):
+            return False
+        self.cash -= amount
+        self.invested += amount
         return True
 
     def earn(self, amount: float) -> None:
@@ -81,6 +93,16 @@ class Agent:
             self.log(f"budget denied: {item} (${amount:.2f})", level="warn", topic="finance")
             return False
         self.ctx.store.add_cost(self.ctx.day, self.dept, item, amount, persona_id)
+        return True
+
+    def invest(self, item: str, amount: float, reserve: float = 0.0,
+               persona_id: str = "") -> bool:
+        """Book a capital expenditure against the balance sheet."""
+        if not self.ctx.ledger.invest(amount, reserve):
+            self.log(f"cannot fund {item}: ${amount:,.2f} against ${self.ctx.ledger.cash:,.2f} "
+                     f"cash with a ${reserve:,.0f} reserve", level="warn", topic="finance")
+            return False
+        self.ctx.store.add_cost(self.ctx.day, self.dept, item, amount, persona_id, kind="capex")
         return True
 
     def llm(self, purpose: str, prompt: str, schema: dict | None = None,

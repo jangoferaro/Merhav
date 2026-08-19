@@ -8,6 +8,7 @@ from typing import Iterable
 
 from ..agents.analytics import AnalystAgent
 from ..agents.compliance import ComplianceAgent
+from ..agents.corpdev import CorpDevAgent
 from ..agents.creative import (ArtDirectorAgent, ContentStrategistAgent, CopywriterAgent,
                                ScriptwriterAgent)
 from ..agents.distribution import PublisherAgent
@@ -29,15 +30,15 @@ AGENT_CLASSES = [
     OpsAgent, CFOAgent, AnalystAgent, CEOAgent, MarketResearchAgent, PersonaArchitectAgent,
     GrowthAgent, ContentStrategistAgent, ScriptwriterAgent, ArtDirectorAgent, ImageStudioAgent,
     VideoStudioAgent, CopywriterAgent, ComplianceAgent, PublisherAgent, CommunityAgent,
-    MonetizationAgent, BizDevAgent,
+    MonetizationAgent, BizDevAgent, CorpDevAgent,
 ]
 
 # The fixed skeleton of a working day. Agents add work inside it by emitting
 # tasks at later stages; nothing else is hard-coded.
 DAY_PLAN = [
     ("day.open", 5), ("finance.open_day", 8), ("analytics.collect", 12),
-    ("analytics.report", 15), ("exec.review", 20), ("growth.experiment", 30),
-    ("growth.amplify", 66), ("community.engage", 68), ("revenue.funnel", 72), ("revenue.deals", 76),
+    ("analytics.report", 15), ("exec.review", 20), ("corp.scan", 22), ("growth.experiment", 30),
+    ("growth.amplify", 66), ("community.engage", 68), ("revenue.funnel", 72), ("revenue.deals", 76), ("corp.exit", 80),
     ("finance.close_day", 90), ("ops.close", 95),
 ]
 
