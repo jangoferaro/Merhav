@@ -11,7 +11,8 @@ class TestDashboard(unittest.TestCase):
         company, store = build_company(days=3)
         out = os.path.join(tempfile.mkdtemp(), "dash.html")
         render(store, company.config, out)
-        html = open(out, encoding="utf-8").read()
+        with open(out, encoding="utf-8") as fh:
+            html = fh.read()
         self.assertIn("<title>", html)
         self.assertIn("the roster", html)
         self.assertIn("compliance gate", html)

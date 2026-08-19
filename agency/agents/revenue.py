@@ -26,6 +26,8 @@ class MonetizationAgent(Agent):
     def handle(self, task: Task) -> Result:
         store, day, world = self.ctx.store, self.ctx.day, self.ctx.world
         payments = self.ctx.providers.payments
+        if world is None:
+            return self._live(store, day, payments)
         booked = 0.0
         for p in store.personas(Persona, status="active"):
             clicks = self._clicks_today(p.id)
@@ -71,6 +73,34 @@ class MonetizationAgent(Agent):
         return Result(output={"booked": round(booked, 2)})
 
 
+    # -- live mode ----------------------------------------------------------
+    def _live(self, store, day, payments) -> Result:
+        """Real money only. Whatever the processor reports as settled is what
+        the ledger gets — no conversion model runs in live mode."""
+        since = int(self.ctx.memory.get("last_receipt_ts", 0))
+        receipts = payments.fetch_receipts(since)
+        if not receipts:
+            self.log("no settled receipts to book"
+                     + ("" if getattr(payments, "live", False) else
+                        " — no live payment processor configured (set STRIPE_API_KEY)"),
+                     level="info" if getattr(payments, "live", False) else "warn",
+                     topic="revenue")
+            return Result(output={"booked": 0.0, "receipts": 0})
+        booked, newest = 0.0, since
+        handles = {p.handle: p.id for p in store.personas(Persona)}
+        for r in receipts:
+            persona_id = handles.get(str(r.get("handle", "")), "")
+            store.add_revenue(day, persona_id, r.get("stream", "subscription"),
+                              float(r["amount"]), r.get("note", ""), source="real",
+                              external_id=r.get("external_id", ""))
+            booked += float(r["amount"])
+            newest = max(newest, int(r.get("created", 0)))
+        self.ctx.memory["last_receipt_ts"] = newest
+        self.log(f"booked ${booked:.2f} of settled revenue from {len(receipts)} receipts",
+                 {"amount": round(booked, 2)}, topic="revenue")
+        return Result(output={"booked": round(booked, 2), "receipts": len(receipts)})
+
+
 class BizDevAgent(Agent):
     name = "bizdev"
     dept = "revenue"
@@ -80,7 +110,9 @@ class BizDevAgent(Agent):
     def handle(self, task: Task) -> Result:
         store, day, world = self.ctx.store, self.ctx.day, self.ctx.world
         if world is None:
-            return Result()
+            # Inbound sponsorship is a human negotiation; in live mode it enters
+            # the books through `agency revenue import`, not through an agent.
+            return Result(output={"skipped": "live_mode"})
         signed = []
         for p in store.personas(Persona, status="active"):
             followers = world.total_followers(p.id)

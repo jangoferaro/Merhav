@@ -45,7 +45,7 @@ MAX_TASKS_PER_DAY = 4000
 
 
 class Company:
-    def __init__(self, config, store: Store, world=None):
+    def __init__(self, config, store: Store, world=None, dry_run: bool = False):
         self.config = config
         self.store = store
         self.bus = Bus(store)
@@ -60,6 +60,8 @@ class Company:
                            ledger=Ledger(cash=cash, daily_budget=config.daily_budget),
                            world=world)
         self.ctx.memory = store.get_meta("memory", {}) or {}
+        self.ctx.memory["dry_run"] = dry_run
+        self.live = world is None
         models.set_counter(store.get_meta("id_counter", 0))
         self.agents = [cls(self.ctx) for cls in AGENT_CLASSES]
         self.routes = {}
@@ -143,4 +145,5 @@ class Company:
         heapq.heappush(queue, (task.stage, next(self._counter), task))
 
     def _serialisable_memory(self) -> dict:
-        return {k: v for k, v in self.ctx.memory.items() if k != "posted_today"}
+        return {k: v for k, v in self.ctx.memory.items()
+                if k not in ("posted_today", "dry_run")}

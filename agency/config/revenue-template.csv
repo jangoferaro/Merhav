@@ -1,0 +1,4 @@
+day,persona_id,stream,amount,note,external_id
+12,,brand_deal,250.00,invoice 001 — sponsored integration,inv-001
+12,,affiliate,18.40,amazon associates payout march,amz-2026-03
+13,,subscription,47.90,fanvue payout,fv-2026-03-13

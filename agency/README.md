@@ -112,12 +112,41 @@ pass/fail. אותו סט רץ גם כבדיקה ב‑CI. הוא כבר תפס ב
 מ‑`sim/world.py` כל עוד אין טוקנים אמיתיים. זה מודל משוב, לא תחזית: המספרים
 בלוח הבקרה מראים שהמערכת עובדת, לא כמה כסף תרוויחו.
 
+## כסף אמיתי מול כסף מודל
+
+בטבלת `revenue` יש עמודה אחת שחשובה יותר מכולן: `source`.
+
+* `real` — כסף שבאמת נחת: קבלות שהתיישבו אצל ספק תשלומים
+  (`payments.fetch_receipts`), או דוח תשלומים שיובא ידנית.
+* `modelled` — מה שסימולטור השוק ייצר.
+
+**הם אף פעם לא מסוכמים לאותו מספר.** `status`, `run` ולוח הבקרה מציגים כל אחד
+בנפרד, ובלוח מופיע באנר מפורש כל עוד `real == 0`. במצב `--live` שום מודל
+המרה לא רץ בכלל — נרשם רק מה שספק התשלומים דיווח שהתיישב.
+
+```bash
+python3 -m agency golive                          # מה עוד חוסם דולר אמיתי
+python3 -m agency run --days 1 --live --dry-run -v # מה בדיוק היה נשלח, בלי לשלוח
+python3 -m agency funnel                          # דף לינק-בביו לכל פרסונה
+python3 -m agency revenue payouts.csv             # להכניס כסף שבאמת התקבל לספרים
+```
+
+`run --live` מסרב לרוץ כש‑`providers.social` הוא `mock` — הרצה כזו הייתה
+"מפרסמת" ליעדים מדומים ורושמת מספרים שלא קרו.
+
+תבנית ה‑CSV: `agency/config/revenue-template.csv`
+(`day,persona_id,stream,amount,note,external_id`). `external_id` מונע ספירה
+כפולה כשמייבאים את אותו דוח פעמיים.
+
 ## מעבר ללייב
 
-1. למלא מפתחות ב‑`.env` ולהחליף `providers.*` ב‑`company.toml`.
-2. `python3 -m agency audit` — חייב 12/12.
-3. להתחיל מפלטפורמה אחת (`distribution.sfw = ["tiktok"]`) ויום אחד:
-   `python3 -m agency run --days 1 --live -v`.
-4. `--live` מכבה את סימולטור השוק — המדדים נמשכים מה‑API האמיתי בלבד.
-5. לוודא מול תנאי השימוש של כל פלטפורמה: חשבון אוטומטי, גילוי תוכן AI,
+1. `python3 -m agency golive` — מדפיס בדיוק מה חסר, ומסמן `[you]` על מה
+   שרק בן אדם עם זהות יכול לעשות (חשבון פלטפורמה, KYC של ספק תשלומים).
+2. למלא מפתחות ב‑`.env` ולהחליף `providers.*` ב‑`company.toml`.
+3. `python3 -m agency audit` — חייב 12/12.
+4. `python3 -m agency funnel` אחרי שיש `SUBSCRIBE_URL` / `AFFILIATE_URL` /
+   `NEWSLETTER_ACTION` — בלי יעד להמרה, קליקים לא שווים כלום.
+5. להתחיל מפלטפורמה אחת (`distribution.sfw = ["tiktok"]`), קודם `--dry-run`
+   ואז יום אחד אמיתי: `python3 -m agency run --days 1 --live -v`.
+6. לוודא מול תנאי השימוש של כל פלטפורמה: חשבון אוטומטי, גילוי תוכן AI,
    ותוכן למבוגרים מותר רק היכן שהוא באמת מותר.

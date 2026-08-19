@@ -160,6 +160,11 @@ ol.pipeline li:last-child{border-bottom:none}
 .dept ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
 .dept li{font-size:13px}
 .dept li span{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3)}
+.banner{border:1px solid var(--warn);border-left-width:4px;border-radius:10px;padding:14px 16px;
+  background:var(--panel);font-size:14px;color:var(--ink-2)}
+.banner b{color:var(--ink)}
+.banner code{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:var(--sunk);
+  padding:1px 6px;border-radius:4px}
 footer{color:var(--ink-3);font-size:12.5px;border-top:1px solid var(--line);padding-top:18px}
 </style>
 """
@@ -197,6 +202,9 @@ def render(store, cfg, path: str) -> str:
             "SELECT COUNT(*) c FROM posts WHERE day=?", (d,))[0]["c"]))
 
     total_rev, total_cost = store.totals()
+    by_source = store.revenue_by_source()
+    real_money = by_source.get("real", 0.0)
+    modelled = by_source.get("modelled", 0.0)
     profit = total_rev - total_cost
     personas = store.personas(Persona)
     niches = {n.id: n for n in store.niches(Niche)}
@@ -227,9 +235,12 @@ def render(store, cfg, path: str) -> str:
     kpis = [
         ("cash on hand", _money(final_cash), f"opened at {_money(cfg.start_capital)}",
          "pos" if final_cash >= cfg.start_capital else "neg"),
-        ("gross revenue", _money(total_rev), f"{len(streams)} streams", "pos"),
+        ("real money banked", _money(real_money),
+         "settled receipts + imported payouts" if real_money else "nothing has settled yet",
+         "pos" if real_money else "amb"),
+        ("modelled revenue", _money(modelled), f"{len(streams)} streams, simulated", ""),
         ("total cost", _money(total_cost), f"{_money(total_cost / max(1, len(days)))}/day", "amb"),
-        ("profit", _money(profit), f"ROAS {roas:.2f}x", "pos" if profit >= 0 else "neg"),
+        ("modelled profit", _money(profit), f"ROAS {roas:.2f}x", "pos" if profit >= 0 else "neg"),
         ("followers", f"{followers[-1]:,.0f}" if followers else "0",
          f"{subs[-1]:,.0f} paying subscribers" if subs else "", ""),
         ("posts published", f"{total_posts:,}", f"{total_assets:,} assets rendered", ""),
@@ -240,6 +251,13 @@ def render(store, cfg, path: str) -> str:
         f'<div class="kpi"><span class="k">{_esc(k)}</span>'
         f'<span class="v {cls}">{_esc(v)}</span><span class="n">{_esc(n)}</span></div>'
         for k, v, n, cls in kpis)
+
+    banner = ("" if real_money else
+              '<div class="banner"><b>No real money has moved.</b> Audience response and every '
+              'revenue figure below come from the market simulator, because no live platform or '
+              'payment credential is configured. Run <code>agency golive</code> for the gap list; '
+              'money that actually settles is booked separately and shown as “real money banked”.'
+              '</div>')
 
     # ---- charts -----------------------------------------------------------
     pnl_chart = area_chart({"revenue": revenue, "cost": costs},
@@ -368,6 +386,7 @@ def render(store, cfg, path: str) -> str:
     <div class="modes">{''.join(pills)}</div>
   </header>
 
+  {banner}
   <section class="kpis">{kpi_html}</section>
 
   <section class="grid2">

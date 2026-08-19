@@ -22,8 +22,13 @@ CREATE TABLE IF NOT EXISTS metrics     (post_id TEXT, day INTEGER, views INTEGER
 CREATE TABLE IF NOT EXISTS audience    (persona_id TEXT, platform TEXT, day INTEGER,
                                         followers INTEGER, subs INTEGER,
                                         PRIMARY KEY (persona_id, platform, day));
+-- `source` is the most important column in this database: 'real' means money
+-- that actually arrived from a payment provider or an imported payout
+-- statement; 'modelled' means the market simulator produced it. They are never
+-- summed together in any report.
 CREATE TABLE IF NOT EXISTS revenue     (id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER,
-                                        persona_id TEXT, stream TEXT, amount REAL, note TEXT);
+                                        persona_id TEXT, stream TEXT, amount REAL, note TEXT,
+                                        source TEXT DEFAULT 'modelled', external_id TEXT);
 CREATE TABLE IF NOT EXISTS costs       (id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER,
                                         dept TEXT, item TEXT, amount REAL, persona_id TEXT);
 CREATE TABLE IF NOT EXISTS events      (id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER,
@@ -98,9 +103,17 @@ class Store:
         self.db.execute("INSERT OR REPLACE INTO audience VALUES (?,?,?,?,?)",
                         (persona_id, platform, day, followers, subs))
 
-    def add_revenue(self, day: int, persona_id: str, stream: str, amount: float, note: str = "") -> None:
-        self.db.execute("INSERT INTO revenue (day,persona_id,stream,amount,note) VALUES (?,?,?,?,?)",
-                        (day, persona_id, stream, round(amount, 4), note))
+    def add_revenue(self, day: int, persona_id: str, stream: str, amount: float, note: str = "",
+                    source: str = "modelled", external_id: str = "") -> None:
+        if source == "real" and external_id:
+            dup = self.db.execute("SELECT 1 FROM revenue WHERE external_id=? AND source='real'",
+                                  (external_id,)).fetchone()
+            if dup:                      # a payout statement imported twice must not double-count
+                return
+        self.db.execute(
+            "INSERT INTO revenue (day,persona_id,stream,amount,note,source,external_id) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (day, persona_id, stream, round(amount, 4), note, source, external_id))
 
     def add_cost(self, day: int, dept: str, item: str, amount: float,
                  persona_id: str = "") -> None:
@@ -169,15 +182,26 @@ class Store:
             "WHERE persona_id=? GROUP BY platform", (persona_id,)).fetchall()
         return {r["platform"]: (r["followers"], r["subs"]) for r in rows}
 
-    def day_pnl(self, day: int) -> tuple[float, float]:
-        rev = self.db.execute("SELECT COALESCE(SUM(amount),0) s FROM revenue WHERE day=?", (day,)).fetchone()["s"]
-        cost = self.db.execute("SELECT COALESCE(SUM(amount),0) s FROM costs WHERE day=?", (day,)).fetchone()["s"]
+    def day_pnl(self, day: int, source: str | None = None) -> tuple[float, float]:
+        extra = " AND source=?" if source else ""
+        args = (day, source) if source else (day,)
+        rev = self.db.execute(
+            f"SELECT COALESCE(SUM(amount),0) s FROM revenue WHERE day=?{extra}", args).fetchone()["s"]
+        cost = self.db.execute("SELECT COALESCE(SUM(amount),0) s FROM costs WHERE day=?",
+                               (day,)).fetchone()["s"]
         return float(rev), float(cost)
 
-    def totals(self) -> tuple[float, float]:
-        rev = self.db.execute("SELECT COALESCE(SUM(amount),0) s FROM revenue").fetchone()["s"]
+    def totals(self, source: str | None = None) -> tuple[float, float]:
+        where = " WHERE source=?" if source else ""
+        args = (source,) if source else ()
+        rev = self.db.execute(f"SELECT COALESCE(SUM(amount),0) s FROM revenue{where}",
+                              args).fetchone()["s"]
         cost = self.db.execute("SELECT COALESCE(SUM(amount),0) s FROM costs").fetchone()["s"]
         return float(rev), float(cost)
+
+    def revenue_by_source(self) -> dict[str, float]:
+        return {r["source"]: float(r["s"]) for r in self.db.execute(
+            "SELECT source, SUM(amount) s FROM revenue GROUP BY source").fetchall()}
 
     def persona_revenue(self, persona_id: str, since_day: int = 0) -> float:
         r = self.db.execute("SELECT COALESCE(SUM(amount),0) s FROM revenue WHERE persona_id=? AND day>=?",

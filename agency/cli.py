@@ -24,13 +24,13 @@ def paint(s: str, *keys: str) -> str:
     return "".join(C[k] for k in keys) + s + C["0"]
 
 
-def _open(cfg, fresh: bool = False, live: bool = False):
+def _open(cfg, fresh: bool = False, live: bool = False, dry_run: bool = False):
     db = cfg.get("paths.db", "agency/out/agency.db")
     if fresh and os.path.exists(db):
         os.remove(db)
     store = Store(db)
     world = None if live else World(cfg.seed)
-    company = Company(cfg, store, world)
+    company = Company(cfg, store, world, dry_run=dry_run)
     return store, company
 
 
@@ -52,7 +52,15 @@ def cmd_org(args, cfg):
 
 
 def cmd_run(args, cfg):
-    store, company = _open(cfg, fresh=args.fresh, live=args.live)
+    if args.live and cfg.provider("social") != "live" and not args.dry_run:
+        print(paint("\n  refusing to run", "r") +
+              " — --live with providers.social = \"" + cfg.provider("social") + "\" would "
+              "publish to mock\n  destinations and write numbers that never happened.\n\n"
+              "  either set providers.social = \"live\" in " + cfg.path + ",\n"
+              "  or add --dry-run to see exactly what would be sent.\n\n"
+              "  run  python3 -m agency golive  for the full gap list.\n")
+        return 2
+    store, company = _open(cfg, fresh=args.fresh, live=args.live, dry_run=args.dry_run)
 
     if args.verbose:
         def show(ev):
@@ -60,8 +68,10 @@ def cmd_run(args, cfg):
             print(f"  {paint(ev['actor'].ljust(14), 'c')} {paint(ev['message'], colour)}")
         company.bus.on("*", show)
 
-    print(paint(f"\n{cfg.company} — running {args.days} day(s) "
-                f"[{'LIVE' if args.live else 'simulated market'}]\n", "b"))
+    mode = "LIVE" if args.live else "simulated market"
+    if args.dry_run:
+        mode += " · DRY RUN, nothing is sent"
+    print(paint(f"\n{cfg.company} — running {args.days} day(s) [{mode}]\n", "b"))
     header = f"{'day':>4} {'tasks':>6} {'posts':>6} {'views':>10} {'followers':>10} " \
              f"{'subs':>6} {'revenue':>9} {'cost':>8} {'cash':>10}"
     print(paint(header, "b"))
@@ -76,11 +86,16 @@ def cmd_run(args, cfg):
         print(paint(line, "g" if s["revenue"] >= s["cost"] else "d"))
 
     rev, cost = store.totals()
+    by_source = store.revenue_by_source()
     print(paint("-" * len(header), "d"))
     print(f"\n  gross revenue {paint(f'${rev:,.2f}', 'g')}   total cost "
           f"{paint(f'${cost:,.2f}', 'y')}   profit "
           f"{paint(f'${rev - cost:,.2f}', 'g' if rev >= cost else 'r')}   "
-          f"cash {paint(f'${company.ctx.ledger.cash:,.2f}', 'b')}\n")
+          f"cash {paint(f'${company.ctx.ledger.cash:,.2f}', 'b')}")
+    real_total = by_source.get("real", 0.0)
+    model_total = by_source.get("modelled", 0.0)
+    print("  of which real money " + paint(f"${real_total:,.2f}", "b") +
+          "   modelled " + paint(f"${model_total:,.2f}", "d") + "\n")
     store.close()
 
 
@@ -92,7 +107,10 @@ def cmd_status(args, cfg):
     posts = store.query("SELECT COUNT(*) c FROM posts")[0]["c"]
     print(paint(f"\n{cfg.company} — day {day}\n", "b"))
     print(f"  cash            ${store.get_meta('cash', cfg.start_capital):,.2f}")
+    by_source = store.revenue_by_source()
     print(f"  revenue / cost  ${rev:,.2f} / ${cost:,.2f}  ({paint(f'{rev - cost:+,.2f}', 'g' if rev >= cost else 'r')})")
+    print("  real money      " + paint(f"${by_source.get('real', 0.0):,.2f}", "b") +
+          "   ·  modelled " + paint(f"${by_source.get('modelled', 0.0):,.2f}", "d"))
     print(f"  roster          {len([p for p in personas if p.status == 'active'])} active "
           f"/ {len(personas)} total")
     print(f"  published       {posts} posts")
@@ -185,6 +203,75 @@ def cmd_audit(args, cfg):
     return 1 if failed else 0
 
 
+def cmd_funnel(args, cfg):
+    """Generate the link-in-bio page each persona's CTA points at."""
+    from .report.funnel import render_all
+    store, _ = _open(cfg)
+    outdir = args.out or "agency/out/funnel"
+    paths = render_all(store, cfg, outdir)
+    print(paint(f"\n  {len(paths)} funnel pages\n", "b"))
+    for path in paths:
+        print(f"    {path}")
+    missing = [k for k in ("SUBSCRIBE_URL", "NEWSLETTER_ACTION", "AFFILIATE_URL")
+               if not os.environ.get(k)]
+    if missing:
+        print(f"\n  placeholders until these are set: {paint(', '.join(missing), 'y')}")
+    print()
+    store.close()
+    return 0
+
+
+def cmd_golive(args, cfg):
+    from .core.preflight import run as preflight
+    store, company = _open(cfg)
+    pf = preflight(cfg, company.ctx.providers, company.ctx.policy)
+    done, total = pf.score()
+    print(paint(f"\n{cfg.company} — go-live preflight\n", "b"))
+    for c in pf.checks:
+        mark = paint("READY", "g") if c.ready else (paint("BLOCK", "r") if c.blocking
+                                                    else paint("opt  ", "y"))
+        who = paint(" [you]", "m") if c.human_only and not c.ready else ""
+        print(f"  {mark}  {c.label}{who}")
+        print(f"         {paint(c.detail, 'd')}")
+        if not c.ready:
+            print(f"         {paint('→ ' + c.how, 'c')}")
+    print(f"\n  {done}/{total} blocking checks satisfied.")
+    if pf.ready:
+        print(paint("  cleared for live publishing:", "g") +
+              "  python3 -m agency run --days 1 --live -v\n")
+    else:
+        print(f"  {len(pf.blocking_gaps)} gaps remain. Dry run works right now:\n"
+              f"    {paint('python3 -m agency run --days 1 --live --dry-run -v', 'b')}\n")
+    store.close()
+    return 0
+
+
+def cmd_revenue(args, cfg):
+    """Import money that actually landed (a payout statement, a bank line, an
+    invoice you were paid) so the books hold real dollars, not model output."""
+    import csv as _csv
+
+    store, company = _open(cfg)
+    day = int(store.get_meta("last_day", 0)) or 1
+    booked, rows = 0.0, 0
+    with open(args.file, newline="", encoding="utf-8") as fh:
+        for row in _csv.DictReader(fh):
+            amount = float(row["amount"])
+            store.add_revenue(day=int(row.get("day") or day),
+                              persona_id=row.get("persona_id", ""),
+                              stream=row.get("stream", "manual"),
+                              amount=amount, note=row.get("note", ""),
+                              source="real", external_id=row.get("external_id", ""))
+            booked += amount
+            rows += 1
+    store.commit()
+    by_source = store.revenue_by_source()
+    print(f"\n  imported {rows} receipts, {paint(f'${booked:,.2f}', 'g')} of real revenue")
+    print("  real total now " + paint(f"${by_source.get('real', 0.0):,.2f}", "b") + "\n")
+    store.close()
+    return 0
+
+
 def cmd_reset(args, cfg):
     db = cfg.get("paths.db", "agency/out/agency.db")
     media = cfg.get("paths.media", "agency/out/media")
@@ -207,6 +294,8 @@ def main(argv=None) -> int:
     r.add_argument("--fresh", action="store_true", help="wipe state first")
     r.add_argument("--live", action="store_true", help="no market simulation — real APIs only")
     r.add_argument("--verbose", "-v", action="store_true", help="stream the event feed")
+    r.add_argument("--dry-run", action="store_true",
+                   help="produce everything, show the exact payloads, send nothing")
     r.set_defaults(fn=cmd_run)
     sub.add_parser("status", help="cash, revenue, roster").set_defaults(fn=cmd_status)
     sub.add_parser("personas", help="the AI influencer roster").set_defaults(fn=cmd_personas)
@@ -218,6 +307,14 @@ def main(argv=None) -> int:
     d = sub.add_parser("report", help="render the HTML dashboard")
     d.add_argument("--out", default=None)
     d.set_defaults(fn=cmd_report)
+    fn = sub.add_parser("funnel", help="render the link-in-bio pages")
+    fn.add_argument("--out", default=None)
+    fn.set_defaults(fn=cmd_funnel)
+    sub.add_parser("golive", help="what still stands between you and a real dollar"
+                   ).set_defaults(fn=cmd_golive)
+    rv = sub.add_parser("revenue", help="import real money into the books (csv)")
+    rv.add_argument("file")
+    rv.set_defaults(fn=cmd_revenue)
     sub.add_parser("audit", help="run the compliance red-team set").set_defaults(fn=cmd_audit)
     sub.add_parser("reset", help="delete the database and generated media").set_defaults(fn=cmd_reset)
 

@@ -45,6 +45,14 @@ class PublisherAgent(Agent):
                 continue
 
             bundle = c.variants[platform]
+            if self.ctx.memory.get("dry_run"):
+                self.log(f"DRY RUN would post to {platform}",
+                         {"platform": platform, "provider": provider.name,
+                          "media": media.get("uri"), "tier": tier,
+                          "caption": bundle["caption"], "hashtags": bundle.get("hashtags", [])},
+                         topic="distribution")
+                published.append(platform + " (dry)")
+                continue
             res = provider.publish(
                 persona={"handle": p.handle, "name": p.name, "id": p.id},
                 media=media, caption=bundle["caption"],
@@ -67,7 +75,10 @@ class PublisherAgent(Agent):
                                              quality=p.quality, tier=tier, variant=c.variant,
                                              hook_strength=c.hook_strength)
 
-        c.status = "published" if published else "unpublished"
+        if self.ctx.memory.get("dry_run"):
+            c.status = "dry_run"
+        else:
+            c.status = "published" if published else "unpublished"
         self.ctx.store.save_content(c)
         if published:
             self.log(f"@{p.handle} → {', '.join(published)} · {c.hook[:60]}",
