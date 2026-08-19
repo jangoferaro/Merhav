@@ -35,11 +35,61 @@ adult     = ["fanvue"]     # age-gated only, and only when the adult tier is ena
 funnel    = ["fanvue"]     # subscription destination every persona funnels into
 subreddit = "test"
 
+[simulation]
+# ---------------------------------------------------------------------------
+# These are ASSUMPTIONS, not measurements. They are the only thing standing
+# between the dashboard and a fantasy, so they live here in the open where they
+# can be argued with — and replaced with your own numbers the moment a live
+# account produces any. They are set deliberately conservative: most posts from
+# a new account are seen by almost nobody.
+# ---------------------------------------------------------------------------
+audience_cap = 120000.0    # addressable followers per persona per platform
+luck_sigma   = 0.65        # spread of the per-post lottery (log-normal)
+viral_chance = 0.04        # probability a post breaks out of its follower base
+
+[simulation.cold_start]    # median impressions a post gets with no following
+tiktok = 350
+instagram = 110
+youtube = 90
+x = 40
+reddit = 200
+fanvue = 15
+patreon = 12
+
+[simulation.follow_rate]   # viewers who follow, as a share of impressions
+tiktok = 0.006
+instagram = 0.005
+youtube = 0.004
+x = 0.003
+reddit = 0.002
+fanvue = 0.012
+patreon = 0.010
+
+[simulation.click_rate]    # viewers who tap through to the funnel
+tiktok = 0.003
+instagram = 0.004
+youtube = 0.005
+x = 0.006
+reddit = 0.010
+fanvue = 0.060
+patreon = 0.050
+
+[portfolio]
+# Discovery platforms are a shots-on-goal problem: most new accounts never find
+# an audience, and which ones do is not predictable in advance. So the company
+# launches a fleet on equal, minimal spend, and only concentrates capital after
+# the market has voted.
+launch_size     = 10       # personas launched on day one, one niche each
+probation_days  = 14       # equal footing for everyone until this age
+keep_top        = 3        # survivors of the cull; the rest are paused
+slots_probation = 2        # posts/day per persona while on probation
+min_views_post  = 250      # a persona below this after probation is culled regardless of rank
+
 [growth]
 daily_boost      = 8.0     # default paid-amplification envelope, overridden by the CEO
 boost_step       = 2.0     # max spend on a single post
 reach_per_dollar = 0.09    # modelled extra reach per dollar of boost
-max_roster       = 8       # personas the company will run at once
+max_roster       = 12      # personas the company will run at once
 
 [policy]
 # The adult tier additionally requires AGENCY_ADULT_TIER=1 in the environment,

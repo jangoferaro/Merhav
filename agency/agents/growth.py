@@ -72,7 +72,11 @@ class GrowthAgent(Agent):
         per_dollar = float(self.ctx.config.get("growth.reach_per_dollar", 0.09))
         spent, boosted = 0.0, []
 
-        personas = store.personas(Persona, status="active")
+        probation = int(self.ctx.config.get("portfolio.probation_days", 14))
+        personas = [p for p in store.personas(Persona, status="active")
+                    if day - p.created_day >= probation]
+        if not personas:
+            return Result(output={"skipped": "everyone_on_probation"})
         ranked = sorted(personas, key=lambda p: store.persona_revenue(p.id, max(0, day - 7)),
                         reverse=True)
         for p in ranked:

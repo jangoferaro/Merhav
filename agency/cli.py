@@ -29,7 +29,7 @@ def _open(cfg, fresh: bool = False, live: bool = False, dry_run: bool = False):
     if fresh and os.path.exists(db):
         os.remove(db)
     store = Store(db)
-    world = None if live else World(cfg.seed)
+    world = None if live else World.from_config(cfg)
     company = Company(cfg, store, world, dry_run=dry_run)
     return store, company
 
@@ -235,6 +235,17 @@ def cmd_golive(args, cfg):
         print(f"         {paint(c.detail, 'd')}")
         if not c.ready:
             print(f"         {paint('→ ' + c.how, 'c')}")
+    from .core.preflight import accounts as account_gap
+    from .core.models import Persona as _P
+    roster = store.personas(_P, status="active")
+    if roster:
+        acc = account_gap(cfg, company.ctx.providers, roster)
+        print(paint("\n  accounts per persona", "b") +
+              f"   {len(acc['ready'])}/{len(roster)} can publish")
+        for handle, plats in acc["ready"]:
+            print(f"    {paint('LIVE ', 'g')} @{handle:<18} {', '.join(plats)}")
+        for handle, needs in list(acc["missing"].items())[:12]:
+            print(f"    {paint('none ', 'y')} @{handle:<18} set {needs[0] if needs else '?'}")
     print(f"\n  {done}/{total} blocking checks satisfied.")
     if pf.ready:
         print(paint("  cleared for live publishing:", "g") +

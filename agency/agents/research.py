@@ -39,7 +39,14 @@ class MarketResearchAgent(Agent):
         self.ctx.memory["scan_pending"] = False
 
         emit = []
-        seats = 2 if self.ctx.ledger.cash > 800 else 1
+        seats = int(task.payload.get("seats", 1))
+        # Each launch costs a setup fee plus a fortnight of production; do not
+        # open more seats than the bank can carry through probation.
+        per_persona = (self.ctx.config.price("persona_setup")
+                       + self.ctx.config.price("image") * 2
+                       * int(self.ctx.config.get("portfolio.probation_days", 14)))
+        affordable = int(self.ctx.ledger.cash * 0.5 / max(0.5, per_persona))
+        seats = max(1, min(seats, len(found), affordable))
         for n in found[:seats]:
             emit.append(task.child("talent.create_persona", {"niche_id": n.id}, stage=28))
         return Result(output={"count": len(found), "launching": seats}, emit=emit)

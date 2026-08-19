@@ -109,6 +109,8 @@ svg.spark polyline{fill:none;stroke-width:1.6}
 .bar-val{font-family:"IBM Plex Mono",monospace;font-size:12.5px;white-space:nowrap}
 .bar-val small{color:var(--ink-3);margin-left:7px}
 
+.chip{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.04em;
+  border:1px solid currentColor;border-radius:999px;padding:2px 9px;white-space:nowrap}
 .scroll{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:13.5px}
 th{text-align:left;font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.09em;
@@ -302,6 +304,40 @@ def render(store, cfg, path: str) -> str:
           {spark(hist, ACCENT)}
         </div>""")
 
+    # ---- portfolio: what each shot returned -------------------------------
+    verdicts = {}
+    for r in store.query("SELECT * FROM decisions WHERE kind IN ('survives_cull','cull_persona') "
+                         "ORDER BY id"):
+        data = json.loads(r["data"] or "{}")
+        if data.get("persona"):
+            verdicts[data["persona"]] = {"kind": r["kind"], "day": r["day"], **data}
+    probation = int(cfg.get("portfolio.probation_days", 14))
+    portfolio_rows = []
+    for p in sorted(personas, key=lambda x: (verdicts.get(x.id, {}).get("score", -1)), reverse=True):
+        v = verdicts.get(p.id)
+        if v is None:
+            age = last - p.created_day
+            label, cls = ("on probation", "amb") if age < probation else ("running", "pos")
+            vpp = fr = None
+        else:
+            label = "survived the cull" if v["kind"] == "survives_cull" else "culled"
+            cls = "pos" if v["kind"] == "survives_cull" else "neg"
+            vpp, fr = v.get("views_per_post"), v.get("follow_rate")
+        rev = store.persona_revenue(p.id)
+        portfolio_rows.append(
+            f'<tr><td>@{_esc(p.handle)}</td><td>{_esc(niches.get(p.niche_id, ""))}</td>'
+            f'<td class="num">{p.created_day}</td>'
+            f'<td><span class="chip {cls}">{_esc(label)}</span></td>'
+            f'<td class="num">{vpp:,.0f}</td>' if vpp is not None else
+            f'<tr><td>@{_esc(p.handle)}</td><td>{_esc(niches.get(p.niche_id, ""))}</td>'
+            f'<td class="num">{p.created_day}</td>'
+            f'<td><span class="chip {cls}">{_esc(label)}</span></td><td class="num">—</td>')
+        portfolio_rows[-1] += (f'<td class="num">{fr:.2%}</td>' if fr is not None
+                               else '<td class="num">—</td>')
+        portfolio_rows[-1] += f'<td class="num">{_money(rev)}</td></tr>'
+    culled = sum(1 for v in verdicts.values() if v["kind"] == "cull_persona")
+    kept = sum(1 for v in verdicts.values() if v["kind"] == "survives_cull")
+
     # ---- pipeline ---------------------------------------------------------
     routes = {}
     for cls in AGENT_CLASSES:
@@ -422,6 +458,20 @@ def render(store, cfg, path: str) -> str:
       <div class="head"><h2>runtime interventions</h2></div>
       <div class="log">{comp_html}</div>
     </div>
+  </section>
+
+  <section class="panel">
+    <div class="head"><h2>portfolio — every shot taken</h2>
+      <span class="who">{len(personas)} launched · {kept} kept · {culled} culled ·
+      probation {probation} days</span></div>
+    <p class="who" style="margin:0">Most new accounts never find an audience, and which ones will
+    is not knowable in advance — so the company launches a fleet on equal minimal spend and only
+    concentrates capital after the market has voted. The cull is decided on leading signal
+    (views per post, follow rate), because at that age revenue is still zero for everyone.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>persona</th><th>niche</th><th>launched</th><th>verdict</th>
+      <th>views / post</th><th>follow rate</th><th>revenue</th></tr></thead>
+      <tbody>{''.join(portfolio_rows)}</tbody></table></div>
   </section>
 
   <section class="panel">

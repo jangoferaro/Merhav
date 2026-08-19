@@ -43,6 +43,31 @@ def _env(key: str) -> bool:
     return bool(os.environ.get(key, "").strip())
 
 
+def accounts(config, providers, personas) -> dict:
+    """Which personas hold real publishing credentials, and the exact variable
+    each one is missing. Answered from the environment rather than from the
+    active providers, so it tells the truth even while the company is still
+    running against mocks.
+    """
+    from ..providers.social.live import LIVE, slug
+
+    out = {"ready": [], "missing": {}}
+    platforms = [p for p in config.platforms("sfw") + config.platforms("funnel") if p in LIVE]
+    for p in personas:
+        live_on, needs = [], []
+        for platform in platforms:
+            key = LIVE[platform].env_key
+            if _env(f"{key}__{slug(p.handle)}") or _env(key):
+                live_on.append(platform)
+            else:
+                needs.append(f"{key}__{slug(p.handle)}")
+        if live_on:
+            out["ready"].append((p.handle, live_on))
+        else:
+            out["missing"][p.handle] = needs
+    return out
+
+
 def run(config, providers, policy) -> Preflight:
     from ..report.redteam import run as redteam
 

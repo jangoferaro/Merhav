@@ -35,15 +35,43 @@ class PostState:
 
 
 class World:
-    """Audience state per persona, plus the decay curve of every live post."""
+    """Audience state per persona, plus the decay curve of every live post.
 
-    def __init__(self, seed: int):
+    Growth is logistic, not exponential: every account has an addressable
+    ceiling on each platform, reach from an existing following has diminishing
+    returns, and follows slow down as the account approaches its ceiling. An
+    uncapped model compounds into numbers that are not merely optimistic but
+    meaningless, and those numbers would be steering real spending decisions.
+    """
+
+    def __init__(self, seed: int, audience_cap: float = 120_000.0,
+                 cold_start: dict | None = None, follow_rate: dict | None = None,
+                 click_rate: dict | None = None, luck_sigma: float = 0.65,
+                 viral_chance: float = 0.04):
         self.rng = random.Random(seed)
+        self.cap = float(audience_cap)
+        self.cold_start = cold_start or {}
+        self.follow_rate = follow_rate or {}
+        self.click_rate = click_rate or {}
+        self.luck_sigma = float(luck_sigma)
+        self.viral_chance = float(viral_chance)
         self.posts: dict[str, PostState] = {}
         self.followers: dict[tuple[str, str], float] = {}   # (persona, platform) -> count
         self.subs: dict[str, float] = {}                    # persona -> paying subscribers
         self.day = 0
         self.pending: dict[str, list[dict]] = {}
+
+    @classmethod
+    def from_config(cls, config) -> "World":
+        """Every assumption comes from [simulation] in company.toml, so the
+        numbers on the dashboard can be traced to a line an operator can edit."""
+        return cls(seed=config.seed,
+                   audience_cap=float(config.get("simulation.audience_cap", 120_000.0)),
+                   cold_start=config.get("simulation.cold_start", {}) or {},
+                   follow_rate=config.get("simulation.follow_rate", {}) or {},
+                   click_rate=config.get("simulation.click_rate", {}) or {},
+                   luck_sigma=float(config.get("simulation.luck_sigma", 0.65)),
+                   viral_chance=float(config.get("simulation.viral_chance", 0.04)))
 
     # -- publishing ---------------------------------------------------------
     def register_post(self, external_id: str, persona_id: str, platform: str, day: int,
@@ -51,11 +79,13 @@ class World:
         prof = PROFILES.get(platform, (False, 3, 0.5, 0.01, 0.01))
         followers = self.followers.get((persona_id, platform), 0.0)
         # Cold-start reach exists on discovery-first platforms even at zero followers.
-        cold = {"tiktok": 900, "instagram": 260, "youtube": 220, "x": 90,
-                "reddit": 400, "fanvue": 20, "patreon": 15}.get(platform, 120)
-        base = (cold + followers * 0.35) * prof[2]
+        cold = float(self.cold_start.get(platform, 120))
+        # Reach from an existing audience has diminishing returns: a following
+        # ten times larger does not get ten times the impressions.
+        earned = (followers ** 0.82) * 1.6 if followers > 0 else 0.0
+        base = (cold + earned) * prof[2]
         viral = 1.0
-        if self.rng.random() < 0.06 * quality * hook_strength:      # the occasional breakout
+        if self.rng.random() < self.viral_chance * quality * hook_strength:   # rare breakout
             viral = self.rng.uniform(4.0, 18.0)
         self.posts[external_id] = PostState(
             external_id, persona_id, platform, day, quality, tier, variant,
@@ -71,14 +101,21 @@ class World:
             if st.age > 6:
                 continue
             decay = math.exp(-0.75 * st.age)
-            noise = self.rng.uniform(0.75, 1.30)
-            views = st.base_reach * st.viral * decay * noise
+            # The per-post lottery is log-normal, not uniform: the median post
+            # underperforms the mean and a few carry everything.
+            luck = math.exp(self.rng.gauss(0.0, self.luck_sigma))
+            views = st.base_reach * st.viral * decay * luck
             prof = PROFILES.get(st.platform, (False, 3, 0.5, 0.01, 0.01))
             likes = views * 0.055 * (0.6 + st.quality)
             comments = views * 0.006 * (0.6 + st.quality)
             shares = views * 0.004 * (0.5 + st.quality)
-            follows = views * prof[3] * (0.5 + st.quality)
-            clicks = views * prof[4] * (0.5 + st.quality)
+            # Logistic damping: the closer to the ceiling, the harder every
+            # additional follower is to win.
+            reached = self.followers.get((st.persona_id, st.platform), 0.0)
+            headroom = max(0.02, 1.0 - reached / self.cap)
+            follows = (views * float(self.follow_rate.get(st.platform, prof[3]))
+                       * (0.5 + st.quality) * headroom)
+            clicks = views * float(self.click_rate.get(st.platform, prof[4])) * (0.5 + st.quality)
             for k, v in (("views", views), ("likes", likes), ("comments", comments),
                          ("shares", shares), ("follows", follows), ("clicks", clicks)):
                 st.cum[k] += v
@@ -136,7 +173,12 @@ class World:
         with a longer track record converts better."""
         if clicks <= 0:
             return 0
-        base = 0.045 * trust * (9.99 / max(price, 1.0)) ** 0.6
+        # Subscription conversion also saturates: the people most likely to pay
+        # convert early, and the pool of remaining willing buyers thins out.
+        already = self.subs.get(persona_id, 0.0)
+        audience = max(1.0, self.total_followers(persona_id))
+        thinning = max(0.15, 1.0 - (already / (audience * 0.05 + 1.0)))
+        base = 0.045 * trust * (9.99 / max(price, 1.0)) ** 0.6 * thinning
         new = 0
         for _ in range(min(clicks, 4000)):
             if self.rng.random() < base:

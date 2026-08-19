@@ -37,6 +37,18 @@ class PersonaArchitectAgent(Agent):
                      verdict.as_dict(), level="warn", topic="compliance")
             return Result(output={"rejected": verdict.reasons})
 
+        # A handle is an account name on a real platform. Collisions in the
+        # generated name pool are common with a fleet, so claim a free one.
+        taken = {x.handle for x in self.ctx.store.personas(Persona)}
+        handle = spec["handle"]
+        if handle in taken:
+            base, n = handle, 2
+            while f"{base}{n}" in taken and n < 100:
+                n += 1
+            handle = f"{base}{n}"
+            self.log(f"handle {base} already taken — claimed @{handle}", topic="talent")
+        spec["handle"] = handle
+
         pid = next_id("persona")
         seed = self.ctx.sub_rng(pid, niche.name).randrange(10_000, 9_999_999)
         p = Persona(id=pid, niche_id=niche.id, name=spec["name"], handle=spec["handle"],

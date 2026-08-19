@@ -20,7 +20,7 @@ def build_company(days: int = 0, adult: bool = False, media_dir: str | None = No
     else:
         os.environ.pop("AGENCY_ADULT_TIER", None)
     store = Store(":memory:")
-    company = Company(cfg, store, World(cfg.seed))
+    company = Company(cfg, store, World.from_config(cfg))
     if days:
         company.run(days=days, start=1)
     return company, store
