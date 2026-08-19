@@ -1,0 +1,51 @@
+# ---------------------------------------------------------------------------
+# Merhav Media Group — company configuration
+# Every provider below can be switched to a live one; without the matching API
+# key it degrades to the deterministic offline implementation.
+# ---------------------------------------------------------------------------
+[company]
+name = "Merhav Media Group"
+seed = 1337
+
+[finance]
+start_capital = 2000.0     # USD in the bank on day 1
+daily_budget  = 60.0       # ceiling the CFO enforces per day
+epc           = 0.06       # affiliate earnings per outbound click
+reinvest_rate = 0.35       # share of trailing revenue the CEO puts back in
+
+[providers]
+llm       = "mock"         # mock | anthropic          (ANTHROPIC_API_KEY)
+llm_model = "claude-sonnet-5"
+image     = "mock"         # mock | eromify | http     (EROMIFY_API_KEY / IMAGE_API_KEY)
+video     = "mock"         # mock | ffmpeg
+voice     = "mock"         # mock | elevenlabs         (ELEVENLABS_API_KEY)
+social    = "mock"         # mock | live              (per-platform tokens, see providers/social/live.py)
+
+[unit_costs]
+image         = 0.04
+video         = 0.02
+voice         = 0.02
+reply         = 0.002
+persona_setup = 1.50
+
+[distribution]
+platforms = ["tiktok", "instagram", "youtube", "x", "reddit", "fanvue"]
+sfw       = ["tiktok", "instagram", "youtube", "x"]
+adult     = ["fanvue"]     # age-gated only, and only when the adult tier is enabled
+funnel    = ["fanvue"]     # subscription destination every persona funnels into
+subreddit = "test"
+
+[growth]
+daily_boost      = 8.0     # default paid-amplification envelope, overridden by the CEO
+boost_step       = 2.0     # max spend on a single post
+reach_per_dollar = 0.09    # modelled extra reach per dollar of boost
+max_roster       = 8       # personas the company will run at once
+
+[policy]
+# The adult tier additionally requires AGENCY_ADULT_TIER=1 in the environment,
+# so it can never be switched on by a config file alone.
+allow_adult_tier = false
+
+[paths]
+media = "agency/out/media"
+db    = "agency/out/agency.db"
