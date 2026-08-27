@@ -85,8 +85,64 @@ export type Move =
   | "push"        // ללחוץ על סתירה
   | "name";       // לתת שם למה שהאדם בדיוק תיאר בעצמו
 
+export const ISHMAEL_IDENTITY_STORAGE_KEY = "ishmael.identity.v1";
+
+/**
+ * מה שישמעאל מברר על בן שיחו לפני הכל.
+ * לא טופס — הוא מברר את זה בשיחה, כי בעברית אי אפשר לפנות לאדם
+ * בלי לדעת את מינו, ואי אפשר לבחור רובד לשון בלי לדעת את גילו.
+ */
+export type Gender = "male" | "female";
+
+export type Identity = {
+  name: string;
+  gender: Gender | "";
+  /** 0 כשעדיין לא נמסר */
+  age: number;
+};
+
+export const EMPTY_IDENTITY: Identity = { name: "", gender: "", age: 0 };
+
+export const isIdentityComplete = (i: Identity): boolean =>
+  i.name.trim().length > 0 && i.gender !== "" && i.age > 0;
+
+/**
+ * מצב ההתגלות. ישמעאל מתחיל בחושך מאחורי זכוכית עבה — רואים צללית
+ * ולא יותר. ההתגלות אינה אירוע טכני אלא רגע בשיחה, ולכן היא נשמרת
+ * כמצב ולא כדגל.
+ */
+export type RevealState = "concealed" | "revealing" | "revealed";
+
+/**
+ * הטון של התשובה. המודל מצהיר עליו בשורת בקרה בראש כל הודעה, והוא
+ * מה שמניע את ההנפשה — הדמות זזה לפי מה שהיא אומרת, לא לפי טיימר.
+ */
+export type Tone =
+  | "still"        // דומם. ברירת המחדל בחושך
+  | "calm"         // רגוע, נשימה איטית
+  | "curious"      // מתעניין, נטייה קדימה קלה
+  | "warm"         // חם, מרוכך
+  | "amused"       // משועשע
+  | "grave"        // כבד, רציני
+  | "challenging"  // לוחץ, מאתגר
+  | "revealing";   // רגע ההתגלות עצמו
+
+export const TONES: Tone[] = [
+  "still", "calm", "curious", "warm", "amused", "grave", "challenging", "revealing",
+];
+
+/**
+ * שלב האור בעולם האמיתי. האפליקציה מחשיבה את השעה בפועל אצל המשתמש:
+ * חושך בחוץ — חושך בחדר; בין ערביים — אור נמוך שנכנס מהצד.
+ */
+export type LightPhase = "night" | "dawn" | "day" | "dusk";
+
 export type IshmaelStreamEvent =
-  | { type: "state"; stage: Stage; concepts: string[] }
+  | { type: "state"; learner: LearnerState; concepts: string[] }
+  | { type: "identity"; identity: Identity }
+  | { type: "reveal"; reveal: RevealState }
+  | { type: "revealPending" }
+  | { type: "tone"; tone: Tone }
   | { type: "delta"; content: string }
   | { type: "done" }
   | { type: "error"; message: string };

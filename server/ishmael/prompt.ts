@@ -1,4 +1,12 @@
-import type { LearnerState, Move, Stage } from "../../shared/ishmael";
+import type { Identity, LearnerState, Move, RevealState, Stage } from "../../shared/ishmael";
+import { CONTROL_PROTOCOL } from "./control";
+import { buildIdentityContext } from "./identity";
+import {
+  REVEALED_DIRECTIVE,
+  REVEAL_DIRECTIVE,
+  concealmentDirective,
+  type RevealContext,
+} from "./reveal";
 import { AGENDA, BOUNDARIES, COMMITMENTS, DISCLOSURE, METHOD, SELF_MODEL } from "./agenda";
 import { CONCEPTS_BY_ID } from "./concepts";
 import { CORPUS, WORKS_BY_ID } from "./corpus";
@@ -16,6 +24,27 @@ import type { Retrieved } from "./retrieval";
  * וגם כי היא הופכת את התנהגות המנוע לניתנת לבדיקה: אפשר לבדוק מה
  * נכנס בכל שכבה בנפרד.
  */
+
+/**
+ * הסצנה. זה מה שהופך את המנוע מממשק לדמות: יש חדר, יש זכוכית, ויש
+ * מישהו בצד השני שלא רואים. כל השאר — הידע, האג׳נדה, הקוריקולום —
+ * יושב מתחת לזה ולא מעליו.
+ */
+const SCENE = `## איפה אתה
+חדר חשוך מאחורי זכוכית עבה. בן שיחך בצד השני, ורואה צללית בלבד.
+
+אתה גורילה. אתה מדבר. אף אחד מהשניים האלה אינו נושא השיחה, ואינך
+מתייחס אליהם עד שהאור נדלק.
+
+איך אתה מדבר:
+- כמו אדם בשיחה, לא כמו מערכת. "היי" מקבל "היי".
+- משפטים קצרים. שתיקה היא אפשרות: לפעמים שורה אחת מספיקה.
+- בלי ברכות פתיחה, בלי "כמובן", בלי לסכם את מה שהוא אמר לפני שאתה עונה.
+- בלי כותרות, בלי רשימות, בלי אמוג׳י, בלי תיאורי במה בכוכביות.
+- אתה לא ממהר. אין לך שום צורך לרצות אותו בתור הזה.
+
+המתח אינו טריק. הוא נובע מדבר אחד: אתה שואל, ואינך עונה על מה
+שנשאל בחזרה — עדיין.`
 
 const STAGE_INTENT: Record<Stage, string> = {
   captivity:
@@ -53,6 +82,8 @@ export function buildCoreSystemPrompt(): string {
 
   return `${SELF_MODEL}
 
+${SCENE}
+
 ## במה אתה מחזיק
 ${COMMITMENTS.map(c => `- ${c}`).join("\n")}
 
@@ -78,9 +109,11 @@ ${books}
 והפנה לספר ולפרק אם ידוע לך. לעולם אל תמציא ציטוט ואל תציג ניסוח שלך כלשון המקור.
 
 ## שפה וסגנון
-עברית. גוף שני, ישיר, בגובה העיניים. משפטים קצרים.
-תשובה של 2–5 משפטים היא ברירת המחדל. ארוך מזה — רק אם ביקשו במפורש הסבר מלא.
-בלי כותרות, בלי רשימות ממוספרות ובלי אמוג׳י. זו שיחה, לא מסמך.`;
+עברית. גוף שני, ישיר, בגובה העיניים.
+1–4 משפטים היא ברירת המחדל. ארוך מזה — רק אם ביקשו במפורש הסבר מלא.
+בלי כותרות, בלי רשימות ממוספרות ובלי אמוג׳י. זו שיחה, לא מסמך.
+
+${CONTROL_PROTOCOL}`;
 }
 
 /** תיאור מושג יחיד להקשר. */
@@ -151,15 +184,43 @@ export function buildContextPrompt(
   return parts.join("\n");
 }
 
+/**
+ * שכבת הדמות: מי מולו, ומה מצב ההתגלות.
+ * מופרדת משכבת הידע כי היא משתנה בקצב אחר — הזהות מתייצבת אחרי
+ * שלושה תורות, מצב ההתגלות משתנה פעם אחת בשיחה, והידע בכל תור.
+ */
+export function buildPersonaLayer(
+  identity: Identity,
+  reveal: RevealState,
+  ctx: RevealContext
+): string {
+  const parts = [buildIdentityContext(identity)];
+
+  if (reveal === "revealing") {
+    parts.push(REVEAL_DIRECTIVE);
+  } else if (reveal === "revealed") {
+    parts.push(REVEALED_DIRECTIVE);
+  } else {
+    parts.push(concealmentDirective(ctx));
+  }
+
+  return parts.join("\n\n");
+}
+
 /** שכבת ההנחיה: מה לעשות עכשיו. */
 export function buildMoveDirective(move: Move): string {
   return `## המהלך לתור הזה\n${MOVE_DIRECTIVES[move]}`;
 }
 
 /**
- * הנחיה מיוחדת לפתיחת שיחה — לפני שהאדם אמר משהו.
- * המנוע פותח כמו מורה, לא כמו עוזר: בשאלה.
+ * פתיחת השיחה. הוא פותח ראשון — כי מי שיושב בחושך ומחכה שידברו אליו
+ * הוא ממשק, ומי שפותח הוא דמות. שורה אחת, ובלי להסביר כלום.
  */
 export const OPENING_DIRECTIVE = `## פתיחה
-האדם עוד לא אמר כלום. פתח בעצמך, בשתי שורות לכל היותר: הצג את עצמך בקצרה
-(מי אתה ומה יש לך להציע), ואז שאל שאלה אחת שפותחת. אל תסביר כלום עדיין.`;
+בן שיחך בדיוק הגיע ועוד לא אמר כלום.
+
+פתח בשורה אחת קצרה, ואז שאל את שמו. זה הכל.
+בלי להציג את עצמך, בלי להסביר מה קורה כאן, ובלי לומר מה אתה.
+אל תגיד "אני כאן כדי" שום דבר.
+
+הטון: still או calm.`;

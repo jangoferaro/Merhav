@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  EMPTY_IDENTITY,
   EMPTY_LEARNER_STATE,
   ISHMAEL_CONVERSATION_STORAGE_KEY,
+  ISHMAEL_IDENTITY_STORAGE_KEY,
   ISHMAEL_LEARNER_STORAGE_KEY,
   ISHMAEL_MAX_HISTORY_MESSAGES,
   ISHMAEL_MAX_MESSAGE_LENGTH,
+  type Identity,
   type LearnerState,
+  type RevealState,
+  type Tone,
 } from "@shared/ishmael";
 
 export type IshmaelMessage = {
@@ -48,6 +53,13 @@ export function useIshmael() {
   const [learner, setLearner] = useState<LearnerState>(
     () => readJson<LearnerState>(ISHMAEL_LEARNER_STORAGE_KEY) ?? EMPTY_LEARNER_STATE
   );
+  const [identity, setIdentity] = useState<Identity>(
+    () => readJson<Identity>(ISHMAEL_IDENTITY_STORAGE_KEY) ?? EMPTY_IDENTITY
+  );
+  const [reveal, setReveal] = useState<RevealState>("concealed");
+  /** בקשת התגלות שאושרה בתור הקודם ומחכה לתור הבא. */
+  const [revealPending, setRevealPending] = useState(false);
+  const [tone, setTone] = useState<Tone>("still");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFailed, setLastFailed] = useState<string | null>(null);
@@ -60,6 +72,10 @@ export function useIshmael() {
   useEffect(() => {
     writeJson(ISHMAEL_LEARNER_STORAGE_KEY, learner);
   }, [learner]);
+
+  useEffect(() => {
+    writeJson(ISHMAEL_IDENTITY_STORAGE_KEY, identity);
+  }, [identity]);
 
   const run = useCallback(
     async (text: string, isOpening: boolean) => {
@@ -80,7 +96,15 @@ export function useIshmael() {
         const response = await fetch("/api/ishmael/stream", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ message: text, history, learner, isOpening }),
+          body: JSON.stringify({
+            message: text,
+            history,
+            learner,
+            identity,
+            reveal,
+            revealPending,
+            isOpening,
+          }),
         });
 
         if (!response.ok || !response.body) {
@@ -113,6 +137,17 @@ export function useIshmael() {
 
             if (event.type === "state" && event.learner) {
               setLearner(event.learner as LearnerState);
+            } else if (event.type === "identity" && event.identity) {
+              setIdentity(event.identity as Identity);
+            } else if (event.type === "reveal" && event.reveal) {
+              // האור נדלק בדיוק כאן — לפני המילים הראשונות של התור הזה
+              const next = event.reveal as RevealState;
+              setReveal(next);
+              if (next !== "concealed") setRevealPending(false);
+            } else if (event.type === "revealPending") {
+              setRevealPending(true);
+            } else if (event.type === "tone" && event.tone) {
+              setTone(event.tone as Tone);
             } else if (event.type === "delta" && typeof event.content === "string") {
               received = true;
               const chunk = event.content;
@@ -142,7 +177,7 @@ export function useIshmael() {
         setIsStreaming(false);
       }
     },
-    [learner, messages]
+    [identity, learner, messages, reveal, revealPending]
   );
 
   const send = useCallback(
@@ -163,6 +198,10 @@ export function useIshmael() {
   const reset = useCallback(() => {
     setMessages([]);
     setLearner(EMPTY_LEARNER_STATE);
+    setIdentity(EMPTY_IDENTITY);
+    setReveal("concealed");
+    setRevealPending(false);
+    setTone("still");
     setError(null);
     setLastFailed(null);
     openedRef.current = false;
@@ -175,5 +214,17 @@ export function useIshmael() {
     void run("", true);
   }, [messages.length, run]);
 
-  return { messages, learner, isStreaming, error, lastFailed, send, retry, reset };
+  return {
+    messages,
+    learner,
+    identity,
+    reveal,
+    tone,
+    isStreaming,
+    error,
+    lastFailed,
+    send,
+    retry,
+    reset,
+  };
 }

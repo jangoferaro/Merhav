@@ -379,3 +379,224 @@
     }
   }
 }
+
+/* ───────────────────────────────────────────────────────────────
+   ישמעאל — החדר מאחורי הזכוכית
+
+   שלוש שכבות שמשתנות בנפרד:
+     data-phase   האור בעולם האמיתי (לילה / שחר / יום / בין ערביים)
+     data-reveal  האם הוא כבר גלוי
+     data-tone    מה הוא עושה ברגע הזה — זה מה שמניע את ההנפשה
+
+   ההנפשה נגזרת מהטון ולא מטיימר: הדמות זזה לפי מה שהיא אומרת.
+   ─────────────────────────────────────────────────────────────── */
+
+.ishmael-room {
+  /* ברירת מחדל: לילה. שאר השלבים דורסים למטה. */
+  --room-light: 0.34;
+  --room-warm: 0.06;
+  --shaft-opacity: 0;
+  --shaft-angle: 18deg;
+  background: #0b0908;
+}
+
+.ishmael-room[data-phase="dawn"] {
+  --room-light: 0.62;
+  --room-warm: 0.16;
+  --shaft-opacity: 0.3;
+  --shaft-angle: 26deg;
+}
+
+.ishmael-room[data-phase="day"] {
+  --room-light: 1;
+  --room-warm: 0.05;
+  --shaft-opacity: 0.1;
+  --shaft-angle: 8deg;
+}
+
+/* בין ערביים — שמש נמוכה שנכנסת מהצד, לא תאורת חדר */
+.ishmael-room[data-phase="dusk"] {
+  --room-light: 0.7;
+  --room-warm: 0.3;
+  --shaft-opacity: 0.45;
+  --shaft-angle: 32deg;
+}
+
+.ishmael-glass {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: #100d0a;
+}
+
+.ishmael-plate {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition:
+    opacity 2.6s var(--ease-in-out-soft),
+    filter 1.2s var(--ease-in-out-soft),
+    transform 1.2s var(--ease-in-out-soft);
+  filter: brightness(var(--room-light)) sepia(var(--room-warm));
+}
+
+/* ההתגלות: הצללית דוהה, הדמות עולה. איטי בכוונה — זה לא מעבר טאב. */
+.ishmael-plate[data-layer="concealed"] {
+  opacity: 1;
+}
+
+.ishmael-plate[data-layer="revealed"] {
+  opacity: 0;
+}
+
+.ishmael-room[data-reveal="revealing"] .ishmael-plate[data-layer="concealed"],
+.ishmael-room[data-reveal="revealed"] .ishmael-plate[data-layer="concealed"] {
+  opacity: 0;
+}
+
+.ishmael-room[data-reveal="revealing"] .ishmael-plate[data-layer="revealed"],
+.ishmael-room[data-reveal="revealed"] .ishmael-plate[data-layer="revealed"] {
+  opacity: 1;
+}
+
+/* עובי הזכוכית: השתקפות אלכסונית ושכבת אבק. לא מטושטש — מרוחק. */
+.ishmael-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      var(--shaft-angle),
+      transparent 42%,
+      rgb(255 236 190 / 0.05) 50%,
+      transparent 58%
+    ),
+    radial-gradient(120% 90% at 50% 120%, rgb(0 0 0 / 0.55), transparent 60%);
+}
+
+/* קרן השמש — נראית רק כשהשמש נמוכה בעולם האמיתי */
+.ishmael-shaft {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  opacity: var(--shaft-opacity);
+  background: linear-gradient(
+    var(--shaft-angle),
+    transparent 30%,
+    rgb(255 205 120 / 0.22) 44%,
+    rgb(255 226 170 / 0.32) 50%,
+    rgb(255 205 120 / 0.18) 56%,
+    transparent 70%
+  );
+  transition: opacity 2s var(--ease-in-out-soft);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ishmael-shaft {
+    animation: ishmael-shaft-drift 22s var(--ease-in-out-soft) infinite;
+  }
+
+  /* דומם: נשימה כמעט בלתי נראית. זה מה שמבדיל בין דמות לתמונה. */
+  .ishmael-figure {
+    animation: ishmael-breath 9s var(--ease-in-out-soft) infinite;
+  }
+
+  .ishmael-room[data-tone="calm"] .ishmael-figure,
+  .ishmael-room[data-tone="warm"] .ishmael-figure {
+    animation-duration: 6.5s;
+  }
+
+  .ishmael-room[data-tone="curious"] .ishmael-figure {
+    animation: ishmael-lean 5s var(--ease-in-out-soft) infinite;
+  }
+
+  .ishmael-room[data-tone="amused"] .ishmael-figure {
+    animation: ishmael-bob 2.4s var(--ease-in-out-soft) infinite;
+  }
+
+  .ishmael-room[data-tone="grave"] .ishmael-figure {
+    animation: ishmael-breath 12s var(--ease-in-out-soft) infinite;
+  }
+
+  .ishmael-room[data-tone="challenging"] .ishmael-figure {
+    animation: ishmael-press 4s var(--ease-in-out-soft) infinite;
+  }
+
+  .ishmael-room[data-tone="revealing"] .ishmael-figure {
+    animation: ishmael-rise 3.4s var(--ease-out-soft) 1 both;
+  }
+}
+
+/* הטון משנה גם את האור, לא רק את התנועה */
+.ishmael-room[data-tone="grave"] .ishmael-plate {
+  filter: brightness(calc(var(--room-light) * 0.82)) sepia(var(--room-warm)) contrast(1.06);
+}
+
+.ishmael-room[data-tone="challenging"] .ishmael-plate {
+  filter: brightness(calc(var(--room-light) * 1.05)) sepia(var(--room-warm)) contrast(1.14);
+}
+
+.ishmael-room[data-tone="warm"] .ishmael-plate {
+  filter: brightness(calc(var(--room-light) * 1.06)) sepia(calc(var(--room-warm) + 0.1));
+}
+
+@keyframes ishmael-breath {
+  0%,
+  100% {
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    transform: scale(1.012) translateY(-0.35%);
+  }
+}
+
+@keyframes ishmael-lean {
+  0%,
+  100% {
+    transform: scale(1.01) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.035) translate(-0.6%, 0.4%);
+  }
+}
+
+@keyframes ishmael-bob {
+  0%,
+  100% {
+    transform: scale(1.01) translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.02) translateY(-0.8%) rotate(0.25deg);
+  }
+}
+
+@keyframes ishmael-press {
+  0%,
+  100% {
+    transform: scale(1.03);
+  }
+  50% {
+    transform: scale(1.06) translateY(0.5%);
+  }
+}
+
+@keyframes ishmael-rise {
+  from {
+    transform: scale(1.09) translateY(2%);
+  }
+  to {
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes ishmael-shaft-drift {
+  0%,
+  100% {
+    transform: translateX(-3%);
+  }
+  50% {
+    transform: translateX(3%);
+  }
+}
