@@ -115,3 +115,46 @@ describe("chooseMove", () => {
     expect(chooseMove(state, "הבנתי")).toBe("name");
   });
 });
+
+describe("פתיחוּת — לגרום לאדם לספר על עצמו", () => {
+  it("נותן משהו משלו כשהתשובה יבשה, במקום לשאול שוב", () => {
+    const state = learner({ turns: 3, threads: ["עובד בהייטק"] });
+    expect(chooseMove(state, "כן")).toBe("offer");
+    expect(chooseMove(state, "לא יודע")).toBe("offer");
+  });
+
+  it("לא מלמד כשעוד לא סופר עליו כלום", () => {
+    const empty = learner({ turns: 2, threads: [] });
+    expect(["offer", "mirror"]).toContain(chooseMove(empty, "אוקיי בסדר גמור"));
+  });
+
+  it("חוזר אל האדם עצמו כל תור חמישי, שלא יהפוך לשיעור", () => {
+    const state = learner({ turns: 5, threads: ["שונא את העבודה שלו"] });
+    expect(chooseMove(state, "אז מה אתה אומר על זה בעצם")).toBe("mirror");
+  });
+
+  it("התנגדות עדיין קודמת לכל שיקול של פתיחוּת", () => {
+    const state = learner({ turns: 4, threads: [] });
+    expect(chooseMove(state, "אבל זה ממש לא נכון")).toBe("evidence");
+  });
+
+  it("רגע שבו הוא ניסח בעצמו קודם גם הוא", () => {
+    const state = learner({ turns: 4, threads: [], introduced: ["captivity"] });
+    expect(chooseMove(state, "הבנתי")).toBe("name");
+  });
+
+  it("שומר את מה שסופר ומגביל את הכמות", () => {
+    const many = normalizeLearner({ threads: Array(40).fill("פרט כלשהו") });
+    expect(many.threads).toHaveLength(12);
+  });
+
+  it("חותך פריט ארוך מדי", () => {
+    const long = normalizeLearner({ threads: ["א".repeat(400)] });
+    expect(long.threads[0]).toHaveLength(120);
+  });
+
+  it("applyTurn שומר על מה שכבר סופר", () => {
+    const before = learner({ threads: ["עובד בהייטק"] });
+    expect(applyTurn(before, "משהו", []).threads).toEqual(["עובד בהייטק"]);
+  });
+});

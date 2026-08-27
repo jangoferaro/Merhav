@@ -22,6 +22,8 @@ export type Control = {
   name?: string;
   gender?: Gender;
   age?: number;
+  /** דבר אחד שהאדם סיפר על עצמו בתור הזה, בלשונו, קצר */
+  note?: string;
 };
 
 const OPEN = "⟦";
@@ -54,6 +56,9 @@ export function parseControlLine(raw: string): Control {
         break;
       case "gender":
         if (value === "male" || value === "female") control.gender = value;
+        break;
+      case "note":
+        control.note = value.slice(0, 120);
         break;
       case "age": {
         const n = Number.parseInt(value, 10);
@@ -160,6 +165,12 @@ reveal הוא hold כברירת מחדל. now — רק כשאתה מבקש לה�
 
 כשאתה לומד פרט זהות, הוסף אותו לאותה שורה:
 ⟦tone:curious|reveal:hold|name:טל|gender:male|age:34⟧
+
+וכשהוא מספר משהו על עצמו — מה שהוא עושה, מה מציק לו, מה הוא רוצה —
+רשום את זה ב-note, בלשונו ובקצרה. זה מה שתחזור אליו בהמשך:
+⟦tone:warm|reveal:hold|note:עובד בהייטק ומרגיש חסר טעם⟧
+
+note אינו יכול להכיל את התו | ואינו סיכום פסיכולוגי. רק מה שנאמר.
 
 gender הוא male או female בלבד. age הוא מספר. אל תמציא ואל תנחש גיל —
 רק מה שנמסר. שם ומין אפשר להסיק כשהם ברורים.`;

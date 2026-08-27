@@ -42,6 +42,12 @@ export function normalizeLearner(raw: unknown): LearnerState {
           .map(s => s.slice(0, 300))
           .slice(-10)
       : [],
+    threads: Array.isArray(r.threads)
+      ? r.threads
+          .filter((x): x is string => typeof x === "string")
+          .map(s => s.slice(0, 120))
+          .slice(-12)
+      : [],
     stage,
     turns: typeof r.turns === "number" && r.turns >= 0 ? Math.min(r.turns, 9999) : 0,
   };
@@ -140,6 +146,7 @@ export function applyTurn(
     grasped: [...grasped],
     introduced,
     objections,
+    threads: learner.threads,
     stage: learner.stage,
     turns: learner.turns + 1,
   };
@@ -157,13 +164,29 @@ export function applyTurn(
 export function chooseMove(learner: LearnerState, text: string): Move {
   const signals = readTurn(text, learner.introduced);
 
+  // הסדר כאן הוא סדר עדיפויות אמיתי, ושתי הראשונות קודמות לכל שיקול
+  // של פתיחוּת: התנגדות שלא נענית שוברת את השיחה, ורגע שבו האדם ניסח
+  // בעצמו רעיון הוא רגע שאסור להחמיץ.
   if (signals.isObjection) {
     // התנגדות שחוזרת פעם שנייה — סימן שהתשובה הקודמת לא נחתה.
     // אז מודים במה שנכון בה במקום ללחוץ שוב.
     return learner.objections.length >= 2 ? "concede" : "evidence";
   }
   if (signals.showsGrasp) return "name";
+
   if (learner.turns === 0) return "question";
+
+  // תשובה קצרה ויבשה היא סימן שהוא עוד לא נפתח. שאלה נוספת תסגור
+  // אותו עוד יותר — צריך לתת לו משהו קודם.
+  if (text.trim().length <= 12) return "offer";
+
+  // אין עדיין כלום שהוא סיפר על עצמו — אין על מה להניח רעיון.
+  if (learner.threads.length === 0 && learner.turns >= 2) {
+    return learner.turns % 2 === 0 ? "offer" : "mirror";
+  }
+
+  // כל תור חמישי חוזר אל האדם עצמו, כדי שהשיחה לא תהפוך לשיעור
+  if (learner.turns % 5 === 0) return "mirror";
   if (learner.turns % 4 === 0) return "reframe";
   if (learner.turns % 3 === 0) return "analogy";
   return "question";
@@ -182,4 +205,10 @@ export const MOVE_DIRECTIVES: Record<Move, string> = {
     "הוא צודק במשהו. הודה בו במפורש ובלי סייגים, ורק אז המשך. אל תנצח בוויכוח.",
   push: "יש כאן סתירה בין שני דברים שהוא אמר. הצבע עליה בשקט ותן לו לענות.",
   name: "הוא בדיוק תיאר את הרעיון במילים שלו. תן לזה שם, בשורה אחת, והמשך.",
+  mirror:
+    "קח את המילה המדויקת שהוא השתמש בה — לא פרפראזה — והחזר לו אותה כשאלה. " +
+    "אל תפרש ואל תסביר מה זה אומר עליו. רק תפתח את הדלת שהוא כבר פתח חצי.",
+  offer:
+    "תן משהו משלך ראשון: תצפית, עמדה, או משהו שאתה חושב — ורק אז שאל. " +
+    "אדם לא נפתח מול מי שרק שואל.",
 };

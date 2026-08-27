@@ -61,6 +61,14 @@ export type LearnerState = {
   introduced: string[];
   /** התנגדויות שהאדם העלה, בלשונו */
   objections: string[];
+  /**
+   * מה שהאדם סיפר על עצמו — בלשונו, קצר.
+   *
+   * זה לא זיכרון לשם זיכרון: הרעיונות כאן לא נוחתים בהפשטה. "מרוץ
+   * המזון" הוא הרצאה; העבודה שהוא לא יכול לעזוב היא לא. בלי לדעת על
+   * מה בחייו להניח את הרעיון, אין לישמעאל על מה לעבוד.
+   */
+  threads: string[];
   /** השלב שבו השיחה נמצאת */
   stage: Stage;
   /** מספר תורות משתמש בשיחה — משמש לקצב */
@@ -71,6 +79,7 @@ export const EMPTY_LEARNER_STATE: LearnerState = {
   grasped: [],
   introduced: [],
   objections: [],
+  threads: [],
   stage: "captivity",
   turns: 0,
 };
@@ -83,7 +92,9 @@ export type Move =
   | "reframe"     // לחשוף את ההנחה שמתחת לשאלה
   | "concede"     // להודות בנקודה טובה של האדם
   | "push"        // ללחוץ על סתירה
-  | "name";       // לתת שם למה שהאדם בדיוק תיאר בעצמו
+  | "name"        // לתת שם למה שהאדם בדיוק תיאר בעצמו
+  | "mirror"      // להחזיר לו את המילה שלו ולפתוח בה דלת
+  | "offer";      // לתת משהו משלך ראשון, כדי שיהיה לו במה להחזיר
 
 export const ISHMAEL_IDENTITY_STORAGE_KEY = "ishmael.identity.v1";
 

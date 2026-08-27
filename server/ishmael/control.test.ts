@@ -43,6 +43,15 @@ describe("parseControlLine", () => {
     expect(parseControlLine("name:טל כהן").name).toBe("טל כהן");
   });
 
+  it("קורא מה שהאדם סיפר על עצמו", () => {
+    const c = parseControlLine("tone:warm|note:עובד בהייטק ומרגיש חסר טעם");
+    expect(c.note).toBe("עובד בהייטק ומרגיש חסר טעם");
+  });
+
+  it("חותך הערה ארוכה מדי", () => {
+    expect(parseControlLine(`note:${"א".repeat(300)}`).note).toHaveLength(120);
+  });
+
   it("reveal:now בלבד נחשב בקשה", () => {
     expect(parseControlLine("reveal:now").revealRequested).toBe(true);
     expect(parseControlLine("reveal:hold").revealRequested).toBe(false);

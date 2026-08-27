@@ -193,7 +193,7 @@ export function registerIshmaelRoutes(app: Express) {
       isOpening
     );
 
-    const nextLearner = isOpening
+    const nextLearner: LearnerState = isOpening
       ? { ...learner, introduced: presented }
       : applyTurn(learner, userMessage, presented);
 
@@ -238,6 +238,16 @@ export function registerIshmaelRoutes(app: Express) {
       controlHandled = true;
 
       if (control.tone) writeEvent(res, { type: "tone", tone: control.tone });
+
+      // מה שהוא סיפר על עצמו בתור הזה. נשמר במצב כדי שישמעאל יוכל
+      // לחזור לזה — בלי זה כל תור מתחיל מאפס והשיחה נשארת מופשטת.
+      if (control.note) {
+        const note = control.note.trim();
+        if (note && !nextLearner.threads.includes(note)) {
+          nextLearner.threads = [...nextLearner.threads, note].slice(-12);
+          writeEvent(res, { type: "state", learner: nextLearner, concepts: presented });
+        }
+      }
 
       const learned: Partial<Identity> = {};
       if (control.name) learned.name = control.name;
