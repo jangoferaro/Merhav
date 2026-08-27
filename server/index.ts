@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import { logModelApiReachability } from "./_core/reachability";
 import { registerChatRoute } from "./chatRoute";
 import { registerIshmaelRoutes } from "./ishmael/route";
 import { serveStatic, setupVite } from "./vite";
@@ -51,6 +52,9 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`מרחב רץ על http://localhost:${port}/`);
+    // אחרי ההאזנה ובלי לחסום אותה: אם היעד לא נגיש, עדיף לדעת עכשיו
+    // ומהלוג — ולא מהמשתמש הראשון שמנסה לדבר.
+    void logModelApiReachability();
   });
 }
 
