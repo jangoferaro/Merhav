@@ -202,8 +202,20 @@ export function registerIshmaelRoutes(app: Express) {
       if (!finished) controller.abort();
     }, STREAM_TIMEOUT_MS);
 
-    req.on("close", () => {
-      if (!finished) controller.abort();
+    // חייב להיות res ולא req.
+    //
+    // `req` הוא זרם הבקשה, ו-"close" שלו נורה כשהזרם הזה מסתיים — מה
+    // שקורה מיד אחרי ש-express.json() קרא את הגוף לזיכרון, בזמן
+    // שהלקוח עדיין מחובר ומחכה. חיווט לשם מבטל כל קריאה למודל ברגע
+    // שהיא מתחילה, תמיד, ונראה כלפי חוץ בדיוק כמו כשל רשת.
+    //
+    // `res` נסגר כשהלקוח באמת הלך, וזה מה שאנחנו רוצים לדעת.
+    res.on("close", () => {
+      if (!finished) {
+        finished = true;
+        controller.abort();
+      }
+      clearTimeout(timeout);
     });
 
     const parser = createControlParser();
