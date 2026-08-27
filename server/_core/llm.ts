@@ -48,10 +48,23 @@ const ANTHROPIC_VERSION = "2023-06-01";
 const resolveApiUrl = () =>
   `${ENV.apiBaseUrl.replace(/\/$/, "")}/v1/messages`;
 
+/** תווים שאסורים בערך של כותרת HTTP. */
+const INVALID_HEADER_CHAR = /[^\t\x20-\x7e\x80-\xff]/;
+
 const assertApiKey = () => {
-  if (!ENV.apiKey) {
+  const key = ENV.apiKey;
+
+  if (!key) {
     throw new Error(
       "ANTHROPIC_API_KEY is not configured. הגדירו אותו במשתני הסביבה (ראו .env.example)."
+    );
+  }
+
+  // בלי הבדיקה הזו מפתח פגום מגיע עד fetch, שזורק TypeError גנרי —
+  // וההודעה שמתקבלת מצביעה על הרשת במקום על המפתח.
+  if (INVALID_HEADER_CHAR.test(key)) {
+    throw new Error(
+      "ANTHROPIC_API_KEY מכיל תו שאינו חוקי בכותרת HTTP (למשל שורה חדשה או תו בקרה). בדקו את הערך במשתני הסביבה."
     );
   }
 };

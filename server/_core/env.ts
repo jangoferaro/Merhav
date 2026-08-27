@@ -11,13 +11,19 @@
 export const ENV = {
   /** מפתח ה-API שלכם מ-console.anthropic.com */
   get apiKey(): string {
-    return process.env.ANTHROPIC_API_KEY || "";
+    // trim הוא הכרחי ולא נימוס: מפתח שהודבק לממשק ניהול נושא לא פעם
+    // תו שורה חדשה בסופו, וכותרת HTTP עם תו כזה גורמת ל-fetch לזרוק
+    // TypeError — שנראה בדיוק כמו כשל רשת ושולח לחפש במקום הלא נכון.
+    return (process.env.ANTHROPIC_API_KEY || "").trim();
   },
   /**
    * כתובת בסיס אופציונלית, למקרה שאתם משתמשים בפרוקסי תואם-Anthropic
    * משלכם (למשל Bedrock/Vertex gateway). ברירת המחדל היא ה-API הרשמי.
    */
   get apiBaseUrl(): string {
-    return process.env.ANTHROPIC_API_BASE_URL || "https://api.anthropic.com";
+    return (
+      (process.env.ANTHROPIC_API_BASE_URL || "").trim() ||
+      "https://api.anthropic.com"
+    );
   },
 };
