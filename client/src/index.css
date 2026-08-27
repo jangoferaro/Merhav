@@ -383,20 +383,23 @@
 /* ───────────────────────────────────────────────────────────────
    ישמעאל — החדר מאחורי הזכוכית
 
-   שלוש שכבות שמשתנות בנפרד:
+   שלוש תכונות על השורש משנות הכל, ואף אחת מהן אינה נשלטת בידי
+   המשתמש:
      data-phase   האור בעולם האמיתי (לילה / שחר / יום / בין ערביים)
      data-reveal  האם הוא כבר גלוי
      data-tone    מה הוא עושה ברגע הזה — זה מה שמניע את ההנפשה
 
-   ההנפשה נגזרת מהטון ולא מטיימר: הדמות זזה לפי מה שהיא אומרת.
+   הדמות זזה לפי מה שהיא אומרת, לא לפי טיימר.
    ─────────────────────────────────────────────────────────────── */
 
 .ishmael-room {
   /* ברירת מחדל: לילה. שאר השלבים דורסים למטה. */
-  --room-light: 0.34;
+  --room-light: 0.26;
   --room-warm: 0.06;
   --shaft-opacity: 0;
   --shaft-angle: 18deg;
+  --dust-opacity: 0.12;
+  --gold: #c9a24d;
   background: #0b0908;
 }
 
@@ -405,6 +408,7 @@
   --room-warm: 0.16;
   --shaft-opacity: 0.3;
   --shaft-angle: 26deg;
+  --dust-opacity: 0.5;
 }
 
 .ishmael-room[data-phase="day"] {
@@ -412,6 +416,7 @@
   --room-warm: 0.05;
   --shaft-opacity: 0.1;
   --shaft-angle: 8deg;
+  --dust-opacity: 0.22;
 }
 
 /* בין ערביים — שמש נמוכה שנכנסת מהצד, לא תאורת חדר */
@@ -420,12 +425,29 @@
   --room-warm: 0.3;
   --shaft-opacity: 0.45;
   --shaft-angle: 32deg;
+  --dust-opacity: 0.5;
+}
+
+.ishmael-frame {
+  border: 1px solid rgb(201 162 77 / 0.22);
+  background: #100e0b;
+  box-shadow:
+    0 0 90px rgb(0 0 0 / 0.75),
+    inset 0 1px 0 rgb(201 162 77 / 0.08);
+}
+
+/* החדר מתעורר — הכל עולה מהשחור פעם אחת, בטעינה */
+@media (prefers-reduced-motion: no-preference) {
+  .ishmael-frame {
+    animation: ishmael-wake 2.4s var(--ease-out-soft) 1 both;
+  }
 }
 
 .ishmael-glass {
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  border: 1px solid rgb(201 162 77 / 0.4);
   background: #100d0a;
 }
 
@@ -436,15 +458,9 @@
   height: 100%;
   object-fit: cover;
   transition:
-    opacity 2.6s var(--ease-in-out-soft),
-    filter 1.2s var(--ease-in-out-soft),
-    transform 1.2s var(--ease-in-out-soft);
+    opacity 2.8s var(--ease-in-out-soft),
+    filter 1.4s var(--ease-in-out-soft);
   filter: brightness(var(--room-light)) sepia(var(--room-warm));
-}
-
-/* ההתגלות: הצללית דוהה, הדמות עולה. איטי בכוונה — זה לא מעבר טאב. */
-.ishmael-plate[data-layer="concealed"] {
-  opacity: 1;
 }
 
 .ishmael-plate[data-layer="revealed"] {
@@ -461,7 +477,43 @@
   opacity: 1;
 }
 
-/* עובי הזכוכית: השתקפות אלכסונית ושכבת אבק. לא מטושטש — מרוחק. */
+/* ── העיניים ────────────────────────────────────────────────────
+   הדבר היחיד שנראה ממנו בחושך. שני נצנוצים חמים במקום שבו האור
+   היה תופס עין, נמוכי אטימות עד שהם נקראים כאור ולא כציור. הם
+   נעלמים ברגע שהוא גלוי — אז כבר רואים את העיניים האמיתיות. */
+.ishmael-eyes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 1.4s var(--ease-in-out-soft);
+}
+
+.ishmael-eyes span {
+  position: absolute;
+  top: 27.5%;
+  width: 1.15%;
+  aspect-ratio: 2 / 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 226 168 / 0.85), rgb(255 196 110 / 0) 70%);
+  filter: blur(1.2px);
+}
+
+.ishmael-eyes span:first-child {
+  left: 38.2%;
+}
+
+.ishmael-eyes span:last-child {
+  left: 45.6%;
+  opacity: 0.55;
+}
+
+.ishmael-room[data-reveal="revealing"] .ishmael-eyes,
+.ishmael-room[data-reveal="revealed"] .ishmael-eyes {
+  opacity: 0;
+}
+
+/* עובי הזכוכית: השתקפות אלכסונית וכהות שנאספת בקצוות */
 .ishmael-glare {
   position: absolute;
   inset: 0;
@@ -473,7 +525,18 @@
       rgb(255 236 190 / 0.05) 50%,
       transparent 58%
     ),
-    radial-gradient(120% 90% at 50% 120%, rgb(0 0 0 / 0.55), transparent 60%);
+    radial-gradient(120% 90% at 50% 120%, rgb(0 0 0 / 0.55), transparent 60%),
+    radial-gradient(100% 100% at 50% 50%, transparent 55%, rgb(0 0 0 / 0.45));
+}
+
+/* גרעיניות עדינה — מחזירה לתמונה את המרקם המצויר שלה */
+.ishmael-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.28;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.5'/></svg>");
 }
 
 /* קרן השמש — נראית רק כשהשמש נמוכה בעולם האמיתי */
@@ -493,9 +556,66 @@
   transition: opacity 2s var(--ease-in-out-soft);
 }
 
+/* אבק שצף בקרן. זה מה שהופך אור לאוויר.
+   שני דברים מונעים ממנו להיראות כמו סריג נקודות: מרווחים בגדלים
+   ראשוניים שלא מתיישרים זה עם זה, ומסכה בזווית הקרן — כך שהאבק
+   מופיע היכן שיש אור לתפוס אותו, ונעלם בצללים. */
+.ishmael-dust {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--dust-opacity);
+  transition: opacity 2s var(--ease-in-out-soft);
+  filter: blur(0.3px);
+  background-image:
+    radial-gradient(circle, rgb(255 232 186 / 0.85) 0.4px, transparent 1.1px),
+    radial-gradient(circle, rgb(255 224 170 / 0.6) 0.5px, transparent 1.3px),
+    radial-gradient(circle, rgb(255 240 210 / 0.45) 0.35px, transparent 1px);
+  background-size: 79px 137px, 149px 103px, 211px 179px;
+  background-position: 0 0, 37px 61px, 113px 23px;
+  mask-image: linear-gradient(
+    var(--shaft-angle),
+    transparent 26%,
+    rgb(0 0 0 / 0.55) 40%,
+    #000 50%,
+    rgb(0 0 0 / 0.5) 60%,
+    transparent 74%
+  );
+}
+
+/* ההתגלות: פריחת אור קצרה שמלווה את דהיית הצללית */
+.ishmael-bloom {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    70% 60% at 46% 34%,
+    rgb(255 226 170 / 0.55),
+    rgb(255 198 116 / 0.15) 45%,
+    transparent 72%
+  );
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  .ishmael-dust {
+    animation: ishmael-dust-drift 34s linear infinite;
+  }
+
   .ishmael-shaft {
     animation: ishmael-shaft-drift 22s var(--ease-in-out-soft) infinite;
+  }
+
+  .ishmael-eyes span {
+    animation: ishmael-glint 7s var(--ease-in-out-soft) infinite;
+  }
+
+  .ishmael-eyes span:last-child {
+    animation-delay: 0.12s;
+  }
+
+  .ishmael-room[data-reveal="revealing"] .ishmael-bloom {
+    animation: ishmael-bloom 3.6s var(--ease-out-soft) 1 both;
   }
 
   /* דומם: נשימה כמעט בלתי נראית. זה מה שמבדיל בין דמות לתמונה. */
@@ -527,6 +647,10 @@
   .ishmael-room[data-tone="revealing"] .ishmael-figure {
     animation: ishmael-rise 3.4s var(--ease-out-soft) 1 both;
   }
+
+  .ishmael-enter {
+    animation: ishmael-enter 0.5s var(--ease-out-soft) 1 both;
+  }
 }
 
 /* הטון משנה גם את האור, לא רק את התנועה */
@@ -540,6 +664,175 @@
 
 .ishmael-room[data-tone="warm"] .ishmael-plate {
   filter: brightness(calc(var(--room-light) * 1.06)) sepia(calc(var(--room-warm) + 0.1));
+}
+
+/* ── השיחה ────────────────────────────────────────────────────── */
+
+.ishmael-bubble {
+  position: relative;
+  max-width: 78%;
+  padding: 0.6rem 0.95rem;
+  border-radius: 1.15rem;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  text-align: right;
+  white-space: pre-wrap;
+}
+
+/* הזנב — הוא מה שהופך מלבן לדיבור */
+.ishmael-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: 0.55rem;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+.ishmael-bubble-him {
+  background: rgb(42 42 32 / 0.78);
+  color: #e6dcc6;
+  border-bottom-left-radius: 0.3rem;
+}
+
+.ishmael-bubble-him::after {
+  left: -0.42rem;
+  border-width: 0 0.5rem 0.55rem 0;
+  border-color: transparent rgb(42 42 32 / 0.78) transparent transparent;
+}
+
+.ishmael-bubble-you {
+  background: #c5a05a;
+  color: #20180d;
+  border-bottom-right-radius: 0.3rem;
+}
+
+.ishmael-bubble-you::after {
+  right: -0.42rem;
+  border-width: 0 0 0.55rem 0.5rem;
+  border-color: transparent transparent transparent #c5a05a;
+}
+
+/* "הוא חושב" — שלוש נקודות שנושמות, לא ספינר */
+.ishmael-thinking {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding-block: 0.85rem;
+}
+
+.ishmael-thinking span {
+  width: 0.36rem;
+  height: 0.36rem;
+  border-radius: 50%;
+  background: rgb(201 162 77 / 0.75);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ishmael-thinking span {
+    animation: ishmael-think 1.5s var(--ease-in-out-soft) infinite;
+  }
+
+  .ishmael-thinking span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .ishmael-thinking span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+}
+
+.ishmael-composer {
+  border: 1px solid rgb(201 162 77 / 0.35);
+  background: rgb(23 19 16 / 0.6);
+  transition: border-color 0.4s var(--ease-out-soft);
+}
+
+.ishmael-composer:focus-within {
+  border-color: rgb(201 162 77 / 0.7);
+}
+
+.ishmael-send {
+  background: #c5a05a;
+  color: #20180d;
+  transition:
+    opacity 0.3s var(--ease-out-soft),
+    transform 0.3s var(--ease-out-soft);
+}
+
+.ishmael-send:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+.ishmael-send:disabled {
+  opacity: 0.35;
+}
+
+/* ── תנועות ───────────────────────────────────────────────────── */
+
+@keyframes ishmael-wake {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ishmael-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ishmael-think {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translateY(-0.14rem);
+  }
+}
+
+/* נצנוץ עין: נשימה ארוכה עם עצימה קצרה באמצע */
+@keyframes ishmael-glint {
+  0%,
+  38%,
+  100% {
+    opacity: 0.5;
+  }
+  46% {
+    opacity: 0.85;
+  }
+  49%,
+  51% {
+    opacity: 0.04;
+  }
+  60% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes ishmael-bloom {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes ishmael-breath {
@@ -598,5 +891,15 @@
   }
   50% {
     transform: translateX(3%);
+  }
+}
+
+/* האבק צף לאט כלפי מעלה ומעט הצידה, כמו אבק אמיתי בקרן */
+@keyframes ishmael-dust-drift {
+  from {
+    background-position: 0 0, 21px 34px, 57px 12px;
+  }
+  to {
+    background-position: 24px -61px, 52px -37px, 93px -85px;
   }
 }
