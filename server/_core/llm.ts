@@ -17,6 +17,15 @@ export type Role = "system" | "user" | "assistant";
 export type Message = {
   role: Role;
   content: string;
+  /**
+   * מסמן תוכן שאינו משתנה בין תורות. בלוקים כאלה נשלחים בראש הפרומפט
+   * עם cache_control, כך שאנתרופיק מגישה אותם מהמטמון במקום לעבד אותם
+   * מחדש — מה שמקצר משמעותית את הזמן עד המילה הראשונה.
+   *
+   * חשוב: המטמון עובד על התאמת קידומת. כל שינוי בתוכן מסומן מבטל את
+   * המטמון לכל מה שאחריו, ולכן תוכן משתנה חייב לבוא אחרי הבלוק הזה.
+   */
+  cacheable?: boolean;
 };
 
 export type InvokeParams = {
@@ -80,25 +89,45 @@ const authHeaders = () => ({
  * המערך, ודורש שההודעות יתחילו ב-user. פונקציה זו מפרידה את כל
  * הודעות ה-"system" (מאוחדות בסדר שהופיעו) מיתר השיחה.
  */
+type SystemBlock = {
+  type: "text";
+  text: string;
+  cache_control?: { type: "ephemeral" };
+};
+
 function splitSystemAndTurns(messages: Message[]): {
-  system: string | undefined;
+  system: SystemBlock[] | undefined;
   turns: Array<{ role: "user" | "assistant"; content: string }>;
 } {
-  const systemParts: string[] = [];
+  const stable: string[] = [];
+  const volatile: string[] = [];
   const turns: Array<{ role: "user" | "assistant"; content: string }> = [];
 
   for (const m of messages) {
     if (m.role === "system") {
-      systemParts.push(m.content);
+      (m.cacheable ? stable : volatile).push(m.content);
     } else {
       turns.push({ role: m.role, content: m.content });
     }
   }
 
-  return {
-    system: systemParts.length > 0 ? systemParts.join("\n\n---\n\n") : undefined,
-    turns,
-  };
+  const blocks: SystemBlock[] = [];
+
+  // היציב תמיד ראשון, עם נקודת מטמון בסופו. המשתנה אחריו — אחרת כל
+  // תור היה מבטל את המטמון של מה שלפניו.
+  if (stable.length > 0) {
+    blocks.push({
+      type: "text",
+      text: stable.join("\n\n---\n\n"),
+      cache_control: { type: "ephemeral" },
+    });
+  }
+
+  if (volatile.length > 0) {
+    blocks.push({ type: "text", text: volatile.join("\n\n---\n\n") });
+  }
+
+  return { system: blocks.length > 0 ? blocks : undefined, turns };
 }
 
 const RETRY_MAX_RETRIES = 4;
@@ -344,6 +373,21 @@ export async function streamLLM(
           evt = JSON.parse(data);
         } catch {
           return;
+        }
+
+        // אימות שהמטמון באמת נפגע. בלי המדידה הזו אין דרך לדעת אם
+        // הקידומת מוגשת ממטמון או מעובדת מחדש בכל תור — והתסמין
+        // (איטיות) נראה זהה בשני המקרים.
+        if (evt.type === "message_start") {
+          const usage = (evt.message as { usage?: Record<string, number> } | undefined)
+            ?.usage;
+          if (usage) {
+            const read = usage.cache_read_input_tokens ?? 0;
+            const written = usage.cache_creation_input_tokens ?? 0;
+            console.log(
+              `[cache] נקראו ${read} טוקנים ממטמון, נכתבו ${written}, טריים ${usage.input_tokens ?? 0}`
+            );
+          }
         }
 
         if (

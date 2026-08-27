@@ -78,13 +78,31 @@ describe("sanitizeIshmaelHistory", () => {
 
 describe("buildIshmaelMessages", () => {
   it("בונה את השכבות בסדר: ליבה, דמות, הקשר, ואז הנחיית מהלך", () => {
-    const { messages } = build({ message: "מה זה בכלל?" });
+    const { messages } = build({ message: "מה זה בכלל?", identity: KNOWN });
     expect(messages[0].role).toBe("system");
     expect(messages[0].content).toContain("מנוע ידע בשם");
     expect(messages[1].content).toContain("מי מולך");
     expect(messages[2].content).toContain("איפה השיחה נמצאת");
     expect(messages.at(-1)!.content).toContain("המהלך לתור הזה");
     expect(messages.at(-2)).toEqual({ role: "user", content: "מה זה בכלל?" });
+  });
+
+  it("הליבה מסומנת ליציבה כדי שתוגש מהמטמון, והשאר לא", () => {
+    const { messages } = build({ message: "שלום", identity: KNOWN });
+    expect(messages[0].cacheable).toBe(true);
+    expect(messages.slice(1).some(m => m.cacheable)).toBe(false);
+  });
+
+  it("שכבת הידע נשמטת כל עוד מבררים זהות, ומופיעה כשהיא מלאה", () => {
+    // בזמן הבירור אין מה ללמד, והחומר הזה הוא מה שמאט את התורות
+    // הראשונים ומכביד על הדמות
+    const onboarding = build({ message: "טל" });
+    expect(onboarding.messages.some(m => m.content.includes("איפה השיחה נמצאת"))).toBe(
+      false
+    );
+
+    const known = build({ message: "טל", identity: KNOWN });
+    expect(known.messages.some(m => m.content.includes("איפה השיחה נמצאת"))).toBe(true);
   });
 
   it("כולל את הנחיית ההסתרה כל עוד הוא בחושך", () => {
@@ -138,8 +156,12 @@ describe("buildIshmaelMessages", () => {
   });
 
   it("מתאים את ההקשר לשלב שבו השיחה נמצאת", () => {
-    const early = build({ message: "מה לעשות?" });
-    const late = build({ message: "מה לעשות?", learner: learner({ stage: "beyond" }) });
+    const early = build({ message: "מה לעשות?", identity: KNOWN });
+    const late = build({
+      message: "מה לעשות?",
+      identity: KNOWN,
+      learner: learner({ stage: "beyond" }),
+    });
     expect(early.messages[2].content).toContain("שלב: captivity");
     expect(late.messages[2].content).toContain("שלב: beyond");
   });

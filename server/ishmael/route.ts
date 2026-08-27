@@ -4,6 +4,7 @@ import {
   EMPTY_IDENTITY,
   ISHMAEL_MAX_HISTORY_MESSAGES,
   ISHMAEL_MAX_MESSAGE_LENGTH,
+  isIdentityComplete,
   type Identity,
   type LearnerState,
   type RevealState,
@@ -84,13 +85,23 @@ export function buildIshmaelMessages(
   const grounding = renderGrounding(loadGrounding(), userMessage);
 
   const messages: Message[] = [
-    { role: "system", content: buildCoreSystemPrompt() },
+    // הליבה זהה בכל תור, ולכן היא נשלחת ראשונה ומסומנת ליציבה: השרת
+    // של אנתרופיק מגיש אותה מהמטמון במקום לעבד אותה מחדש. כל השאר
+    // חייב לבוא אחריה, אחרת כל תור היה מבטל את המטמון.
+    { role: "system", content: buildCoreSystemPrompt(), cacheable: true },
     { role: "system", content: buildPersonaLayer(identity, reveal, ctx) },
-    {
+  ];
+
+  // שכבת הידע נשלחת רק כשיש לתוכה ללמד. כל עוד הוא מברר שם, גיל
+  // ומין, גרף המושגים אינו רלוונטי — והוא גם מה שהופך את התורות
+  // הראשונים לאיטיים ואת הדמות לכבדה, כי היא מגיעה לשיחת היכרות
+  // עמוסה בחומר שאין לו מקום בה.
+  if (isIdentityComplete(identity)) {
+    messages.push({
       role: "system",
       content: buildContextPrompt(learner, retrieved, next ? next.id : null),
-    },
-  ];
+    });
+  }
 
   if (grounding) messages.push({ role: "system", content: grounding });
 
