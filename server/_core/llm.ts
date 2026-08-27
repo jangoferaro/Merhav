@@ -115,6 +115,31 @@ const computeBackoffDelay = (
   return Math.min(Math.max(jittered, retryAfterMs ?? 0), RETRY_MAX_DELAY_MS);
 };
 
+const isAbort = (error: unknown): boolean =>
+  (error instanceof Error && error.name === "AbortError") ||
+  (typeof error === "object" &&
+    error !== null &&
+    (error as { name?: unknown }).name === "AbortError");
+
+/**
+ * תיאור שאפשר לפעול לפיו. שגיאות fetch ב-Node עוטפות את הסיבה
+ * האמיתית ב-`cause`, ובלעדיה ההודעה היא תמיד "fetch failed" — חסרת
+ * ערך בדיוק ברגע שצריך אותה.
+ */
+export function describeError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+
+  const cause = (error as { cause?: unknown }).cause;
+  const causeText =
+    cause instanceof Error
+      ? ` (${cause.name}: ${cause.message})`
+      : cause
+        ? ` (${String(cause)})`
+        : "";
+
+  return `${error.name}: ${error.message}${causeText}`;
+}
+
 type FetchInit = NonNullable<Parameters<typeof fetch>[1]>;
 
 // Retries non-2xx responses and network errors with exponential backoff, then
@@ -151,9 +176,19 @@ const fetchWithBackoff = async (
       await sleep(computeBackoffDelay(attempt, retryAfterMs));
     } catch (error) {
       lastError = error;
+
+      // ביטול הוא לא כשל רשת: הקורא סגר את החיבור או שפג הזמן, ואין
+      // טעם לנסות שוב — ניסיון חוזר רק היה בולע את הסיבה האמיתית
+      // מאחורי ארבעה סיבובים מיותרים.
+      if (isAbort(error) || init.signal?.aborted) throw error;
+
       if (attempt === RETRY_MAX_RETRIES) throw error;
+
+      // הסיבה עצמה, לא "network error" גנרי. בלעדיה אי אפשר להבחין
+      // בין DNS, TLS, כותרת פסולה או יעד חסום — וזה בדיוק מה שצריך
+      // לדעת כשמשהו נשבר בסביבה אחרת.
       console.warn(
-        `LLM request retry ${attempt + 1}/${RETRY_MAX_RETRIES} after network error`
+        `LLM request retry ${attempt + 1}/${RETRY_MAX_RETRIES}: ${describeError(error)}`
       );
       await sleep(computeBackoffDelay(attempt));
     }
@@ -161,7 +196,9 @@ const fetchWithBackoff = async (
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("LLM request failed after exhausting retries");
+    : new Error(
+        `LLM request failed after exhausting retries: ${describeError(lastError)}`
+      );
 };
 
 function buildAnthropicPayload(params: InvokeParams, stream: boolean) {

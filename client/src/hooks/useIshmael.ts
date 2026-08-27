@@ -19,6 +19,9 @@ export type IshmaelMessage = {
   content: string;
 };
 
+/** סימן פנימי: הכשל היה בפתיחה, ולכן הניסיון החוזר הוא פתיחה מחדש. */
+const OPENING_RETRY = "\u0000opening";
+
 const createId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -170,7 +173,9 @@ export function useIshmael() {
         // נפלה נמחקת, כדי שלא תישאר תשובה חתוכה על המסך.
         if (streamFailed || !received) {
           setMessages(prev => prev.filter(m => m.id !== assistantId));
-          if (!isOpening) setLastFailed(text);
+          // גם פתיחה שנכשלה צריכה כפתור. בלי זה המשתמש מקבל חדר חשוך
+          // עם הודעת שגיאה ושום דרך להתחיל — וזה בדיוק הרגע הראשון שלו.
+          setLastFailed(isOpening ? OPENING_RETRY : text);
         } else {
           setLastFailed(null);
         }
@@ -192,6 +197,10 @@ export function useIshmael() {
 
   const retry = useCallback(() => {
     if (!lastFailed || isStreaming) return;
+    if (lastFailed === OPENING_RETRY) {
+      void run("", true);
+      return;
+    }
     void run(lastFailed, false);
   }, [isStreaming, lastFailed, run]);
 

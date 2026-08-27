@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import { streamLLM, type Message } from "../_core/llm";
+import { describeError, streamLLM, type Message } from "../_core/llm";
 import {
   EMPTY_IDENTITY,
   ISHMAEL_MAX_HISTORY_MESSAGES,
@@ -288,7 +288,7 @@ export function registerIshmaelRoutes(app: Express) {
       writeEvent(res, { type: "done" });
     } catch (error) {
       finished = true;
-      console.error("ishmael stream failed:", error);
+      console.error("ishmael stream failed:", describeError(error));
       writeEvent(res, { type: "error", message: "משהו נקטע באמצע. אפשר לנסות שוב." });
     } finally {
       clearTimeout(timeout);
