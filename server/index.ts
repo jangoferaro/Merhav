@@ -3,6 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { registerChatRoute } from "./chatRoute";
+import { registerIshmaelRoutes } from "./ishmael/route";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -32,6 +33,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "2mb", extended: true }));
 
   registerChatRoute(app);
+  registerIshmaelRoutes(app);
 
   // מצב פיתוח משתמש ב-Vite (HMR), מצב פרודקשן מגיש קבצים סטטיים
   if (process.env.NODE_ENV === "development") {
