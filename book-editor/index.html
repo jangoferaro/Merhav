@@ -286,6 +286,8 @@ label.check input { margin-top: .3em; }
   .modal footer { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
   .diff-list { font-size: 1rem; }
   .chapbar { position: sticky; top: var(--topbar-h, 56px); z-index: 19; padding-block: 4px; }
+  /* while the keyboard is up, the bars scroll away so the text gets the room */
+  body.typing .topbar, body.typing .chapbar { position: relative; top: 0; }
   .chapfoot { margin: 8px max(18px, env(safe-area-inset-right, 0px)) 0 max(18px, env(safe-area-inset-left, 0px)); }
   #home { padding-block: 28px 48px; }
   .drop { padding: 20px; }
@@ -1785,6 +1787,40 @@ if (window.visualViewport) {
   vv.addEventListener("resize", place); vv.addEventListener("scroll", place);
 }
 $("#backToResults").onclick = () => openSide("pCheck");
+
+/* keep the line being typed visible above the formatting bar and the keyboard */
+function caretRect() {
+  const sel = getSelection(); if (!sel.rangeCount || !editor.contains(sel.focusNode)) return null;
+  const r = sel.getRangeAt(0).cloneRange(); r.collapse(false);
+  const rects = r.getClientRects();
+  if (rects.length) return rects[rects.length - 1];
+  let n = sel.focusNode; if (n.nodeType !== 1) n = n.parentElement;
+  const b = n && n.getBoundingClientRect(); if (!b) return null;
+  const lh = parseFloat(getComputedStyle(n).lineHeight) || 30;
+  return { top: b.top, bottom: Math.min(b.bottom, b.top + lh) };
+}
+function keepCaretVisible() {
+  if (!isMobile() || document.activeElement !== editor) return;
+  const r = caretRect(); if (!r) return;
+  const fb = $("#formatbar").getBoundingClientRect();
+  const vvH = window.visualViewport ? window.visualViewport.height + window.visualViewport.offsetTop : innerHeight;
+  const bottom = Math.min(fb.top, vvH) - 24;
+  const top = document.body.classList.contains("typing") ? 12 : topInset() + 12;
+  if (r.bottom > bottom) window.scrollBy(0, r.bottom - bottom + 48);
+  else if (r.top < top) window.scrollBy(0, r.top - top - 48);
+}
+let caretRaf = 0;
+const scheduleCaret = () => { cancelAnimationFrame(caretRaf); caretRaf = requestAnimationFrame(keepCaretVisible); };
+editor.addEventListener("focus", () => {
+  if (!isMobile()) return;
+  document.body.classList.add("typing");
+  [80, 300, 600, 1000].forEach(t => setTimeout(keepCaretVisible, t));   // follow the keyboard animation
+});
+editor.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== editor) document.body.classList.remove("typing"); }, 200));
+editor.addEventListener("input", scheduleCaret);
+document.addEventListener("selectionchange", () => { if (document.activeElement === editor) scheduleCaret(); });
+window.addEventListener("resize", () => setTimeout(keepCaretVisible, 60));
+if (window.visualViewport) window.visualViewport.addEventListener("resize", () => setTimeout(keepCaretVisible, 60));
 
 /* text size */
 const SIZES = [1.0, 1.1, 1.22, 1.35, 1.5, 1.7];
