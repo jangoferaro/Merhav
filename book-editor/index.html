@@ -120,6 +120,7 @@ label.check input { margin-top: .3em; }
 #editor { white-space: pre-wrap; max-width: 70ch; margin: 0 auto; background: var(--paper); box-shadow: var(--shadow); border-radius: 3px; padding: 56px clamp(20px, 6vw, 72px) 72px; font: 400 1.22rem/1.9 var(--font-book); outline: none; min-height: 60vh; text-align: start; }
 #editor p, #editor h1, #editor h2, #editor h3, #editor div { margin: 0 0 .7em; position: relative; }
 #editor h1, #editor h2, #editor h3 { font: 700 1.55rem/1.35 var(--font-book); margin: 1.4em 0 .6em; text-align: start; }
+#editor h3 { font: 700 1.2rem/1.4 var(--font-ui); margin: 1.2em 0 .35em; }
 #editor [data-pgmark]::before { content: "עמ׳ " attr(data-pgmark); position: absolute; inset-inline-start: calc(-1 * clamp(20px, 6vw, 72px) + 4px); top: .35em; font: 600 .7rem/1 var(--font-ui); color: var(--muted); letter-spacing: .02em; user-select: none; pointer-events: none; white-space: nowrap; }
 #editor.show-edits .edited::after { content: ""; position: absolute; inset-inline-end: -14px; top: .3em; bottom: .3em; width: 3px; border-radius: 2px; background: var(--accent); opacity: .65; }
 #editor.show-edits .added::after { background: var(--ins); }
@@ -256,6 +257,7 @@ label.check input { margin-top: .3em; }
     <span class="sep"></span>
     <button class="btn" data-block="p">פסקה</button>
     <button class="btn" data-block="h">כותרת</button>
+    <button class="btn" data-block="s">כותרת משנה</button>
     <span class="sep"></span>
     <button class="btn on" id="tMarks" title="סימון בשוליים של פסקאות ששונו מאז הייבוא">סימון פסקאות שנערכו</button>
     <button class="btn" id="saveVerQuick" title="Ctrl+S">שמירת גרסה</button>
@@ -437,7 +439,7 @@ async function readPages(pdf, onProgress) {
       if (!it.str) continue;
       const tr = it.transform;
       const size = Math.hypot(tr[2], tr[3]) || it.height || 10;
-      items.push({ str: it.str, x: tr[4], y: tr[5], w: it.width || 0, size });
+      items.push({ str: it.str, x: tr[4], y: tr[5], w: it.width || 0, size, font: it.fontName });
     }
     pages.push(items);
     page.cleanup();
@@ -483,7 +485,7 @@ function buildLines(items, reverse) {
     if (!s) continue;
     const left = Math.min(...L.items.map(i => i.x)), right = Math.max(...L.items.map(i => i.x + i.w));
     const sizes = L.items.filter(i => i.str.trim()).map(i => i.size);
-    out.push({ text: s, y: L.y, size: median(sizes) || L.size, left, right, rtl: !(lat > heb) });
+    out.push({ text: s, y: L.y, size: median(sizes) || L.size, left, right, rtl: !(lat > heb), fonts: L.items.filter(i => i.str.trim()).map(i => i.font) });
   }
   return out;
 }
@@ -514,6 +516,11 @@ function extractBook(pages, opts) {
   // global body font size
   const allSizes = all.flat().map(l => l.size);
   const bodySize = median(allSizes) || 10;
+  // body font = the font carrying most of the text; short lines set entirely in another font are subheadings
+  const fcount = new Map();
+  for (const items of pages) for (const it of items) fcount.set(it.font, (fcount.get(it.font) || 0) + it.str.length);
+  let bodyFont = null, best = 0;
+  for (const [f, c] of fcount) if (c > best) { best = c; bodyFont = f; }
 
   const paras = [];
   all.forEach((lines, pi) => {
@@ -529,17 +536,19 @@ function extractBook(pages, opts) {
     const pagePs = [];
     for (const ln of lines) {
       const heading = ln.size > bodySize * 1.2 && ln.text.length < 140;
+      const sub = !heading && bodyFont && ln.size >= bodySize * 0.97 && ln.fonts.length && ln.fonts.every(f => f !== bodyFont) && ln.text.length <= 70 && !/[.,;]$/.test(ln.text) && /\p{L}{2}/u.test(ln.text);
+      const kind = heading ? "h" : sub ? "s" : "p";
       const gap = prevY === null ? 0 : prevY - ln.y;
       const indent = ln.rtl ? ln.right < maxR - Math.max(0.8 * ln.size, width * 0.025) : ln.left > minL + Math.max(0.8 * ln.size, width * 0.025);
       let start = !cur;
       if (cur) {
-        if (heading !== cur.heading) start = true;
-        else if (heading) start = gap > lineGap * 2.2;
+        if (kind !== cur.kind) start = true;
+        else if (kind === "h") start = gap > lineGap * 2.2;
         else if (gap > lineGap * 1.55) start = true;
         else if (prevShort) start = true;
         else if (indent) start = true;
       }
-      if (start) { cur = { text: ln.text, heading, pg, indentStart: indent, open: false }; pagePs.push(cur); }
+      if (start) { cur = { text: ln.text, kind, pg, indentStart: indent, open: false }; pagePs.push(cur); }
       else {
         const t = cur.text;
         if (/[־]$/.test(t)) cur.text = t + ln.text;
@@ -553,7 +562,7 @@ function extractBook(pages, opts) {
     // merge a paragraph that runs over from the previous page
     if (opts.mergePages && paras.length && pagePs.length) {
       const last = paras[paras.length - 1], first = pagePs[0];
-      if (last.open && !last.heading && !first.heading && !first.indentStart && !/[.!?:׃…"״”)]$/.test(last.text)) {
+      if (last.open && last.kind === "p" && first.kind === "p" && !first.indentStart && !/[.!?:׃…"״”)]$/.test(last.text)) {
         last.text += (/[־]$/.test(last.text) ? "" : " ") + first.text;
         last.open = first.open;
         pagePs.shift();
@@ -561,7 +570,7 @@ function extractBook(pages, opts) {
     }
     paras.push(...pagePs);
   });
-  return paras.map(p => ({ id: uid(), t: p.heading ? "h" : "p", h: esc(p.text), pg: p.pg }));
+  return paras.map(p => ({ id: uid(), t: p.kind, h: esc(p.text), pg: p.pg }));
 }
 
 /* ---------------- diff ---------------- */
@@ -695,12 +704,12 @@ function runXml(r) {
 }
 function buildDocx(title, paras) {
   const body = paras.map(p => {
-    const style = p.t === "h" ? '<w:pStyle w:val="Heading1"/>' : "";
+    const style = p.t === "h" ? '<w:pStyle w:val="Heading1"/>' : p.t === "s" ? '<w:pStyle w:val="Heading2"/>' : "";
     return `<w:p><w:pPr>${style}<w:bidi/></w:pPr>${runsFromHtml(p.h).map(runXml).join("")}</w:p>`;
   }).join("");
   const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
   const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${W}><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/><w:bidi/></w:sectPr></w:body></w:document>`;
-  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="he-IL" w:bidi="he-IL"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:bidi/><w:spacing w:after="160" w:line="360" w:lineRule="auto"/><w:jc w:val="both"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="360" w:after="200"/><w:jc w:val="right"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:bCs/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr></w:style></w:styles>`;
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="he-IL" w:bidi="he-IL"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:bidi/><w:spacing w:after="160" w:line="360" w:lineRule="auto"/><w:jc w:val="both"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="360" w:after="200"/><w:jc w:val="right"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:bCs/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="120"/><w:jc w:val="right"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:bCs/><w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr></w:style></w:styles>`;
   const ct = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`;
   const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`;
   const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
@@ -794,11 +803,13 @@ async function startImport(file) {
   const scanned = totalChars < pdf.numPages * 40;
   const rev = detectReversed(pages);
   const opts = { reverse: rev, cleanup: true, mergePages: true };
+  let metaTitle = "";
+  try { const md = await pdf.getMetadata(); metaTitle = ((md && md.info && md.info.Title) || "").trim(); } catch (e) {}
   const sampleIdx = Math.max(0, pages.findIndex(p => p.reduce((t, i) => t + i.str.length, 0) > 300));
   const mm = openModal(`<header><h3>הגדרות ייבוא</h3><span class="muted num">${pdf.numPages} עמודים</span></header>
     <div class="mbody">
       ${scanned ? `<div class="alert">כמעט לא נמצא טקסט בקובץ. כנראה שה-PDF סרוק (תמונות של עמודים), ואז אי אפשר לחלץ ממנו טקסט ישירות. אפשר לייצא את הספר מחדש מ-Word כ-PDF, או להעביר את הסריקה קודם דרך תוכנת OCR.</div>` : ""}
-      <label style="display:grid;gap:4px"><span class="eyebrow">שם הספר</span><input type="text" id="impTitle" value="${esc(file.name.replace(/\.pdf$/i, ""))}"></label>
+      <label style="display:grid;gap:4px"><span class="eyebrow">שם הספר</span><input type="text" id="impTitle" value="${esc(metaTitle || file.name.replace(/\.pdf$/i, ""))}"></label>
       <label class="check"><input type="checkbox" id="oRev" ${rev ? "checked" : ""}><span>תיקון טקסט עברי הפוך${rev ? " <b>(זוהה אוטומטית שהטקסט בקובץ הפוך)</b>" : ""}<br><span class="muted">לסמן אם בתצוגה המקדימה המילים כתובות מהסוף להתחלה.</span></span></label>
       <label class="check"><input type="checkbox" id="oClean" checked><span>הסרת מספרי עמודים וכותרות רצות<br><span class="muted">שורות שחוזרות בראש או בתחתית של הרבה עמודים.</span></span></label>
       <label class="check"><input type="checkbox" id="oMerge" checked><span>חיבור פסקאות שנחתכו בין עמודים</span></label>
@@ -809,7 +820,7 @@ async function startImport(file) {
   const preview = () => {
     readOpts();
     const ps = extractBook([pages[sampleIdx] || []], { ...opts, cleanup: false, mergePages: false });
-    $("#impPrev").innerHTML = ps.length ? ps.slice(0, 12).map(p => p.t === "h" ? `<h4>${p.h}</h4>` : `<p>${p.h}</p>`).join("") : `<span class="muted">אין טקסט בעמוד הזה.</span>`;
+    $("#impPrev").innerHTML = ps.length ? ps.slice(0, 12).map(p => p.t !== "p" ? `<h4>${p.h}</h4>` : `<p>${p.h}</p>`).join("") : `<span class="muted">אין טקסט בעמוד הזה.</span>`;
   };
   ["#oRev", "#oClean", "#oMerge"].forEach(s => $(s, mm).addEventListener("change", preview));
   preview();
@@ -877,7 +888,7 @@ async function openBook(id) {
 }
 
 function blockHtml(p) {
-  const tag = p.t === "h" ? "h2" : "p";
+  const tag = p.t === "h" ? "h2" : p.t === "s" ? "h3" : "p";
   return `<${tag} data-id="${esc(p.id)}"${p.pg ? ` data-pg="${p.pg}"` : ""}>${p.h || "<br>"}</${tag}>`;
 }
 function renderEditor(paras) {
@@ -958,7 +969,7 @@ function serialize() {
     let pg = el.dataset.pg || lastPg;
     if (pg && !el.dataset.pg) el.dataset.pg = pg;
     lastPg = pg;
-    return { id: el.dataset.id, t: /^H/.test(el.nodeName) ? "h" : "p", h: cleanInline(el), pg: pg ? +pg : null };
+    return { id: el.dataset.id, t: /^H[12]$/.test(el.nodeName) ? "h" : /^H/.test(el.nodeName) ? "s" : "p", h: cleanInline(el), pg: pg ? +pg : null };
   });
 }
 
@@ -1049,7 +1060,7 @@ $$("[data-block]").forEach(b => b.addEventListener("mousedown", e => e.preventDe
 $$("[data-block]").forEach(b => b.addEventListener("click", () => setBlockType(b.dataset.block)));
 function setBlockType(t) {
   const el = currentBlock(); if (!el) { toast("קודם מציבים את הסמן בתוך פסקה"); return; }
-  const tag = t === "h" ? "H2" : "P"; if (el.nodeName === tag) return;
+  const tag = t === "h" ? "H2" : t === "s" ? "H3" : "P"; if (el.nodeName === tag) return;
   const n = document.createElement(tag);
   for (const a of el.attributes) n.setAttribute(a.name, a.value);
   n.append(...el.childNodes); el.replaceWith(n); placeCaret(n, true);
