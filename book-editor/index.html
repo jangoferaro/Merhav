@@ -143,6 +143,10 @@ label.check input { margin-top: .3em; }
 #editor p, #editor h1, #editor h2, #editor h3, #editor div { margin: 0 0 .7em; position: relative; }
 #editor h1, #editor h2, #editor h3 { font: 700 1.55rem/1.35 var(--font-book); margin: 1.4em 0 .6em; text-align: start; }
 #editor h3 { font: 700 1.2rem/1.4 var(--font-ui); margin: 1.2em 0 .35em; }
+/* emphasize: the marked words are 3px larger than the text around them */
+#editor big, .preview big { font-size: calc(1em + 3px); }
+.emph-btn { font-family: var(--font-book); }
+.emph-btn::first-letter { font-size: 1.15em; }
 #editor [data-pgmark]::before { content: "עמ׳ " attr(data-pgmark); position: absolute; inset-inline-start: calc(-1 * clamp(20px, 6vw, 72px) + 4px); top: .35em; font: 600 .7rem/1 var(--font-ui); color: var(--muted); letter-spacing: .02em; user-select: none; pointer-events: none; white-space: nowrap; }
 #editor.show-edits .edited::after { content: ""; position: absolute; inset-inline-end: -14px; top: .3em; bottom: .3em; width: 3px; border-radius: 2px; background: var(--accent); opacity: .65; }
 #editor.show-edits .added::after { background: var(--ins); }
@@ -362,6 +366,7 @@ label.check input { margin-top: .3em; }
     <button class="btn icon-btn" data-cmd="bold" title="מודגש (Ctrl+B)"><b>ב</b></button>
     <button class="btn icon-btn" data-cmd="italic" title="נטוי (Ctrl+I)"><i>נ</i></button>
     <button class="btn icon-btn" data-cmd="underline" title="קו תחתון (Ctrl+U)"><u>ק</u></button>
+    <button class="btn emph-btn" id="emphBtn" title="הבלטה: הגדלת המילים המסומנות ב-3 פיקסלים">הבלטה</button>
     <button class="btn" data-cmd="removeFormat" title="ניקוי עיצוב"><span class="desk-only">ניקוי עיצוב</span><span class="mob-only">נקה</span></button>
     <span class="sep"></span>
     <button class="btn" data-block="p">פסקה</button>
@@ -830,7 +835,7 @@ function runsFromHtml(h) {
       else if (n.nodeName === "BR") runs.push({ br: true });
       else if (n.nodeType === 1) {
         const tag = n.nodeName;
-        walk(n, { b: f.b || tag === "B" || tag === "STRONG", i: f.i || tag === "I" || tag === "EM", u: f.u || tag === "U" });
+        walk(n, { b: f.b || tag === "B" || tag === "STRONG", i: f.i || tag === "I" || tag === "EM", u: f.u || tag === "U", big: f.big || tag === "BIG" });
       }
     }
   })(tmpl.content, {});
@@ -842,7 +847,8 @@ function runXml(r) {
   for (const piece of r.t.split(/([A-Za-z][A-Za-z0-9 .,'’\-]*[A-Za-z0-9]|[A-Za-z])/)) {
     if (!piece) continue;
     const latin = /^[A-Za-z]/.test(piece);
-    const pr = (r.b ? "<w:b/><w:bCs/>" : "") + (r.i ? "<w:i/><w:iCs/>" : "") + (r.u ? '<w:u w:val="single"/>' : "") + (latin ? "" : "<w:rtl/>");
+    // emphasize = +3px; at 12pt body text that is about 14.5pt (sizes are in half-points)
+    const pr = (r.b ? "<w:b/><w:bCs/>" : "") + (r.i ? "<w:i/><w:iCs/>" : "") + (r.u ? '<w:u w:val="single"/>' : "") + (r.big ? '<w:sz w:val="29"/><w:szCs w:val="29"/>' : "") + (latin ? "" : "<w:rtl/>");
     out.push(`<w:r>${pr ? "<w:rPr>" + pr + "</w:rPr>" : ""}<w:t xml:space="preserve">${xesc(piece)}</w:t></w:r>`);
   }
   return out.join("");
@@ -1218,7 +1224,7 @@ function updateStatus(edited) {
 }
 
 /* ---------------- serialize ---------------- */
-const ALLOWED = new Set(["B", "STRONG", "I", "EM", "U", "BR", "SUP", "SUB"]);
+const ALLOWED = new Set(["B", "STRONG", "I", "EM", "U", "BR", "SUP", "SUB", "BIG"]);
 function cleanInline(el) {
   const c = el.cloneNode(true);
   (function walk(n) {
@@ -1375,6 +1381,43 @@ function setBlockType(t) {
   n.append(...el.childNodes); el.replaceWith(n); placeCaret(n, true);
   markEdited(n); markDirty();
 }
+/* emphasize (הבלטה) */
+let lastEditorRange = null;
+document.addEventListener("selectionchange", () => {
+  const sel = getSelection();
+  if (sel.rangeCount && editor.contains(sel.anchorNode)) lastEditorRange = sel.getRangeAt(0).cloneRange();
+});
+const bigOf = n => { const el = n && (n.nodeType === 1 ? n : n.parentElement); const b = el && el.closest("big"); return b && editor.contains(b) ? b : null; };
+const unwrapEl = el => el.replaceWith(...el.childNodes);
+function blockOfNode(n) { while (n && n.parentNode !== editor) n = n.parentNode; return n; }
+$("#emphBtn").addEventListener("mousedown", e => e.preventDefault());
+$("#emphBtn").addEventListener("click", () => {
+  const sel = getSelection();
+  const live = sel.rangeCount && editor.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
+  const r = (live || lastEditorRange) ? (live || lastEditorRange).cloneRange() : null;
+  if (!r) { toast("קודם מסמנים מילה או משפט"); return; }
+  const block = blockOfNode(r.startContainer);
+  const a = bigOf(r.startContainer), z = bigOf(r.endContainer);
+  if (a && a === z) {   // inside an emphasized run: tapping again removes it
+    const first = a.firstChild, last = a.lastChild;
+    unwrapEl(a);
+    if (first && last) { const nr = document.createRange(); nr.setStartBefore(first); nr.setEndAfter(last); sel.removeAllRanges(); sel.addRange(nr); }
+  } else {
+    if (r.collapsed) { toast("קודם מסמנים מילה או משפט"); return; }
+    if (block !== blockOfNode(r.endContainer)) { toast("אפשר להבליט רק בתוך פסקה אחת"); return; }
+    if (a) r.setStartBefore(a);
+    if (z) r.setEndAfter(z);
+    const frag = r.extractContents();
+    frag.querySelectorAll("big").forEach(unwrapEl);
+    const big = document.createElement("big");
+    big.appendChild(frag);
+    r.insertNode(big);
+    block.querySelectorAll("big").forEach(b => { if (!b.textContent) b.remove(); });
+    const nr = document.createRange(); nr.selectNodeContents(big); sel.removeAllRanges(); sel.addRange(nr);
+  }
+  if (block) markEdited(block);
+  markDirty();
+});
 $("#tMarks").onclick = () => { editor.classList.toggle("show-edits"); $("#tMarks").classList.toggle("on", editor.classList.contains("show-edits")); };
 $("#bookTitle").addEventListener("input", () => { document.title = ($("#bookTitle").value || "ספר") + " · מגיה"; markDirty(); });
 $("#goHome").onclick = showHome;
