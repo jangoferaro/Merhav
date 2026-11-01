@@ -91,7 +91,26 @@ label.check input { margin-top: .3em; }
 .note { font-size: .9rem; color: var(--muted); max-width: 70ch; }
 
 /* ---------- App ---------- */
-#app { height: 100%; display: grid; grid-template-rows: auto auto 1fr auto; }
+#app { height: 100%; display: grid; grid-template-rows: auto auto auto 1fr auto; }
+.chapbar { display: flex; align-items: center; gap: 8px; padding-block: 6px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--accent-soft); border-bottom: 1px solid var(--line); }
+.chap-title { flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: center; gap: 8px; border: 0; background: transparent; padding: .3em .4em; color: var(--ink); }
+.chap-num { font-size: .8rem; color: var(--accent); font-weight: 700; white-space: nowrap; }
+.chap-name { font: 700 1.02rem var(--font-book); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.chap-caret { color: var(--muted); font-size: .8rem; }
+.chap-title.done .chap-name::after { content: " ✓"; color: var(--ins); }
+.chapfoot { max-width: 70ch; margin: 20px auto 0; display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+.chapfoot .btn { flex: 1 1 180px; justify-content: center; min-height: 46px; }
+#markDone.on { background: var(--ins-bg); color: var(--ins); border-color: var(--ins); }
+.chap-progress { margin: 12px max(16px, env(safe-area-inset-right, 0px)) 6px max(16px, env(safe-area-inset-left, 0px)); }
+.chap-progress > div { background: var(--ins); }
+.chap-item { display: grid; grid-template-columns: 2.2em 1fr auto; gap: 10px; align-items: baseline; }
+.chap-item .n { color: var(--muted); font-size: .85rem; }
+.chap-item .ct { font-family: var(--font-book); }
+.chap-item .cm { font-size: .78rem; color: var(--muted); white-space: nowrap; }
+.chap-item .cm .d { color: var(--ins); font-weight: 700; }
+.chap-item .cm .e { color: var(--accent); }
+.chap-item.cur { background: var(--accent-soft); }
+@media (min-width: 761px) { #chapSheet { align-items: center; justify-content: center; } #chapSheet .sheet { max-width: 620px; border-radius: 14px; max-height: 80%; } }
 .topbar { display: flex; align-items: center; gap: 10px; padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--paper); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .topbar .title-wrap { flex: 1 1 220px; min-width: 0; display: flex; align-items: center; gap: 10px; }
 .topbar .logo { font: 700 1.25rem var(--font-book); color: var(--accent); background: none; border: 0; padding: 0; }
@@ -263,6 +282,8 @@ label.check input { margin-top: .3em; }
   .modal .mbody { padding: 16px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); }
   .modal footer { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
   .diff-list { font-size: 1rem; }
+  .chapbar { position: sticky; top: var(--topbar-h, 56px); z-index: 19; padding-block: 4px; }
+  .chapfoot { margin: 8px max(18px, env(safe-area-inset-right, 0px)) 0 max(18px, env(safe-area-inset-left, 0px)); }
   #home { padding-block: 28px 48px; }
   .drop { padding: 20px; }
   .drop .row { width: 100%; }
@@ -324,6 +345,11 @@ label.check input { margin-top: .3em; }
       <button class="btn" id="tExport">ייצוא</button>
     </div>
   </div>
+  <nav class="chapbar" id="chapbar" aria-label="ניווט בין פרקים">
+    <button class="btn small" id="chPrev" aria-label="הפרק הקודם">→ <span class="desk-only">הקודם</span></button>
+    <button class="chap-title" id="chTitle" aria-label="רשימת הפרקים"><span class="chap-num num" id="chNum"></span><span class="chap-name" id="chName"></span><span class="chap-caret">▾</span></button>
+    <button class="btn small" id="chNext" aria-label="הפרק הבא"><span class="desk-only">הבא</span> ←</button>
+  </nav>
   <div class="formatbar" id="formatbar" role="toolbar" aria-label="עיצוב">
     <button class="btn icon-btn" data-cmd="undo" title="ביטול (Ctrl+Z)">↶</button>
     <button class="btn icon-btn" data-cmd="redo" title="חזרה (Ctrl+Y)">↷</button>
@@ -361,15 +387,15 @@ label.check input { margin-top: .3em; }
             <button class="btn" id="fRepl">החלפה</button>
             <button class="btn" id="fReplAll">החלפת הכל</button>
           </div>
-          <p class="note">כל החלפה נרשמת כשינוי רגיל. אפשר לבטל עם Ctrl+Z, או לחזור לגרסה קודמת מההיסטוריה.</p>
+          <p class="note">החיפוש וההחלפה פועלים על הפרק הפתוח. כל החלפה נרשמת כשינוי רגיל. אפשר לבטל עם Ctrl+Z, או לחזור לגרסה קודמת מההיסטוריה.</p>
         </div>
       </div>
       <!-- checks -->
       <div id="pCheck" hidden>
         <header><h3>בדיקות הגהה</h3><button class="btn small" data-close>סגירה</button></header>
         <div class="body">
-          <p class="note" style="margin:0">סריקה של כל הספר לבעיות נפוצות. לחיצה על ממצא מובילה אליו בטקסט.</p>
-          <button class="btn primary" id="runChecks">סריקת הספר</button>
+          <p class="note" style="margin:0">סריקה של הפרק הפתוח לבעיות נפוצות. לחיצה על ממצא מובילה אליו בטקסט.</p>
+          <button class="btn primary" id="runChecks">סריקת הפרק</button>
           <div id="checkResults" style="display:grid;gap:10px"></div>
         </div>
       </div>
@@ -388,7 +414,11 @@ label.check input { margin-top: .3em; }
     </aside>
 
     <div class="sheet-scroll" id="sheetScroll">
-      <article id="editor" class="show-edits" contenteditable="true" spellcheck="true" lang="he" dir="rtl" aria-label="טקסט הספר"></article>
+      <article id="editor" class="show-edits" contenteditable="true" spellcheck="true" lang="he" dir="rtl" aria-label="טקסט הפרק"></article>
+      <div class="chapfoot" id="chapFoot">
+        <button class="btn" id="markDone">סימון הפרק כנבדק</button>
+        <button class="btn primary" id="footNext">לפרק הבא ←</button>
+      </div>
     </div>
 
     <aside class="pdfpane" id="pdfPane" hidden>
@@ -421,6 +451,7 @@ label.check input { margin-top: .3em; }
   <div class="sheet" role="dialog" aria-label="תפריט">
     <div class="sheet-head"><div><div class="sheet-title" id="menuTitle"></div><div class="muted num" id="menuStats"></div></div><button class="btn small" data-menu-close>סגירה</button></div>
     <div class="menu-list">
+      <button class="menu-item" data-act="chapters">רשימת הפרקים</button>
       <button class="menu-item" data-act="find">חיפוש והחלפה</button>
       <button class="menu-item" data-act="check">בדיקות הגהה</button>
       <button class="menu-item" data-act="hist">היסטוריית גרסאות</button>
@@ -435,6 +466,15 @@ label.check input { margin-top: .3em; }
   </div>
 </div>
 <button class="float-chip" id="backToResults" hidden>‹ חזרה לממצאים</button>
+
+<!-- chapter list -->
+<div class="sheet-back" id="chapSheet" hidden>
+  <div class="sheet chap-sheet" role="dialog" aria-label="פרקים">
+    <div class="sheet-head"><div><div class="sheet-title">פרקים</div><div class="muted num" id="chProgress"></div></div><button class="btn small" data-chap-close>סגירה</button></div>
+    <div class="progress chap-progress"><div id="chBar"></div></div>
+    <div id="chList" class="menu-list"></div>
+  </div>
+</div>
 
 <div id="modalRoot"></div>
 <div id="toast" hidden></div>
@@ -997,7 +1037,8 @@ async function openBook(id) {
   S.lastVersionAt = vers.length ? Math.max(...vers.map(v => v.ts)) : 0;
   $("#home").hidden = true; $("#app").hidden = false;
   $("#bookTitle").value = book.title; document.title = book.title + " · מגיה";
-  renderEditor(book.paras);
+  S.chapters = null; S.ci = 0;
+  renderEditor(book.paras, book.lastPos);
   setSaveState("saved");
   closeSide();
   // PDF
@@ -1019,10 +1060,129 @@ function blockHtml(p) {
   const tag = p.t === "h" ? "h2" : p.t === "s" ? "h3" : "p";
   return `<${tag} data-id="${esc(p.id)}"${p.pg ? ` data-pg="${p.pg}"` : ""}>${p.h || "<br>"}</${tag}>`;
 }
-function renderEditor(paras) {
-  editor.innerHTML = paras.map(blockHtml).join("") || "<p><br></p>";
-  decorate();
+/* ---------------- chapters: the editor shows one chapter at a time ----------------
+   S.full holds the whole book; the open chapter lives in the editor DOM and is merged back by fullParas(). */
+function computeChapters(paras) {
+  const T = paras.map(pText), starts = [];
+  for (let i = 0; i < paras.length; i++) {
+    if (paras[i].t !== "h") continue;
+    let s = i;   // pull in a short label just above the heading ("01", "חלק א")
+    while (s > 0 && paras[s - 1].t !== "h" && T[s - 1].trim().length <= 14 && (!starts.length || s - 1 > starts[starts.length - 1])) s--;
+    if (!starts.length || s > starts[starts.length - 1]) starts.push(s);
+  }
+  if (!starts.length || starts[0] !== 0) starts.unshift(0);
+  const raw = starts.map((s, k) => ({ start: s, end: k + 1 < starts.length ? starts[k + 1] : paras.length }));
+  const body = c => { let n = 0; for (let i = c.start; i < c.end; i++) if (paras[i].t === "p" && T[i].length > 40) n += T[i].length; return n; };
+  const merged = [];
+  for (let k = 0; k < raw.length; k++) {   // a heading with no text of its own (part titles, the title page) joins the next chapter
+    const c = { ...raw[k] };
+    while (body(c) < 80 && k + 1 < raw.length) { k++; c.end = raw[k].end; }
+    merged.push(c);
+  }
+  const titled = merged.map(c => {
+    let t = null;
+    for (let i = c.start; i < c.end; i++) { if (paras[i].t === "p" && T[i].length > 40) break; if (paras[i].t === "h") t = i; }
+    if (t === null) for (let i = c.start; i < c.end; i++) if (paras[i].t === "h") { t = i; break; }
+    return { ...c, title: (t === null ? T[c.start] : T[t]).trim().slice(0, 80) || "ללא כותרת" };
+  });
+  // very long chapters (e.g. the notes) are split at subheadings into readable parts
+  const out = [];
+  for (const c of titled) {
+    if (c.end - c.start <= 120) { out.push(c); continue; }
+    const cuts = [c.start];
+    for (let i = c.start + 1; i < c.end; i++) if (paras[i].t === "s" && i - cuts[cuts.length - 1] >= 40 && c.end - i >= 20) cuts.push(i);
+    cuts.forEach((s, j) => out.push({ start: s, end: j + 1 < cuts.length ? cuts[j + 1] : c.end, title: cuts.length > 1 ? `${c.title} (${j + 1}/${cuts.length})` : c.title }));
+  }
+  return out.length ? out : [{ start: 0, end: paras.length, title: "הספר" }];
 }
+function chapterIndexOfId(id) {
+  const idx = S.full.findIndex(p => p.id === id);
+  return idx < 0 ? -1 : S.chapters.findIndex(c => idx >= c.start && idx < c.end);
+}
+function fullParas() {
+  const c = S.chapters && S.chapters[S.ci];
+  if (!c) return serialize();
+  const cur = serialize(), delta = cur.length - (c.end - c.start);
+  S.full = S.full.slice(0, c.start).concat(cur, S.full.slice(c.end));
+  c.end += delta;
+  for (let k = S.ci + 1; k < S.chapters.length; k++) { S.chapters[k].start += delta; S.chapters[k].end += delta; }
+  return S.full;
+}
+function renderEditor(paras, focusId) {
+  const cur = S.chapters && S.chapters[S.ci] && S.full[S.chapters[S.ci].start];
+  const keep = focusId || (cur && cur.id);
+  S.full = paras.slice();
+  S.chapters = computeChapters(S.full);
+  const k = keep ? chapterIndexOfId(keep) : 0;
+  renderChapter(k < 0 ? 0 : k);
+}
+function renderChapter(k) {
+  S.ci = Math.max(0, Math.min(S.chapters.length - 1, k));
+  const c = S.chapters[S.ci];
+  editor.innerHTML = S.full.slice(c.start, c.end).map(blockHtml).join("") || "<p><br></p>";
+  decorate(); paintChapter();
+}
+const chapStartId = c => (S.full[c.start] || {}).id;
+const isDone = c => !!(S.book && S.book.done && S.book.done.includes(chapStartId(c)));
+function paintChapter() {
+  const c = S.chapters[S.ci], n = S.chapters.length;
+  $("#chNum").textContent = `${S.ci + 1}/${n}`;
+  $("#chName").textContent = c.title;
+  $("#chTitle").classList.toggle("done", isDone(c));
+  $("#chPrev").disabled = S.ci === 0; $("#chNext").disabled = S.ci === n - 1;
+  $("#footNext").hidden = S.ci === n - 1;
+  const d = isDone(c);
+  $("#markDone").classList.toggle("on", d);
+  $("#markDone").textContent = d ? "✓ הפרק סומן כנבדק" : "סימון הפרק כנבדק";
+}
+function goChapter(k, focusId) {
+  if (!S.chapters[k]) return;
+  const full = fullParas();
+  const targetId = focusId || full[S.chapters[k].start].id;
+  S.chapters = computeChapters(full);
+  const idx = chapterIndexOfId(targetId);
+  renderChapter(idx < 0 ? k : idx);
+  closeChapters();
+  if (!$("#side").hidden && !$("#pFind").hidden) refreshFind(false);
+  if (!focusId) { $("#sheetScroll").scrollTop = 0; window.scrollTo(0, 0); }
+  if (S.book) { S.book.lastPos = targetId; S.dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 800); }
+  if (S.pdf && !$("#pdfPane").hidden) { const pg = S.full[S.chapters[S.ci].start].pg; if (pg) showPdfPage(pg); }
+}
+function goToPara(id) {
+  let el = editor.querySelector(`[data-id="${CSS.escape(id)}"]`);
+  if (!el) { fullParas(); const k = chapterIndexOfId(id); if (k < 0) return null; goChapter(k, id); el = editor.querySelector(`[data-id="${CSS.escape(id)}"]`); }
+  return el;
+}
+function openChapters() {
+  const full = fullParas();
+  const list = $("#chList"), n = S.chapters.length;
+  let done = 0;
+  list.innerHTML = S.chapters.map((c, k) => {
+    let edited = false;
+    for (let i = c.start; i < c.end && !edited; i++) { const b = S.baseline.get(full[i].id); edited = b === undefined || b !== pText(full[i]); }
+    const d = isDone(c); if (d) done++;
+    return `<button class="menu-item chap-item${k === S.ci ? " cur" : ""}" data-k="${k}"><span class="n num">${k + 1}</span><span class="ct">${esc(c.title)}</span><span class="cm num">${d ? '<span class="d">✓ נבדק</span> · ' : ""}${edited ? '<span class="e">נערך</span> · ' : ""}עמ׳ ${full[c.start].pg || "—"}</span></button>`;
+  }).join("");
+  $("#chProgress").textContent = `${done} מתוך ${n} פרקים סומנו כנבדקים`;
+  $("#chBar").style.width = Math.round(done / n * 100) + "%";
+  $$("[data-k]", list).forEach(b => b.onclick = () => goChapter(+b.dataset.k));
+  $("#chapSheet").hidden = false;
+  const cur = $(".chap-item.cur", list); if (cur) cur.scrollIntoView({ block: "center" });
+}
+function closeChapters() { $("#chapSheet").hidden = true; }
+$("#chTitle").onclick = openChapters;
+$("#chapSheet").addEventListener("click", e => { if (e.target.id === "chapSheet" || e.target.closest("[data-chap-close]")) closeChapters(); });
+$("#chPrev").onclick = () => goChapter(S.ci - 1);
+$("#chNext").onclick = () => goChapter(S.ci + 1);
+$("#footNext").onclick = () => goChapter(S.ci + 1);
+$("#markDone").onclick = () => {
+  const id = chapStartId(S.chapters[S.ci]);
+  S.book.done = S.book.done || [];
+  const i = S.book.done.indexOf(id);
+  if (i >= 0) S.book.done.splice(i, 1); else S.book.done.push(id);
+  paintChapter(); S.dirty = true; saveNow();
+  if (i < 0) toast("הפרק סומן כנבדק");
+};
 
 function decorate() {
   let lastPg = null, edited = 0;
@@ -1133,7 +1293,7 @@ async function saveNow() {
   clearTimeout(saveTimer);
   if (!S.book || !S.dirty) return;
   setSaveState("saving");
-  S.book.paras = serialize();
+  S.book.paras = fullParas();
   S.book.title = $("#bookTitle").value.trim() || S.book.title;
   S.book.updated = Date.now();
   try { await DB.put("books", S.book); S.dirty = false; S.lastSave = Date.now(); setSaveState("saved"); Cloud.schedule(); }
@@ -1142,7 +1302,7 @@ async function saveNow() {
 async function createVersion(kind, note) {
   if (!S.book) return null;
   if (S.dirty) await saveNow();
-  const paras = stripParas(serialize());
+  const paras = stripParas(fullParas());
   const vers = (await DB.versionsOf(S.book.id)).sort((a, b) => a.ts - b.ts);
   const prev = vers[vers.length - 1];
   const stats = prev ? diffStats(diffParas(prev.paras, paras)) : null;
@@ -1433,10 +1593,10 @@ async function renderHistory() {
     }).join("");
   const byId = new Map(vers.map(v => [v.vid, v]));
   const asc = vers.slice().sort((a, b) => a.ts - b.ts);
-  $("[data-cmp-base]", list).onclick = () => { const base = asc.find(v => v.kind === "import") || asc[0]; if (base) showDiff(base.paras, serialize(), `הנוסח המקורי ← הטקסט הנוכחי`, true); };
+  $("[data-cmp-base]", list).onclick = () => { const base = asc.find(v => v.kind === "import") || asc[0]; if (base) showDiff(base.paras, fullParas(), `הנוסח המקורי ← הטקסט הנוכחי`, true); };
   $$(".ver[data-vid]", list).forEach(row => {
     const v = byId.get(+row.dataset.vid);
-    $("[data-cmp-cur]", row).onclick = () => showDiff(v.paras, serialize(), `גרסה מ-${fmtTime(v.ts)} ← הטקסט הנוכחי`, true);
+    $("[data-cmp-cur]", row).onclick = () => showDiff(v.paras, fullParas(), `גרסה מ-${fmtTime(v.ts)} ← הטקסט הנוכחי`, true);
     const cp = $("[data-cmp-prev]", row);
     if (cp) cp.onclick = () => { const i = asc.indexOf(v); const prev = asc[i - 1]; if (prev) showDiff(prev.paras, v.paras, `${fmtTime(prev.ts)} ← ${fmtTime(v.ts)}`, false); };
     const rb = $("[data-restore]", row);
@@ -1480,8 +1640,8 @@ function showDiff(oldP, newP, title, jumpable) {
     if (!st.paras) html = `<p class="muted">אין הבדלים בין שתי הגרסאות.</p>`;
     $("#diffList").innerHTML = html;
     $$("[data-jump]", m).forEach(d => d.onclick = () => {
-      const el = editor.querySelector(`[data-id="${CSS.escape(d.dataset.jump)}"]`);
-      closeModal(); if (!el) return;
+      closeModal(); closeSide();
+      const el = goToPara(d.dataset.jump); if (!el) return;
       el.scrollIntoView({ block: "center" }); placeCaret(el, true);
       el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
     });
@@ -1540,10 +1700,10 @@ $("#tExport").onclick = () => {
         <span class="note">הגיבוי כולל את הטקסט ואת כל היסטוריית הגרסאות. אפשר לשחזר אותו במסך הראשי, גם במחשב אחר.</span></div>
     </div>`);
   const name = safeName($("#bookTitle").value);
-  $("#exDocx", m).onclick = async () => { await saveNow(); download(buildDocx(name, serialize()), name + ".docx"); };
+  $("#exDocx", m).onclick = async () => { await saveNow(); download(buildDocx(name, fullParas()), name + ".docx"); };
   $("#exTxt", m).onclick = async () => {
     await saveNow();
-    const txt = serialize().map(p => htmlToText(p.h.replace(/<br>/g, "\n"))).join("\n\n");
+    const txt = fullParas().map(p => htmlToText(p.h.replace(/<br>/g, "\n"))).join("\n\n");
     download(new Blob(["﻿" + txt], { type: "text/plain;charset=utf-8" }), name + ".txt");
   };
   $("#exBak", m).onclick = async () => {
@@ -1583,7 +1743,7 @@ async function restoreBackup(file) {
 /* ---------------- phone layout helpers ---------------- */
 const mq = window.matchMedia("(max-width: 760px)");
 const isMobile = () => mq.matches;
-function topInset() { return isMobile() ? $("#topbar").getBoundingClientRect().bottom : $("#sheetScroll").getBoundingClientRect().top; }
+function topInset() { return isMobile() ? Math.max($("#topbar").getBoundingClientRect().bottom, $("#chapbar").getBoundingClientRect().bottom) : $("#sheetScroll").getBoundingClientRect().top; }
 function bottomLimit() {
   if (isMobile()) { const fb = $(".formatbar").getBoundingClientRect(); return Math.min(fb.top, window.visualViewport ? window.visualViewport.height : innerHeight); }
   return $("#sheetScroll").getBoundingClientRect().bottom;
@@ -1645,6 +1805,7 @@ $("#menuSheet").addEventListener("click", e => { if (e.target.id === "menuSheet"
 const ACTS = {
   find: () => { openSide("pFind"); setTimeout(() => $("#findQ").focus(), 50); },
   check: () => openSide("pCheck"),
+  chapters: () => openChapters(),
   hist: () => openSide("pHist"),
   savever: () => quickVersion(),
   export: () => $("#tExport").click(),
@@ -1720,7 +1881,7 @@ const Cloud = {
         if (this.sent.get(key) !== json) { await this.col().doc(key).set({ kind: "chunk", book: book.id, i, paras: chunks[i] }); this.sent.set(key, json); }
       }
       const prevN = this.chunkN.get(book.id);
-      await this.col().doc("book_" + book.id).set({ kind: "book", id: book.id, title: book.title, created: book.created, updated: book.updated, pages: book.pages || 0, chunks: chunks.length, lastPos: book.lastPos || null });
+      await this.col().doc("book_" + book.id).set({ kind: "book", id: book.id, title: book.title, created: book.created, updated: book.updated, pages: book.pages || 0, chunks: chunks.length, lastPos: book.lastPos || null, done: book.done || [] });
       if (prevN && prevN > chunks.length) for (let i = chunks.length; i < prevN; i++) { await this.col().doc(`c_${book.id}_${i}`).delete(); this.sent.delete(`c_${book.id}_${i}`); }
       this.chunkN.set(book.id, chunks.length);
       this.state = "ok"; this.lastOk = Date.now();
@@ -1763,7 +1924,8 @@ const Cloud = {
         if (!S.book || S.book.id !== id || S.dirty) return;
         if (S.book.updated > 0) await createVersion("restore", "לפני עדכון מהענן (נערך במכשיר אחר)");
         S.book.title = meta.title; $("#bookTitle").value = meta.title;
-        renderEditor(paras); S.book.paras = paras; S.book.updated = meta.updated;
+        if (Array.isArray(meta.done)) S.book.done = meta.done.slice();
+        renderEditor(paras, meta.lastPos || undefined); S.book.paras = paras; S.book.updated = meta.updated;
         await DB.put("books", S.book);
         toast("נטענה הגרסה העדכנית מהענן, שנערכה במכשיר אחר", 4000);
       }
