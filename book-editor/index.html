@@ -197,6 +197,77 @@ label.check input { margin-top: .3em; }
   #editor.show-edits .edited::after { inset-inline-end: -10px; }
 }
 @media (max-width: 560px) { .book-row { grid-template-columns: 1fr; } .book-row .acts { justify-content: flex-start; } }
+
+/* ---------- phone ---------- */
+.mob-only { display: none !important; }
+#editor { font-size: var(--book-size, 1.22rem); }
+.title-col { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--paper); }
+.seg button { border: 0; background: transparent; padding: .45em .9em; font-weight: 600; color: var(--muted); }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
+.sheet-back { position: fixed; inset: 0; z-index: 60; background: rgba(10,14,24,.45); display: flex; align-items: flex-end; }
+.sheet { width: 100%; background: var(--paper); border-radius: 14px 14px 0 0; padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 0px)); max-height: 88%; overflow: auto; box-shadow: var(--shadow); }
+.sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 10px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid var(--line); }
+.sheet-title { font: 700 1.1rem var(--font-book); }
+.menu-list { display: grid; }
+.menu-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: start; padding: 14px max(16px, env(safe-area-inset-right, 0px)) 14px max(16px, env(safe-area-inset-left, 0px)); border: 0; border-bottom: 1px solid var(--line); background: transparent; font-size: 1.05rem; min-height: 52px; }
+.menu-item:active { background: var(--accent-soft); }
+.menu-item.static { cursor: default; }
+.menu-item .toggle { font-size: .85rem; color: var(--accent); font-weight: 600; }
+.size-ctl { display: flex; gap: 8px; }
+.menu-foot { padding: 12px max(16px, env(safe-area-inset-left, 0px)) 0; font-size: .88rem; }
+.float-chip { position: fixed; top: calc(var(--topbar-h, 56px) + 10px); right: max(12px, env(safe-area-inset-right, 0px)); z-index: 35; border: 0; border-radius: 99px; padding: .55em 1.1em; background: var(--ink); color: var(--paper); font-weight: 600; box-shadow: var(--shadow); }
+#cloudState.ok { color: var(--ins); }
+#cloudState.err { color: var(--del); }
+
+@media (max-width: 760px) {
+  .mob-only { display: revert !important; }
+  .seg.mob-only { display: inline-flex !important; }
+  .desk-only, .formatbar .sep, .statusbar { display: none !important; }
+  body { font-size: 16px; }
+  input[type=text], input[type=search] { font-size: 16px; padding: .6em .75em; }
+  .btn { padding: .55em .95em; min-height: 42px; }
+  .btn.small { min-height: 36px; padding: .35em .75em; }
+  #app { display: block; height: auto; min-height: 100%; }
+  .topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; flex-wrap: nowrap; gap: 8px; padding-block: 6px; }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 21; background: var(--paper); }
+  .topbar .title-wrap { flex: 1 1 auto; gap: 6px; }
+  .topbar .logo { font-size: 2rem; line-height: 1; padding: 0 4px 4px; min-width: 32px; }
+  .title-col { flex-direction: column; align-items: stretch; gap: 0; }
+  #bookTitle { font-size: 1rem; padding: .1em .2em; text-overflow: ellipsis; }
+  .save-state { font-size: .75rem; padding-inline: .25em; }
+  #menuBtn { font-size: 1.3rem; padding: 0; width: 44px; }
+  .formatbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: var(--paper); border-top: 1px solid var(--line); border-bottom: 0; flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding-block: 6px calc(6px + env(safe-area-inset-bottom, 0px)); scrollbar-width: none; will-change: transform; }
+  .formatbar::-webkit-scrollbar { display: none; }
+  .formatbar .btn { flex: 0 0 auto; }
+  .workspace { display: block; }
+  .sheet-scroll { overflow: visible; padding-block: 0 calc(90px + env(safe-area-inset-bottom, 0px)); padding-left: 0; padding-right: 0; }
+  #editor { max-width: none; box-shadow: none; border-radius: 0; padding: 18px max(18px, env(safe-area-inset-right, 0px)) 40px max(18px, env(safe-area-inset-left, 0px)); line-height: 1.85; min-height: 70vh; }
+  #editor [data-pgmark]::before { position: static; display: block; margin-bottom: 4px; }
+  #editor.show-edits .edited::after { inset-inline-end: auto; inset-inline-start: -12px; width: 3px; }
+  #editor h2 { font-size: 1.4em; }
+  .side { position: fixed; inset: var(--topbar-h, 56px) 0 0 0; width: auto; z-index: 30; border: 0; box-shadow: none; padding-top: 0; }
+  .side header { padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); }
+  .side .body { padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  .side.find-mode { bottom: auto; max-height: 75%; box-shadow: var(--shadow); border-bottom: 1px solid var(--line); }
+  .side.find-mode .note { display: none; }
+  .issue { padding: 10px 12px; font-size: 1rem; }
+  .issue-list { max-height: none; }
+  .pdfpane { position: fixed; inset: var(--topbar-h, 56px) 0 0 0; width: auto; z-index: 28; border: 0; box-shadow: none; padding-top: 0; }
+  .pdfpane .bar { padding: 8px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px)); }
+  .pdfpane .canvas-wrap { padding: 8px 8px calc(16px + env(safe-area-inset-bottom, 0px)); }
+  #pdfFollowWrap, #pdfClose { display: none !important; }
+  .modal-back { padding: 0; align-items: stretch; }
+  .modal, .modal.wide { width: 100%; min-height: 100%; border-radius: 0; align-content: start; }
+  .modal > header { position: sticky; top: 0; background: var(--paper); z-index: 2; padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px)); }
+  .modal .mbody { padding: 16px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); }
+  .modal footer { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .diff-list { font-size: 1rem; }
+  #home { padding-block: 28px 48px; }
+  .drop { padding: 20px; }
+  .drop .row { width: 100%; }
+  .drop .row .btn { flex: 1 1 auto; justify-content: center; }
+}
 </style>
 </head>
 <body>
@@ -232,13 +303,19 @@ label.check input { margin-top: .3em; }
 
 <!-- ================= APP ================= -->
 <div id="app" hidden>
-  <div class="topbar">
+  <div class="topbar" id="topbar">
     <div class="title-wrap">
-      <button class="logo" id="goHome" title="חזרה לרשימת הספרים">מגיה</button>
-      <input id="bookTitle" type="text" aria-label="שם הספר">
-      <span class="save-state" id="saveState">נשמר</span>
+      <button class="logo" id="goHome" title="חזרה לרשימת הספרים"><span class="desk-only">מגיה</span><span class="mob-only" aria-label="חזרה לספרים">‹</span></button>
+      <div class="title-col">
+        <input id="bookTitle" type="text" aria-label="שם הספר">
+        <span class="save-state" id="saveState">נשמר</span>
+      </div>
     </div>
-    <div class="tools">
+    <div class="seg mob-only" role="group" aria-label="תצוגה">
+      <button id="vText" class="on">טקסט</button><button id="vPdf">מקור</button>
+    </div>
+    <button class="btn icon-btn mob-only" id="menuBtn" aria-label="תפריט">⋯</button>
+    <div class="tools desk-only">
       <button class="btn" id="tFind" title="Ctrl+F">חיפוש והחלפה</button>
       <button class="btn" id="tCheck">בדיקות הגהה</button>
       <button class="btn" id="tHist">היסטוריה</button>
@@ -246,21 +323,21 @@ label.check input { margin-top: .3em; }
       <button class="btn" id="tExport">ייצוא</button>
     </div>
   </div>
-  <div class="formatbar" role="toolbar" aria-label="עיצוב">
+  <div class="formatbar" id="formatbar" role="toolbar" aria-label="עיצוב">
     <button class="btn icon-btn" data-cmd="undo" title="ביטול (Ctrl+Z)">↶</button>
     <button class="btn icon-btn" data-cmd="redo" title="חזרה (Ctrl+Y)">↷</button>
     <span class="sep"></span>
     <button class="btn icon-btn" data-cmd="bold" title="מודגש (Ctrl+B)"><b>ב</b></button>
     <button class="btn icon-btn" data-cmd="italic" title="נטוי (Ctrl+I)"><i>נ</i></button>
     <button class="btn icon-btn" data-cmd="underline" title="קו תחתון (Ctrl+U)"><u>ק</u></button>
-    <button class="btn" data-cmd="removeFormat" title="ניקוי עיצוב">ניקוי עיצוב</button>
+    <button class="btn" data-cmd="removeFormat" title="ניקוי עיצוב"><span class="desk-only">ניקוי עיצוב</span><span class="mob-only">נקה</span></button>
     <span class="sep"></span>
     <button class="btn" data-block="p">פסקה</button>
     <button class="btn" data-block="h">כותרת</button>
     <button class="btn" data-block="s">כותרת משנה</button>
-    <span class="sep"></span>
-    <button class="btn on" id="tMarks" title="סימון בשוליים של פסקאות ששונו מאז הייבוא">סימון פסקאות שנערכו</button>
-    <button class="btn" id="saveVerQuick" title="Ctrl+S">שמירת גרסה</button>
+    <span class="sep desk-only"></span>
+    <button class="btn on desk-only" id="tMarks" title="סימון בשוליים של פסקאות ששונו מאז הייבוא">סימון פסקאות שנערכו</button>
+    <button class="btn desk-only" id="saveVerQuick" title="Ctrl+S">שמירת גרסה</button>
   </div>
 
   <div class="workspace">
@@ -321,11 +398,11 @@ label.check input { margin-top: .3em; }
         <span class="grow"></span>
         <button class="btn small" id="zOut" title="הקטנה">−</button>
         <button class="btn small" id="zIn" title="הגדלה">+</button>
-        <label class="check" style="align-items:center;font-size:.85rem"><input type="checkbox" id="pdfFollow" checked style="margin:0"> לעקוב אחרי הסמן</label>
+        <label class="check" id="pdfFollowWrap" style="align-items:center;font-size:.85rem"><input type="checkbox" id="pdfFollow" checked style="margin:0"> לעקוב אחרי הסמן</label>
         <button class="btn small" id="pdfClose">סגירה</button>
       </div>
       <div class="canvas-wrap" id="canvasWrap"><canvas id="pdfCanvas"></canvas></div>
-      <div class="empty" id="pdfEmpty" hidden>לספר הזה אין קובץ PDF מקורי שמור.</div>
+      <div class="empty" id="pdfEmpty" hidden><p style="margin:0 0 12px">קובץ ה-PDF המקורי לא שמור במכשיר הזה.</p><button class="btn" id="attachPdf">צירוף קובץ PDF</button><input type="file" id="attachInput" accept="application/pdf,.pdf" hidden></div>
     </aside>
   </div>
 
@@ -334,8 +411,28 @@ label.check input { margin-top: .3em; }
     <span class="num" id="stParas"></span>
     <span class="num" id="stEdited"></span>
     <span class="num" id="stPage"></span>
+    <span id="cloudState"></span>
   </div>
 </div>
+
+<!-- mobile: actions menu -->
+<div class="sheet-back" id="menuSheet" hidden>
+  <div class="sheet" role="dialog" aria-label="תפריט">
+    <div class="sheet-head"><div><div class="sheet-title" id="menuTitle"></div><div class="muted num" id="menuStats"></div></div><button class="btn small" data-menu-close>סגירה</button></div>
+    <div class="menu-list">
+      <button class="menu-item" data-act="find">חיפוש והחלפה</button>
+      <button class="menu-item" data-act="check">בדיקות הגהה</button>
+      <button class="menu-item" data-act="hist">היסטוריית גרסאות</button>
+      <button class="menu-item" data-act="savever">שמירת גרסה עכשיו</button>
+      <button class="menu-item" data-act="export">ייצוא (Word, טקסט, גיבוי)</button>
+      <button class="menu-item" data-act="marks"><span>סימון פסקאות שנערכו</span><span class="toggle" id="marksState">פעיל</span></button>
+      <div class="menu-item static"><span>גודל הטקסט</span><span class="size-ctl"><button class="btn icon-btn" data-size="-1" aria-label="הקטנת טקסט">א−</button><button class="btn icon-btn" data-size="1" aria-label="הגדלת טקסט">א+</button></span></div>
+      <button class="menu-item" data-act="home">חזרה לרשימת הספרים</button>
+    </div>
+    <div class="menu-foot muted" id="menuCloud"></div>
+  </div>
+</div>
+<button class="float-chip" id="backToResults" hidden>‹ חזרה לממצאים</button>
 
 <div id="modalRoot"></div>
 <div id="toast" hidden></div>
@@ -721,7 +818,17 @@ function buildDocx(title, paras) {
   ]);
 }
 
-function download(blob, name) {
+const inViewer = !!(window.claude && typeof window.claude.use === "function");
+let downloadsP = null;
+async function download(blob, name) {
+  if (inViewer) {
+    const d = await (downloadsP || (downloadsP = window.claude.use("downloads").catch(() => null)));
+    if (d) {
+      try { await d.save({ filename: name, data: blob }); toast("הקובץ נשמר"); }
+      catch (e) { if (e && e.code !== "declined") toast("לא ניתן לשמור את הקובץ כאן (" + ((e && e.code) || "שגיאה") + ")", 4000); }
+      return;
+    }
+  }
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
@@ -754,30 +861,46 @@ const editor = $("#editor");
 async function showHome() {
   if (S.book) await saveNow();
   S.book = null; S.pdf = null;
-  $("#app").hidden = true; $("#home").hidden = false; closeModal();
+  $("#app").hidden = true; $("#home").hidden = false; closeModal(); closeMenu(); togglePdf(false); closeSide();
   document.title = "מגיה";
   renderLibrary();
 }
+let libToken = 0;
 async function renderLibrary() {
-  const list = $("#bookList");
+  const list = $("#bookList"), token = ++libToken;
   let books = [];
   try { books = await DB.all("books"); } catch (e) { list.innerHTML = `<div class="alert">לא ניתן לגשת לאחסון של הדפדפן (${esc(e.message || e)}). ייתכן שמדובר בחלון גלישה פרטית.</div>`; return; }
+  const localIds = new Set(books.map(b => b.id));
+  let cloudOnly = [];
+  if (Cloud.ready) { try { cloudOnly = (await Cloud.list()).filter(m => !localIds.has(m.id)); } catch (e) { console.warn(e); } }
+  if (token !== libToken) return;
   books.sort((a, b) => b.updated - a.updated);
-  if (!books.length) { list.innerHTML = `<p class="muted" style="margin:0">עדיין אין כאן ספרים. מייבאים PDF כדי להתחיל, או פותחים את הספר לדוגמה כדי לראות איך זה עובד.</p>`; return; }
+  if (!books.length && !cloudOnly.length) { list.innerHTML = `<p class="muted" style="margin:0">עדיין אין כאן ספרים. מייבאים PDF כדי להתחיל, או פותחים את הספר לדוגמה כדי לראות איך זה עובד.</p>`; return; }
   list.innerHTML = books.map(b => {
     const words = (b.paras || []).reduce((s, p) => s + countWords(htmlToText(p.h)), 0);
     return `<div class="book-row" data-id="${esc(b.id)}">
       <div><div class="t">${esc(b.title)}</div>
       <div class="meta num">${words.toLocaleString("he-IL")} מילים${b.pages ? " · " + b.pages + " עמודים במקור" : ""} · עריכה אחרונה ${fmtTime(b.updated)}</div></div>
       <div class="acts"><button class="btn primary" data-open>פתיחה</button><button class="btn danger" data-del>מחיקה</button></div></div>`;
-  }).join("");
-  $$(".book-row", list).forEach(row => {
+  }).join("") + cloudOnly.map(m => `<div class="book-row" data-cloud="${esc(m.id)}">
+      <div><div class="t">${esc(m.title)}</div>
+      <div class="meta num">שמור בענן, עדיין לא במכשיר הזה · עריכה אחרונה ${fmtTime(m.updated)}</div></div>
+      <div class="acts"><button class="btn primary" data-pull>הורדה ופתיחה</button></div></div>`).join("");
+  $$("[data-cloud]", list).forEach(row => {
+    const m = cloudOnly.find(x => x.id === row.dataset.cloud);
+    $("[data-pull]", row).onclick = async e => {
+      e.target.disabled = true; e.target.textContent = "מוריד…";
+      try { await Cloud.download(m); openBook(m.id); }
+      catch (err) { console.error(err); toast("ההורדה נכשלה, נסו שוב"); e.target.disabled = false; e.target.textContent = "הורדה ופתיחה"; }
+    };
+  });
+  $$(".book-row[data-id]", list).forEach(row => {
     const id = row.dataset.id;
     $("[data-open]", row).onclick = () => openBook(id);
     const del = $("[data-del]", row);
     del.onclick = async () => {
       if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "למחוק לצמיתות?"; setTimeout(() => { del.classList.remove("armed"); del.textContent = "מחיקה"; }, 4000); return; }
-      await DB.deleteBook(id); toast("הספר נמחק"); renderLibrary();
+      await DB.deleteBook(id); Cloud.remove(id); toast("הספר נמחק"); renderLibrary();
     };
   });
 }
@@ -804,7 +927,7 @@ async function startImport(file) {
   const rev = detectReversed(pages);
   const opts = { reverse: rev, cleanup: true, mergePages: true };
   let metaTitle = "";
-  try { const md = await pdf.getMetadata(); metaTitle = ((md && md.info && md.info.Title) || "").trim(); } catch (e) {}
+  try { const md = await pdf.getMetadata(); metaTitle = String((md && md.info && md.info.Title) || (md && md.metadata && md.metadata.get("dc:title")) || "").trim(); } catch (e) { console.warn("pdf metadata", e); }
   const sampleIdx = Math.max(0, pages.findIndex(p => p.reduce((t, i) => t + i.str.length, 0) > 300));
   const mm = openModal(`<header><h3>הגדרות ייבוא</h3><span class="muted num">${pdf.numPages} עמודים</span></header>
     <div class="mbody">
@@ -837,6 +960,7 @@ async function startImport(file) {
       try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
     } catch (e) { toast("השמירה בדפדפן נכשלה: " + (e.message || e), 5000); return; }
     closeModal();
+    Cloud.push(book);
     openBook(book.id);
   };
 }
@@ -856,6 +980,7 @@ async function createSample() {
   const book = { id: uid(), title: "הבית שעל הגבעה (ספר לדוגמה)", created: now, updated: now, pages: 0, paras, hasPdf: false, lastPos: null };
   await DB.put("books", book);
   await DB.put("versions", { bookId: book.id, ts: now, kind: "import", note: "טקסט הדוגמה המקורי", paras, stats: null });
+  Cloud.push(book);
   openBook(book.id);
 }
 
@@ -877,14 +1002,15 @@ async function openBook(id) {
   S.pdf = null; S.pdfPage = 1;
   if (book.hasPdf && window.pdfjsLib) {
     DB.get("pdfs", id).then(buf => buf && pdfjsLib.getDocument({ data: buf.slice(0), cMapUrl: PDFJS_BASE + "cmaps/", cMapPacked: true, standardFontDataUrl: PDFJS_BASE + "standard_fonts/" }).promise)
-      .then(pdf => { if (pdf && S.book && S.book.id === id) { S.pdf = pdf; if (window.innerWidth > 980) togglePdf(true); } })
+      .then(pdf => { if (pdf && S.book && S.book.id === id) { S.pdf = pdf; if (window.innerWidth > 980) togglePdf(true); else if (!$("#pdfPane").hidden) togglePdf(true); } })
       .catch(e => console.warn("pdf load", e));
   }
-  $("#tPdf").disabled = !book.hasPdf;
+  setView("text");
+  Cloud.reconcile(id);
   // restore position
   const last = book.lastPos && editor.querySelector(`[data-id="${CSS.escape(book.lastPos)}"]`);
-  if (last) setTimeout(() => { last.scrollIntoView({ block: "center" }); placeCaret(last); }, 50);
-  else $("#sheetScroll").scrollTop = 0;
+  if (last) setTimeout(() => { last.scrollIntoView({ block: "center" }); if (!isMobile()) placeCaret(last); }, 50);
+  else { $("#sheetScroll").scrollTop = 0; window.scrollTo(0, 0); }
 }
 
 function blockHtml(p) {
@@ -952,6 +1078,17 @@ function normalizeEditor() {
   }
   if (!editor.children.length) editor.innerHTML = "<p><br></p>";
 }
+const blockCache = new WeakMap();
+const dirtyBlocks = new Set();
+let allDirty = true;
+new MutationObserver(muts => {
+  for (const m of muts) {
+    let n = m.target;
+    if (n === editor) { allDirty = true; continue; }
+    while (n && n.parentNode !== editor) n = n.parentNode;
+    if (n) dirtyBlocks.add(n);
+  }
+}).observe(editor, { childList: true, characterData: true, subtree: true });
 function serialize() {
   normalizeEditor();
   const els = Array.from(editor.children);
@@ -964,13 +1101,17 @@ function serialize() {
     g.slice(1).forEach(el => el.dataset.id = uid());
   }
   let lastPg = null;
-  return els.map(el => {
+  const out = els.map(el => {
     if (!el.dataset.id) el.dataset.id = uid();
     let pg = el.dataset.pg || lastPg;
     if (pg && !el.dataset.pg) el.dataset.pg = pg;
     lastPg = pg;
-    return { id: el.dataset.id, t: /^H[12]$/.test(el.nodeName) ? "h" : /^H/.test(el.nodeName) ? "s" : "p", h: cleanInline(el), pg: pg ? +pg : null };
+    let h = blockCache.get(el);
+    if (h === undefined || allDirty || dirtyBlocks.has(el)) { h = cleanInline(el); blockCache.set(el, h); }
+    return { id: el.dataset.id, t: /^H[12]$/.test(el.nodeName) ? "h" : /^H/.test(el.nodeName) ? "s" : "p", h, pg: pg ? +pg : null };
   });
+  dirtyBlocks.clear(); allDirty = false;
+  return out;
 }
 
 /* ---------------- saving ---------------- */
@@ -993,7 +1134,7 @@ async function saveNow() {
   S.book.paras = serialize();
   S.book.title = $("#bookTitle").value.trim() || S.book.title;
   S.book.updated = Date.now();
-  try { await DB.put("books", S.book); S.dirty = false; S.lastSave = Date.now(); setSaveState("saved"); }
+  try { await DB.put("books", S.book); S.dirty = false; S.lastSave = Date.now(); setSaveState("saved"); Cloud.schedule(); }
   catch (e) { console.error(e); setSaveState("error"); toast("השמירה נכשלה: " + (e.message || e), 5000); }
 }
 async function createVersion(kind, note) {
@@ -1023,7 +1164,7 @@ window.addEventListener("beforeunload", e => { if (S.dirty) { saveNow(); e.preve
 try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) {}
 editor.addEventListener("input", () => {
   const b = currentBlock(); if (b) markEdited(b);
-  clearTimeout(decoTimer); decoTimer = setTimeout(() => { serialize(); decorate(); if (!$("#pFind").hidden) refreshFind(false); }, 500);
+  clearTimeout(decoTimer); decoTimer = setTimeout(() => { normalizeEditor(); decorate(); if (!$("#pFind").hidden && !$("#side").hidden) refreshFind(true); }, 600);
   markDirty();
 });
 editor.addEventListener("paste", e => {
@@ -1047,7 +1188,7 @@ let posTimer = null;
 document.addEventListener("selectionchange", () => {
   if (!S.book) return;
   const b = currentBlock(); if (!b) return;
-  const pg = b.dataset.pg;
+  const pg = b.dataset.pg; S.lastBlock = b;
   $("#stPage").textContent = pg ? "עמוד " + pg + " במקור" : "";
   if (pg && S.pdf && $("#pdfFollow").checked && !$("#pdfPane").hidden && +pg !== S.pdfPage) showPdfPage(+pg);
   clearTimeout(posTimer);
@@ -1084,13 +1225,15 @@ $("#saveVerQuick").onclick = quickVersion;
 
 /* ---------------- side panels ---------------- */
 function openSide(id) {
-  $("#side").hidden = false;
+  $("#side").hidden = false; $("#backToResults").hidden = true;
+  $("#side").classList.toggle("find-mode", id === "pFind");
+  if (isMobile()) setView("text");
   ["pFind", "pCheck", "pHist"].forEach(p => $("#" + p).hidden = p !== id);
   $("#tFind").classList.toggle("on", id === "pFind"); $("#tCheck").classList.toggle("on", id === "pCheck"); $("#tHist").classList.toggle("on", id === "pHist");
   if (id === "pHist") renderHistory();
   if (id === "pFind") refreshFind(false);
 }
-function closeSide() { $("#side").hidden = true; ["#tFind", "#tCheck", "#tHist"].forEach(s => $(s).classList.remove("on")); clearHighlights(); }
+function closeSide() { $("#side").hidden = true; $("#backToResults").hidden = true; ["#tFind", "#tCheck", "#tHist"].forEach(s => $(s).classList.remove("on")); clearHighlights(); }
 $$("[data-close]").forEach(b => b.onclick = closeSide);
 const toggleSide = id => () => ($("#side").hidden || $("#" + id).hidden) ? openSide(id) : closeSide();
 $("#tFind").onclick = toggleSide("pFind");
@@ -1140,8 +1283,7 @@ function scanBlocks(regex, ignoreNiqqud) {
 }
 function selectRange(r, el) {
   const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-  const rect = r.getBoundingClientRect(), box = $("#sheetScroll").getBoundingClientRect();
-  if (rect.top < box.top + 40 || rect.bottom > box.bottom - 40) (el || r.startContainer.parentElement).scrollIntoView({ block: "center" });
+  ensureVisible(r.getBoundingClientRect(), el || r.startContainer.parentElement);
 }
 function replaceRange(r, text) {
   editor.focus();
@@ -1257,7 +1399,8 @@ function runChecks() {
       const it = r.items[+btn.dataset.i];
       if (!it.info.el.isConnected) { toast("הטקסט השתנה, מריצים סריקה מחדש"); return runChecks(); }
       const fresh = blockInfo(it.info.el, false);
-      editor.focus(); selectRange(makeRange(fresh, Math.min(it.s, fresh.text.length), Math.min(it.e, fresh.text.length)), it.info.el);
+      if (isMobile()) { $("#side").hidden = true; $("#backToResults").hidden = false; } else editor.focus();
+      selectRange(makeRange(fresh, Math.min(it.s, fresh.text.length), Math.min(it.e, fresh.text.length)), it.info.el);
     });
     const fa = $("[data-fixall]", g);
     if (fa) fa.onclick = () => {
@@ -1350,9 +1493,10 @@ function togglePdf(force) {
   const pane = $("#pdfPane");
   const show = force !== undefined ? force : pane.hidden;
   pane.hidden = !show; $("#tPdf").classList.toggle("on", show);
+  $("#vPdf").classList.toggle("on", show); $("#vText").classList.toggle("on", !show);
   if (!show) return;
   $("#pdfEmpty").hidden = !!S.pdf; $("#canvasWrap").hidden = !S.pdf;
-  if (S.pdf) { const b = currentBlock() || editor.querySelector("[data-pg]"); showPdfPage(b && b.dataset.pg ? +b.dataset.pg : S.pdfPage); }
+  if (S.pdf) { const b = (isMobile() ? (S.lastBlock && S.lastBlock.isConnected && inView(S.lastBlock) ? S.lastBlock : visibleBlock()) : currentBlock()) || editor.querySelector("[data-pg]"); showPdfPage(b && b.dataset.pg ? +b.dataset.pg : S.pdfPage); }
 }
 $("#tPdf").onclick = () => togglePdf();
 $("#pdfClose").onclick = () => togglePdf(false);
@@ -1421,8 +1565,209 @@ async function restoreBackup(file) {
   await DB.put("books", book);
   for (const v of data.versions || []) await DB.put("versions", { ...v, bookId: book.id });
   toast("הגיבוי שוחזר");
+  Cloud.push(book);
   openBook(book.id);
 }
+
+/* ---------------- phone layout helpers ---------------- */
+const mq = window.matchMedia("(max-width: 760px)");
+const isMobile = () => mq.matches;
+function topInset() { return isMobile() ? $("#topbar").getBoundingClientRect().bottom : $("#sheetScroll").getBoundingClientRect().top; }
+function bottomLimit() {
+  if (isMobile()) { const fb = $(".formatbar").getBoundingClientRect(); return Math.min(fb.top, window.visualViewport ? window.visualViewport.height : innerHeight); }
+  return $("#sheetScroll").getBoundingClientRect().bottom;
+}
+function ensureVisible(rect, el) {
+  if (rect.top < topInset() + 30 || rect.bottom > bottomLimit() - 30) el.scrollIntoView({ block: "center" });
+}
+function inView(el) { const r = el.getBoundingClientRect(); return r.bottom > topInset() && r.top < bottomLimit(); }
+function visibleBlock() {
+  // first paragraph whose bottom is below the top bar (binary search: blocks are in document order)
+  const kids = editor.children, top = topInset() + 4;
+  let lo = 0, hi = kids.length - 1, ans = null;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (kids[mid].getBoundingClientRect().bottom > top) { ans = kids[mid]; hi = mid - 1; } else lo = mid + 1; }
+  return ans;
+}
+function setView(v) {
+  if (!isMobile()) return;
+  if (v === "pdf") { closeSide(); togglePdf(true); }
+  else if (!$("#pdfPane").hidden) togglePdf(false);
+  $("#vPdf").classList.toggle("on", v === "pdf"); $("#vText").classList.toggle("on", v !== "pdf");
+}
+$("#vText").onclick = () => setView("text");
+$("#vPdf").onclick = () => setView("pdf");
+mq.addEventListener("change", () => { if (!isMobile()) { $("#formatbar").style.transform = ""; } syncTopbar(); });
+function syncTopbar() { document.documentElement.style.setProperty("--topbar-h", Math.round($("#topbar").getBoundingClientRect().height + (isMobile() ? parseFloat(getComputedStyle($("#topbar")).top) || 0 : 0)) + "px"); }
+new ResizeObserver(syncTopbar).observe($("#topbar"));
+// keep the formatting bar above the on-screen keyboard (iOS keeps fixed elements behind it)
+if (window.visualViewport) {
+  const vv = window.visualViewport;
+  const place = () => {
+    if (!isMobile()) return;
+    const off = Math.max(0, innerHeight - vv.height - vv.offsetTop);
+    $("#formatbar").style.transform = off > 40 ? `translateY(${-off}px)` : "";
+  };
+  vv.addEventListener("resize", place); vv.addEventListener("scroll", place);
+}
+$("#backToResults").onclick = () => openSide("pCheck");
+
+/* text size */
+const SIZES = [1.0, 1.1, 1.22, 1.35, 1.5, 1.7];
+let sizeIdx = 2;
+try { const v = +localStorage.getItem("magiha.size"); if (v >= 0 && v < SIZES.length && localStorage.getItem("magiha.size") !== null) sizeIdx = v; } catch (e) {}
+function applySize() { document.documentElement.style.setProperty("--book-size", SIZES[sizeIdx] + "rem"); try { localStorage.setItem("magiha.size", sizeIdx); } catch (e) {} }
+applySize();
+$$("[data-size]").forEach(b => b.onclick = () => { sizeIdx = Math.max(0, Math.min(SIZES.length - 1, sizeIdx + +b.dataset.size)); applySize(); });
+
+/* menu */
+function openMenu() {
+  $("#menuTitle").textContent = $("#bookTitle").value;
+  const words = countWords(editor.textContent), ed = editor.querySelectorAll(".edited").length;
+  $("#menuStats").textContent = `${words.toLocaleString("he-IL")} מילים · ${ed === 1 ? "פסקה אחת שונתה" : ed.toLocaleString("he-IL") + " פסקאות שונו"}`;
+  $("#marksState").textContent = editor.classList.contains("show-edits") ? "פעיל" : "כבוי";
+  $("#menuCloud").textContent = Cloud.label();
+  $("#menuSheet").hidden = false;
+}
+function closeMenu() { $("#menuSheet").hidden = true; }
+$("#menuBtn").onclick = openMenu;
+$("#menuSheet").addEventListener("click", e => { if (e.target.id === "menuSheet" || e.target.closest("[data-menu-close]")) closeMenu(); });
+const ACTS = {
+  find: () => { openSide("pFind"); setTimeout(() => $("#findQ").focus(), 50); },
+  check: () => openSide("pCheck"),
+  hist: () => openSide("pHist"),
+  savever: () => quickVersion(),
+  export: () => $("#tExport").click(),
+  marks: () => { $("#tMarks").click(); $("#marksState").textContent = editor.classList.contains("show-edits") ? "פעיל" : "כבוי"; return true; },
+  home: () => showHome()
+};
+$$("[data-act]").forEach(b => b.onclick = () => { if (ACTS[b.dataset.act]() !== true) closeMenu(); });
+
+/* attach a PDF to a book that has none on this device */
+$("#attachPdf").onclick = () => $("#attachInput").click();
+$("#attachInput").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f || !S.book || !window.pdfjsLib) return;
+  const buf = await f.arrayBuffer();
+  try {
+    const pdf = await pdfjsLib.getDocument({ data: buf.slice(0), cMapUrl: PDFJS_BASE + "cmaps/", cMapPacked: true, standardFontDataUrl: PDFJS_BASE + "standard_fonts/" }).promise;
+    await DB.put("pdfs", buf, S.book.id); S.book.hasPdf = true; S.dirty = true; await saveNow();
+    S.pdf = pdf; togglePdf(true); toast("קובץ ה-PDF צורף");
+  } catch (err) { toast("לא הצלחתי לפתוח את הקובץ"); }
+};
+
+/* ---------------- cloud copy (claude.ai: private per-person storage) ---------------- */
+const CHUNK_BYTES = 180000;
+const Cloud = {
+  ready: false, db: null, uid: null, state: "off", lastOk: 0, sent: new Map(), chunkN: new Map(), busy: false, again: false, timer: null,
+  label() {
+    if (!this.ready) return "הספר שמור במכשיר הזה בלבד. כדאי לייצא גיבוי מדי פעם.";
+    if (this.state === "err") return "הגיבוי בענן נכשל בפעם האחרונה. העבודה שמורה במכשיר, ננסה שוב בשמירה הבאה.";
+    return this.lastOk ? `הטקסט מגובה בענן בחשבון שלך (עודכן ${fmtClock(this.lastOk)}). אפשר לפתוח אותו גם במכשיר אחר.` : "הטקסט מגובה בענן בחשבון שלך.";
+  },
+  paint() {
+    const el = $("#cloudState");
+    el.className = this.state === "ok" ? "ok" : this.state === "err" ? "err" : "";
+    el.textContent = !this.ready ? "" : this.state === "err" ? "הגיבוי בענן נכשל" : this.state === "sync" ? "מגבה בענן…" : this.lastOk ? "מגובה בענן" : "";
+    if (!$("#menuSheet").hidden) $("#menuCloud").textContent = this.label();
+  },
+  async init() {
+    if (!inViewer) return;
+    try {
+      const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+      if (!db || !user) return;
+      const id = await user.id();
+      if (!id) return;
+      this.db = db; this.uid = id; this.ready = true; this.paint();
+      if (!$("#home").hidden) renderLibrary();
+      if (S.book) { this.reconcile(S.book.id); this.schedule(); }
+    } catch (e) { console.warn("cloud init", e); }
+  },
+  col() { return this.db.collection("data/users/" + this.uid); },
+  async list() {
+    const q = await this.col().where("kind", "==", "book").get();
+    return q.docs.map(d => d.data()).filter(Boolean);
+  },
+  chunks(paras) {
+    const enc = new TextEncoder(), out = []; let cur = [], size = 0;
+    for (const p of paras) {
+      const b = enc.encode(JSON.stringify(p)).length + 2;
+      if (cur.length && size + b > CHUNK_BYTES) { out.push(cur); cur = []; size = 0; }
+      cur.push({ id: p.id, t: p.t, h: p.h, pg: p.pg == null ? null : p.pg }); size += b;
+    }
+    if (cur.length) out.push(cur);
+    return out;
+  },
+  schedule() { if (!this.ready || !S.book) return; clearTimeout(this.timer); this.timer = setTimeout(() => S.book && this.push(S.book), 5000); },
+  async push(book) {
+    if (!this.ready || !book) return;
+    if (this.busy) { this.again = book; return; }
+    this.busy = true; this.state = "sync"; this.paint();
+    try {
+      const chunks = this.chunks(book.paras || []);
+      for (let i = 0; i < chunks.length; i++) {
+        const key = `c_${book.id}_${i}`, json = JSON.stringify(chunks[i]);
+        if (this.sent.get(key) !== json) { await this.col().doc(key).set({ kind: "chunk", book: book.id, i, paras: chunks[i] }); this.sent.set(key, json); }
+      }
+      const prevN = this.chunkN.get(book.id);
+      await this.col().doc("book_" + book.id).set({ kind: "book", id: book.id, title: book.title, created: book.created, updated: book.updated, pages: book.pages || 0, chunks: chunks.length, lastPos: book.lastPos || null });
+      if (prevN && prevN > chunks.length) for (let i = chunks.length; i < prevN; i++) { await this.col().doc(`c_${book.id}_${i}`).delete(); this.sent.delete(`c_${book.id}_${i}`); }
+      this.chunkN.set(book.id, chunks.length);
+      this.state = "ok"; this.lastOk = Date.now();
+    } catch (e) {
+      console.warn("cloud push", e); this.state = "err";
+      if (e && e.code === "quota_exceeded") toast("נגמר המקום בגיבוי בענן. העבודה עדיין שמורה במכשיר.", 5000);
+    }
+    this.busy = false; this.paint();
+    if (this.again) { const b = this.again; this.again = false; this.push(b); }
+  },
+  async fetchParas(meta) {
+    const paras = [];
+    for (let i = 0; i < meta.chunks; i++) {
+      const snap = await this.col().doc(`c_${meta.id}_${i}`).get();
+      if (!snap.exists) throw new Error("missing chunk " + i);
+      const d = snap.data();
+      paras.push(...d.paras.map(p => ({ ...p })));
+      this.sent.set(`c_${meta.id}_${i}`, JSON.stringify(d.paras));
+    }
+    this.chunkN.set(meta.id, meta.chunks);
+    return paras;
+  },
+  async download(meta) {
+    const paras = await this.fetchParas(meta);
+    const book = { id: meta.id, title: meta.title, created: meta.created || Date.now(), updated: meta.updated, pages: meta.pages || 0, paras, hasPdf: false, lastPos: meta.lastPos || null };
+    await DB.put("books", book);
+    await DB.put("versions", { bookId: book.id, ts: Date.now(), kind: "import", note: "הטקסט כפי שהורד מהגיבוי בענן", paras, stats: null });
+  },
+  async reconcile(id) {
+    // another device edited this book more recently: bring its text here, keeping ours as a version
+    if (!this.ready) return;
+    try {
+      const snap = await this.col().doc("book_" + id).get();
+      if (!S.book || S.book.id !== id) return;
+      if (!snap.exists) { this.push(S.book); return; }
+      const meta = snap.data();
+      this.chunkN.set(id, meta.chunks);
+      if (meta.updated > S.book.updated + 2000 && !S.dirty) {
+        const paras = await this.fetchParas(meta);
+        if (!S.book || S.book.id !== id || S.dirty) return;
+        await createVersion("restore", "לפני עדכון מהענן (נערך במכשיר אחר)");
+        S.book.title = meta.title; $("#bookTitle").value = meta.title;
+        renderEditor(paras); S.book.paras = paras; S.book.updated = meta.updated;
+        await DB.put("books", S.book);
+        toast("נטענה הגרסה העדכנית מהענן, שנערכה במכשיר אחר", 4000);
+      }
+    } catch (e) { console.warn("cloud reconcile", e); }
+  },
+  async remove(id) {
+    if (!this.ready) return;
+    try {
+      const snap = await this.col().doc("book_" + id).get();
+      const n = snap.exists ? snap.data().chunks : 0;
+      await this.col().doc("book_" + id).delete();
+      for (let i = 0; i < n; i++) await this.col().doc(`c_${id}_${i}`).delete();
+    } catch (e) { console.warn("cloud remove", e); }
+  }
+};
+document.addEventListener("visibilitychange", () => { if (document.hidden && Cloud.ready && S.book && !S.dirty) { clearTimeout(Cloud.timer); Cloud.push(S.book); } });
 
 /* ---------------- home wiring ---------------- */
 $("#pickPdf").onclick = () => $("#pdfInput").click();
@@ -1442,6 +1787,7 @@ drop.addEventListener("drop", e => {
 (async function init() {
   try { await DB.open(); } catch (e) { $("#bookList").innerHTML = `<div class="alert">הדפדפן לא מאפשר שמירה מקומית (${esc(e.message || e)}). נסו דפדפן אחר או חלון רגיל (לא פרטי).</div>`; return; }
   renderLibrary();
+  Cloud.init();
 })();
 </script>
 </body>
