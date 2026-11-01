@@ -273,6 +273,7 @@ label.check input { margin-top: .3em; }
 <body>
 
 <!-- ================= HOME ================= -->
+<div id="boot" hidden style="padding:48px 20px;text-align:center;color:var(--muted)">טוען את הספר…</div>
 <main id="home">
   <div class="home-inner">
     <div class="brand">
@@ -427,6 +428,7 @@ label.check input { margin-top: .3em; }
       <button class="menu-item" data-act="export">ייצוא (Word, טקסט, גיבוי)</button>
       <button class="menu-item" data-act="marks"><span>סימון פסקאות שנערכו</span><span class="toggle" id="marksState">פעיל</span></button>
       <div class="menu-item static"><span>גודל הטקסט</span><span class="size-ctl"><button class="btn icon-btn" data-size="-1" aria-label="הקטנת טקסט">א−</button><button class="btn icon-btn" data-size="1" aria-label="הגדלת טקסט">א+</button></span></div>
+      <button class="menu-item" data-act="restore" hidden>שחזור מקובץ גיבוי</button>
       <button class="menu-item" data-act="home">חזרה לרשימת הספרים</button>
     </div>
     <div class="menu-foot muted" id="menuCloud"></div>
@@ -1557,6 +1559,15 @@ async function restoreBackup(file) {
   let data;
   try { data = JSON.parse(await file.text()); } catch (e) { toast("הקובץ אינו קובץ גיבוי תקין"); return; }
   if (data.format !== "magiha-backup" || !data.book) { toast("הקובץ אינו קובץ גיבוי של מגיה"); return; }
+  if (PRESET) {
+    if (!S.book) return;
+    await createVersion("restore", "לפני שחזור מקובץ גיבוי");
+    const have = new Set((await DB.versionsOf(S.book.id)).map(v => v.ts));
+    for (const v of data.versions || []) if (!have.has(v.ts)) await DB.put("versions", { ...v, bookId: S.book.id });
+    renderEditor(data.book.paras || []); markDirty(); await saveNow();
+    toast("הטקסט שוחזר מקובץ הגיבוי");
+    return;
+  }
   const book = data.book;
   const existing = await DB.get("books", book.id);
   if (existing) { book.id = uid(); book.title += " (עותק משוחזר)"; }
@@ -1638,7 +1649,8 @@ const ACTS = {
   savever: () => quickVersion(),
   export: () => $("#tExport").click(),
   marks: () => { $("#tMarks").click(); $("#marksState").textContent = editor.classList.contains("show-edits") ? "פעיל" : "כבוי"; return true; },
-  home: () => showHome()
+  home: () => showHome(),
+  restore: () => $("#backupInput").click()
 };
 $$("[data-act]").forEach(b => b.onclick = () => { if (ACTS[b.dataset.act]() !== true) closeMenu(); });
 
@@ -1749,7 +1761,7 @@ const Cloud = {
       if (meta.updated > S.book.updated + 2000 && !S.dirty) {
         const paras = await this.fetchParas(meta);
         if (!S.book || S.book.id !== id || S.dirty) return;
-        await createVersion("restore", "לפני עדכון מהענן (נערך במכשיר אחר)");
+        if (S.book.updated > 0) await createVersion("restore", "לפני עדכון מהענן (נערך במכשיר אחר)");
         S.book.title = meta.title; $("#bookTitle").value = meta.title;
         renderEditor(paras); S.book.paras = paras; S.book.updated = meta.updated;
         await DB.put("books", S.book);
@@ -1769,6 +1781,23 @@ const Cloud = {
 };
 document.addEventListener("visibilitychange", () => { if (document.hidden && Cloud.ready && S.book && !S.dirty) { clearTimeout(Cloud.timer); Cloud.push(S.book); } });
 
+/* ---------------- single-book mode ----------------
+   A build step may define window.MAGIHA_PRESET = {id, title, created, pages, paras, pdf (base64)}.
+   The tool then opens straight into that book, with stable paragraph ids on every device. */
+const PRESET = window.MAGIHA_PRESET || null;
+async function seedPreset() {
+  const P = PRESET;
+  const local = await DB.get("books", P.id);
+  if (!local) {
+    await DB.put("books", { id: P.id, title: P.title, created: P.created, updated: 0, pages: P.pages, paras: P.paras, hasPdf: !!P.pdf, lastPos: null });
+    await DB.put("versions", { bookId: P.id, ts: P.created, kind: "import", note: "הנוסח המקורי, כפי שחולץ מה-PDF", paras: P.paras, stats: null });
+  }
+  if (P.pdf && !(await DB.get("pdfs", P.id))) {
+    await DB.put("pdfs", b64ToBuf(P.pdf), P.id);
+    if (local && !local.hasPdf) { local.hasPdf = true; await DB.put("books", local); }
+  }
+}
+
 /* ---------------- home wiring ---------------- */
 $("#pickPdf").onclick = () => $("#pdfInput").click();
 $("#pdfInput").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) startImport(f); };
@@ -1785,7 +1814,21 @@ drop.addEventListener("drop", e => {
 });
 
 (async function init() {
-  try { await DB.open(); } catch (e) { $("#bookList").innerHTML = `<div class="alert">הדפדפן לא מאפשר שמירה מקומית (${esc(e.message || e)}). נסו דפדפן אחר או חלון רגיל (לא פרטי).</div>`; return; }
+  if (PRESET) {
+    $("#home").hidden = true; $("#boot").hidden = false;
+    $("#goHome").hidden = true; $('[data-act="home"]').hidden = true; $('[data-act="restore"]').hidden = false;
+  }
+  try { await DB.open(); } catch (e) {
+    const msg = `<div class="alert">הדפדפן לא מאפשר שמירה מקומית (${esc(e.message || e)}). נסו דפדפן אחר או חלון רגיל (לא פרטי).</div>`;
+    if (PRESET) $("#boot").innerHTML = msg; else $("#bookList").innerHTML = msg;
+    return;
+  }
+  if (PRESET) {
+    try { await seedPreset(); } catch (e) { $("#boot").innerHTML = `<div class="alert">טעינת הספר נכשלה: ${esc(e.message || e)}</div>`; return; }
+    $("#boot").hidden = true;
+    Cloud.init();
+    return openBook(PRESET.id);
+  }
   renderLibrary();
   Cloud.init();
 })();
