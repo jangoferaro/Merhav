@@ -1,0 +1,1437 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>מגיה</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Frank+Ruhl+Libre:wght@400;500;700&display=swap">
+<style>
+/* Layout: an editor's desk. Tools on the right, the manuscript sheet in the middle, the source PDF page on the left. */
+:root {
+  --desk: #e9ecf2;
+  --paper: #fdfdfc;
+  --ink: #1b2130;
+  --muted: #5d6578;
+  --line: #d3d8e3;
+  --accent: #2149b8;        /* the editor's blue pencil */
+  --accent-soft: #e2e9fb;
+  --accent-ink: #ffffff;
+  --ins: #17703f;
+  --ins-bg: #ddf3e5;
+  --del: #b3261e;
+  --del-bg: #fbe3e1;
+  --warn: #8a5a00;
+  --warn-bg: #fdf1d6;
+  --hl: #ffe58a;
+  --shadow: 0 1px 2px rgba(27,33,48,.06), 0 8px 24px rgba(27,33,48,.07);
+  --font-book: "Frank Ruhl Libre", "David", "Times New Roman", serif;
+  --font-ui: "Assistant", "Segoe UI", "Arial Hebrew", Arial, sans-serif;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --desk: #12151c; --paper: #1b1f29; --ink: #e5e8ef; --muted: #9aa2b4; --line: #2f3545;
+    --accent: #84a5ff; --accent-soft: #233056; --accent-ink: #0d1220;
+    --ins: #6fd59a; --ins-bg: #173826; --del: #ff8f86; --del-bg: #45201d;
+    --warn: #f3c25b; --warn-bg: #3b2f12; --hl: #6b5a14;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --desk: #12151c; --paper: #1b1f29; --ink: #e5e8ef; --muted: #9aa2b4; --line: #2f3545;
+  --accent: #84a5ff; --accent-soft: #233056; --accent-ink: #0d1220;
+  --ins: #6fd59a; --ins-bg: #173826; --del: #ff8f86; --del-bg: #45201d;
+  --warn: #f3c25b; --warn-bg: #3b2f12; --hl: #6b5a14;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--desk); color: var(--ink); font: 15px/1.5 var(--font-ui); }
+[hidden] { display: none !important; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { display: inline-flex; align-items: center; gap: .4em; padding: .42em .9em; border: 1px solid var(--line); background: var(--paper); border-radius: var(--radius); white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.danger { color: var(--del); }
+.btn.danger.armed { background: var(--del); color: var(--paper); border-color: var(--del); }
+.btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.small { padding: .2em .6em; font-size: .9em; }
+.icon-btn { min-width: 2.2em; justify-content: center; }
+input[type=text], input[type=search] { padding: .45em .7em; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); width: 100%; }
+label.check { display: flex; gap: .5em; align-items: flex-start; }
+label.check input { margin-top: .3em; }
+.muted { color: var(--muted); }
+.eyebrow { font-size: .78rem; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- Home ---------- */
+#home { min-height: 100%; padding-block: 48px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.home-inner { max-width: 880px; margin: 0 auto; display: grid; gap: 32px; }
+.brand { display: grid; gap: 6px; }
+.brand h1 { font: 700 clamp(2.4rem, 6vw, 3.4rem)/1.05 var(--font-book); margin: 0; letter-spacing: -.01em; }
+.brand h1 .mark { color: var(--accent); }
+.brand p { margin: 0; max-width: 56ch; font-size: 1.08rem; color: var(--muted); }
+.drop { border: 2px dashed var(--line); border-radius: 10px; background: var(--paper); padding: 28px; display: grid; gap: 14px; justify-items: start; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop h2 { margin: 0; font: 700 1.3rem/1.3 var(--font-book); }
+.drop .row { display: flex; gap: 10px; flex-wrap: wrap; }
+.library { display: grid; gap: 10px; }
+.library h2 { margin: 0; font: 700 1.15rem var(--font-book); }
+.book-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.book-row .t { font: 600 1.1rem var(--font-book); }
+.book-row .meta { font-size: .88rem; color: var(--muted); }
+.book-row .acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.note { font-size: .9rem; color: var(--muted); max-width: 70ch; }
+
+/* ---------- App ---------- */
+#app { height: 100%; display: grid; grid-template-rows: auto auto 1fr auto; }
+.topbar { display: flex; align-items: center; gap: 10px; padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--paper); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.topbar .title-wrap { flex: 1 1 220px; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.topbar .logo { font: 700 1.25rem var(--font-book); color: var(--accent); background: none; border: 0; padding: 0; }
+#bookTitle { font: 600 1.05rem var(--font-book); border: 1px solid transparent; background: transparent; padding: .25em .4em; min-width: 0; }
+#bookTitle:hover, #bookTitle:focus { border-color: var(--line); background: var(--paper); }
+.save-state { font-size: .85rem; color: var(--muted); white-space: nowrap; }
+.save-state.dirty { color: var(--warn); }
+.tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.formatbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding-block: 6px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--desk); border-bottom: 1px solid var(--line); }
+.formatbar .sep { width: 1px; height: 1.6em; background: var(--line); margin-inline: 4px; }
+.formatbar b, .formatbar i, .formatbar u { font-family: var(--font-book); font-size: 1.05em; }
+
+.workspace { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; min-height: 0; }
+.side { width: 310px; background: var(--paper); border-inline-end: 1px solid var(--line); overflow: auto; min-height: 0; display: flex; flex-direction: column; }
+.side header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--paper); z-index: 1; }
+.side header h3 { margin: 0; font: 700 1.05rem var(--font-book); }
+.side .body { padding: 14px; display: grid; gap: 12px; align-content: start; }
+.pdfpane { width: clamp(300px, 34vw, 560px); background: var(--desk); border-inline-start: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.pdfpane .bar { display: flex; gap: 6px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--paper); flex-wrap: wrap; }
+.pdfpane .bar .grow { flex: 1; }
+.pdfpane .canvas-wrap { overflow: auto; flex: 1; padding: 12px; display: flex; justify-content: center; align-items: flex-start; }
+.pdfpane canvas { box-shadow: var(--shadow); background: #fff; max-width: none; }
+.pdfpane .empty { padding: 24px; color: var(--muted); }
+
+.sheet-scroll { overflow: auto; min-height: 0; padding-block: 28px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+#editor { white-space: pre-wrap; max-width: 70ch; margin: 0 auto; background: var(--paper); box-shadow: var(--shadow); border-radius: 3px; padding: 56px clamp(20px, 6vw, 72px) 72px; font: 400 1.22rem/1.9 var(--font-book); outline: none; min-height: 60vh; text-align: start; }
+#editor p, #editor h1, #editor h2, #editor h3, #editor div { margin: 0 0 .7em; position: relative; }
+#editor h1, #editor h2, #editor h3 { font: 700 1.55rem/1.35 var(--font-book); margin: 1.4em 0 .6em; text-align: start; }
+#editor [data-pgmark]::before { content: "עמ׳ " attr(data-pgmark); position: absolute; inset-inline-start: calc(-1 * clamp(20px, 6vw, 72px) + 4px); top: .35em; font: 600 .7rem/1 var(--font-ui); color: var(--muted); letter-spacing: .02em; user-select: none; pointer-events: none; white-space: nowrap; }
+#editor.show-edits .edited::after { content: ""; position: absolute; inset-inline-end: -14px; top: .3em; bottom: .3em; width: 3px; border-radius: 2px; background: var(--accent); opacity: .65; }
+#editor.show-edits .added::after { background: var(--ins); }
+#editor .flash { animation: flash 1.6s ease-out; }
+@keyframes flash { 0% { background: var(--hl); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { #editor .flash { animation: none; background: var(--hl); } }
+::highlight(find-all) { background-color: var(--hl); }
+::highlight(find-cur) { background-color: var(--accent); color: var(--accent-ink); }
+
+.statusbar { display: flex; gap: 16px; flex-wrap: wrap; padding-block: 5px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); font-size: .82rem; color: var(--muted); background: var(--paper); border-top: 1px solid var(--line); }
+
+/* history */
+.ver { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; }
+.ver.cur { border-color: var(--accent); }
+.ver .top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ver .when { font-weight: 600; }
+.chip { font-size: .75rem; padding: .05em .55em; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.chip.import { background: var(--warn-bg); color: var(--warn); }
+.chip.auto { background: var(--desk); color: var(--muted); }
+.chip.restore { background: var(--del-bg); color: var(--del); }
+.ver .stats { font-size: .85rem; }
+.ver .stats .p { color: var(--ins); } .ver .stats .m { color: var(--del); }
+.ver .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.newver { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+
+/* find + checks */
+.find-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.find-count { font-size: .88rem; color: var(--muted); }
+.issue-group { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.issue-group > header { position: static; padding: 8px 10px; background: var(--desk); display: flex; justify-content: space-between; gap: 8px; align-items: center; border: 0; }
+.issue-group h4 { margin: 0; font-size: .95rem; }
+.issue-group .count { font-size: .8rem; color: var(--muted); }
+.issue-list { max-height: 220px; overflow: auto; }
+.issue { display: block; width: 100%; text-align: start; padding: 6px 10px; border: 0; border-top: 1px solid var(--line); background: var(--paper); font: .92rem/1.5 var(--font-book); }
+.issue:hover { background: var(--accent-soft); }
+.issue mark { background: var(--hl); color: inherit; padding: 0 1px; white-space: pre-wrap; }
+.issue .pg { font: .72rem var(--font-ui); color: var(--muted); margin-inline-end: 6px; }
+
+/* modal */
+.modal-back { position: fixed; inset: 0; background: rgba(10,14,24,.45); display: flex; align-items: flex-start; justify-content: center; padding: max(24px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); z-index: 50; overflow: auto; }
+.modal { background: var(--paper); border-radius: 10px; box-shadow: var(--shadow); width: min(760px, 100%); display: grid; gap: 0; }
+.modal.wide { width: min(1000px, 100%); }
+.modal > header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.modal > header h3 { margin: 0; font: 700 1.2rem var(--font-book); }
+.modal .mbody { padding: 18px; display: grid; gap: 14px; }
+.modal footer { display: flex; justify-content: flex-start; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.preview { max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; font: 1rem/1.75 var(--font-book); background: var(--desk); }
+.preview p { margin: 0 0 .6em; } .preview h4 { margin: .4em 0; font-size: 1.1rem; }
+.alert { padding: 10px 12px; border-radius: 6px; background: var(--warn-bg); color: var(--warn); font-size: .92rem; }
+.progress { height: 6px; background: var(--desk); border-radius: 99px; overflow: hidden; }
+.progress > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+
+/* diff */
+.diff-sum { display: flex; gap: 14px; flex-wrap: wrap; font-size: .92rem; }
+.diff-sum .p { color: var(--ins); } .diff-sum .m { color: var(--del); }
+.diff-list { display: grid; gap: 10px; font: 1.05rem/1.8 var(--font-book); }
+.dpara { padding: 8px 12px 8px 12px; border-radius: 6px; border: 1px solid var(--line); position: relative; }
+.dpara.same { border-color: transparent; color: var(--muted); }
+.dpara.add { background: var(--ins-bg); border-color: transparent; }
+.dpara.del { background: var(--del-bg); border-color: transparent; text-decoration: line-through; text-decoration-color: var(--del); }
+.dpara .lbl { display: block; font: 600 .74rem var(--font-ui); color: var(--muted); margin-bottom: 2px; }
+.dpara.jump { cursor: pointer; } .dpara.jump:hover { border-color: var(--accent); }
+.diff-list ins { text-decoration: none; background: var(--ins-bg); color: var(--ins); border-bottom: 2px solid var(--ins); }
+.diff-list del { background: var(--del-bg); color: var(--del); text-decoration: line-through; }
+.gap-row { text-align: center; color: var(--muted); font: .8rem var(--font-ui); }
+
+#toast { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 8px 16px; border-radius: 6px; z-index: 80; font-size: .92rem; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+
+@media (max-width: 980px) {
+  .side { position: fixed; top: 0; bottom: 0; right: 0; z-index: 30; width: min(360px, 92vw); box-shadow: var(--shadow); padding-top: env(safe-area-inset-top, 0px); }
+  .pdfpane { position: fixed; top: 0; bottom: 0; left: 0; z-index: 30; width: min(560px, 94vw); box-shadow: var(--shadow); padding-top: env(safe-area-inset-top, 0px); }
+  #editor [data-pgmark]::before { position: static; display: block; margin-bottom: 2px; }
+  #editor { padding-inline: 22px; }
+  #editor.show-edits .edited::after { inset-inline-end: -10px; }
+}
+@media (max-width: 560px) { .book-row { grid-template-columns: 1fr; } .book-row .acts { justify-content: flex-start; } }
+</style>
+</head>
+<body>
+
+<!-- ================= HOME ================= -->
+<main id="home">
+  <div class="home-inner">
+    <div class="brand">
+      <span class="eyebrow">עורך כתבי יד להגהה ועריכה לשונית</span>
+      <h1>מגיה<span class="mark">.</span></h1>
+      <p>מעלים PDF של הספר ומקבלים טקסט שאפשר לערוך, לצד העמוד המקורי. כל שינוי נשמר, ואפשר לחזור לכל גרסה ולראות בדיוק מה השתנה.</p>
+    </div>
+
+    <section class="drop" id="drop">
+      <h2>ייבוא ספר מ-PDF</h2>
+      <p class="muted" style="margin:0">גוררים לכאן קובץ PDF או בוחרים אותו מהמחשב. הקובץ לא נשלח לשום מקום ונשמר רק בדפדפן הזה.</p>
+      <div class="row">
+        <button class="btn primary" id="pickPdf">בחירת קובץ PDF</button>
+        <button class="btn" id="pickBackup">שחזור מקובץ גיבוי</button>
+        <button class="btn" id="openSample">פתיחת ספר לדוגמה</button>
+      </div>
+      <input type="file" id="pdfInput" accept="application/pdf,.pdf" hidden>
+      <input type="file" id="backupInput" accept=".json,application/json" hidden>
+    </section>
+
+    <section class="library">
+      <h2>הספרים שלי</h2>
+      <div id="bookList" class="library"></div>
+      <p class="note">הספרים, הגרסאות וקובצי ה-PDF נשמרים בדפדפן הזה בלבד. כדאי לייצא גיבוי מלא מדי פעם (בתוך הספר: ייצוא ← גיבוי מלא), כדי שלא תאבד עבודה אם הדפדפן ינוקה.</p>
+    </section>
+  </div>
+</main>
+
+<!-- ================= APP ================= -->
+<div id="app" hidden>
+  <div class="topbar">
+    <div class="title-wrap">
+      <button class="logo" id="goHome" title="חזרה לרשימת הספרים">מגיה</button>
+      <input id="bookTitle" type="text" aria-label="שם הספר">
+      <span class="save-state" id="saveState">נשמר</span>
+    </div>
+    <div class="tools">
+      <button class="btn" id="tFind" title="Ctrl+F">חיפוש והחלפה</button>
+      <button class="btn" id="tCheck">בדיקות הגהה</button>
+      <button class="btn" id="tHist">היסטוריה</button>
+      <button class="btn" id="tPdf">PDF מקורי</button>
+      <button class="btn" id="tExport">ייצוא</button>
+    </div>
+  </div>
+  <div class="formatbar" role="toolbar" aria-label="עיצוב">
+    <button class="btn icon-btn" data-cmd="undo" title="ביטול (Ctrl+Z)">↶</button>
+    <button class="btn icon-btn" data-cmd="redo" title="חזרה (Ctrl+Y)">↷</button>
+    <span class="sep"></span>
+    <button class="btn icon-btn" data-cmd="bold" title="מודגש (Ctrl+B)"><b>ב</b></button>
+    <button class="btn icon-btn" data-cmd="italic" title="נטוי (Ctrl+I)"><i>נ</i></button>
+    <button class="btn icon-btn" data-cmd="underline" title="קו תחתון (Ctrl+U)"><u>ק</u></button>
+    <button class="btn" data-cmd="removeFormat" title="ניקוי עיצוב">ניקוי עיצוב</button>
+    <span class="sep"></span>
+    <button class="btn" data-block="p">פסקה</button>
+    <button class="btn" data-block="h">כותרת</button>
+    <span class="sep"></span>
+    <button class="btn on" id="tMarks" title="סימון בשוליים של פסקאות ששונו מאז הייבוא">סימון פסקאות שנערכו</button>
+    <button class="btn" id="saveVerQuick" title="Ctrl+S">שמירת גרסה</button>
+  </div>
+
+  <div class="workspace">
+    <aside class="side" id="side" hidden>
+      <!-- find -->
+      <div id="pFind" hidden>
+        <header><h3>חיפוש והחלפה</h3><button class="btn small" data-close>סגירה</button></header>
+        <div class="body">
+          <input type="search" id="findQ" placeholder="מה לחפש">
+          <input type="text" id="replQ" placeholder="להחליף ב…">
+          <label class="check"><input type="checkbox" id="optNiqqud" checked> <span>להתעלם מניקוד וטעמים</span></label>
+          <label class="check"><input type="checkbox" id="optWhole"> <span>מילה שלמה בלבד</span></label>
+          <label class="check"><input type="checkbox" id="optRegex"> <span>ביטוי רגולרי (למתקדמים)</span></label>
+          <div class="find-row">
+            <button class="btn" id="fPrev">הקודם</button>
+            <button class="btn primary" id="fNext">הבא</button>
+            <span class="find-count num" id="fCount"></span>
+          </div>
+          <div class="find-row">
+            <button class="btn" id="fRepl">החלפה</button>
+            <button class="btn" id="fReplAll">החלפת הכל</button>
+          </div>
+          <p class="note">כל החלפה נרשמת כשינוי רגיל. אפשר לבטל עם Ctrl+Z, או לחזור לגרסה קודמת מההיסטוריה.</p>
+        </div>
+      </div>
+      <!-- checks -->
+      <div id="pCheck" hidden>
+        <header><h3>בדיקות הגהה</h3><button class="btn small" data-close>סגירה</button></header>
+        <div class="body">
+          <p class="note" style="margin:0">סריקה של כל הספר לבעיות נפוצות. לחיצה על ממצא מובילה אליו בטקסט.</p>
+          <button class="btn primary" id="runChecks">סריקת הספר</button>
+          <div id="checkResults" style="display:grid;gap:10px"></div>
+        </div>
+      </div>
+      <!-- history -->
+      <div id="pHist" hidden>
+        <header><h3>היסטוריית גרסאות</h3><button class="btn small" data-close>סגירה</button></header>
+        <div class="body">
+          <div class="newver">
+            <input type="text" id="verNote" placeholder="הערה לגרסה (למשל: סיום הגהה פרק 3)">
+            <button class="btn primary" id="saveVer">שמירת גרסה עכשיו</button>
+            <span class="note">גרסה נשמרת גם אוטומטית כל 10 דקות של עבודה.</span>
+          </div>
+          <div id="verList" style="display:grid;gap:10px"></div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="sheet-scroll" id="sheetScroll">
+      <article id="editor" class="show-edits" contenteditable="true" spellcheck="true" lang="he" dir="rtl" aria-label="טקסט הספר"></article>
+    </div>
+
+    <aside class="pdfpane" id="pdfPane" hidden>
+      <div class="bar">
+        <button class="btn small" id="pgPrev" title="עמוד קודם">→</button>
+        <span class="num" id="pgLabel">—</span>
+        <button class="btn small" id="pgNext" title="עמוד הבא">←</button>
+        <span class="grow"></span>
+        <button class="btn small" id="zOut" title="הקטנה">−</button>
+        <button class="btn small" id="zIn" title="הגדלה">+</button>
+        <label class="check" style="align-items:center;font-size:.85rem"><input type="checkbox" id="pdfFollow" checked style="margin:0"> לעקוב אחרי הסמן</label>
+        <button class="btn small" id="pdfClose">סגירה</button>
+      </div>
+      <div class="canvas-wrap" id="canvasWrap"><canvas id="pdfCanvas"></canvas></div>
+      <div class="empty" id="pdfEmpty" hidden>לספר הזה אין קובץ PDF מקורי שמור.</div>
+    </aside>
+  </div>
+
+  <div class="statusbar">
+    <span class="num" id="stWords"></span>
+    <span class="num" id="stParas"></span>
+    <span class="num" id="stEdited"></span>
+    <span class="num" id="stPage"></span>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   מגיה — single-file book proofreading editor.
+   Storage: IndexedDB (books, pdfs, versions). PDF parsing: pdf.js.
+   ===================================================================== */
+
+const PDFJS_BASE = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + "pdf.worker.min.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let uidN = 0;
+const uid = () => Date.now().toString(36) + (uidN++).toString(36) + Math.random().toString(36).slice(2, 6);
+const fmtTime = ts => new Date(ts).toLocaleString("he-IL", { day: "numeric", month: "numeric", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+const fmtClock = ts => new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+const plural = (n, one, many) => n === 1 ? one : n.toLocaleString("he-IL") + " " + many;
+
+function toast(msg, ms = 2600) {
+  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, ms);
+}
+
+/* ---------------- IndexedDB ---------------- */
+const DB = {
+  db: null,
+  open() {
+    return new Promise((res, rej) => {
+      let r;
+      try { r = indexedDB.open("magiha", 1); } catch (e) { return rej(e); }
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        d.createObjectStore("books", { keyPath: "id" });
+        d.createObjectStore("pdfs");
+        const v = d.createObjectStore("versions", { keyPath: "vid", autoIncrement: true });
+        v.createIndex("book", "bookId");
+      };
+      r.onsuccess = () => { this.db = r.result; res(); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  req(store, mode, fn) {
+    return new Promise((res, rej) => {
+      const t = this.db.transaction(store, mode), s = t.objectStore(store);
+      let out; const r = fn(s);
+      if (r) r.onsuccess = () => { out = r.result; };
+      t.oncomplete = () => res(out); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+    });
+  },
+  get(s, k) { return this.req(s, "readonly", st => st.get(k)); },
+  put(s, v, k) { return this.req(s, "readwrite", st => k === undefined ? st.put(v) : st.put(v, k)); },
+  del(s, k) { return this.req(s, "readwrite", st => st.delete(k)); },
+  all(s) { return this.req(s, "readonly", st => st.getAll()); },
+  versionsOf(bookId) { return this.req("versions", "readonly", st => st.index("book").getAll(bookId)); },
+  async deleteBook(id) {
+    await this.del("books", id); await this.del("pdfs", id);
+    await this.req("versions", "readwrite", st => {
+      const c = st.index("book").openKeyCursor(IDBKeyRange.only(id));
+      c.onsuccess = () => { const cur = c.result; if (cur) { st.delete(cur.primaryKey); cur.continue(); } };
+    });
+  }
+};
+
+/* ---------------- text helpers ---------------- */
+const tmpl = document.createElement("template");
+function htmlToText(h) { tmpl.innerHTML = h || ""; return tmpl.content.textContent; }
+const pText = p => (p._t !== undefined ? p._t : (p._t = htmlToText(p.h)));
+const WORD_RE = /[\p{L}\p{N}\p{M}]+(?:['"׳״\-־][\p{L}\p{N}\p{M}]+)*/gu;
+const countWords = s => (s.match(WORD_RE) || []).length;
+const NIQQUD_RE = /[֑-ׇ]/; // cantillation + vowel points (incl. maqaf ־ excluded below)
+function isNiqqud(ch) { return NIQQUD_RE.test(ch) && ch !== "־" && ch !== "׀" && ch !== "׃" && ch !== "׆"; }
+function stripParas(paras) { return paras.map(p => ({ id: p.id, t: p.t, h: p.h, pg: p.pg })); }
+
+/* ---------------- PDF extraction ---------------- */
+const HEB = /[֐-׿]/g, LAT = /[A-Za-z]/g;
+const FINALS = "ךםןףץ";
+const MIRROR = { "(": ")", ")": "(", "[": "]", "]": "[", "{": "}", "}": "{", "<": ">", ">": "<", "«": "»", "»": "«" };
+function median(a) { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; }
+function pct(a, q) { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.max(0, Math.round(q * (s.length - 1))))]; }
+
+function fixVisual(s) {
+  // Visual-order (reversed) Hebrew: reverse the line, then put LTR runs (numbers, Latin) back in order and mirror brackets.
+  let r = Array.from(s).reverse().map(c => MIRROR[c] || c).join("");
+  r = r.replace(/[A-Za-z0-9][A-Za-z0-9.,:%\/+'\-]*[A-Za-z0-9]/g, m => Array.from(m).reverse().join(""));
+  return r;
+}
+
+async function readPages(pdf, onProgress) {
+  const pages = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const page = await pdf.getPage(n);
+    const tc = await page.getTextContent();
+    const items = [];
+    for (const it of tc.items) {
+      if (!it.str) continue;
+      const tr = it.transform;
+      const size = Math.hypot(tr[2], tr[3]) || it.height || 10;
+      items.push({ str: it.str, x: tr[4], y: tr[5], w: it.width || 0, size });
+    }
+    pages.push(items);
+    page.cleanup();
+    if (onProgress) onProgress(n / pdf.numPages);
+  }
+  return pages;
+}
+
+function detectReversed(pages) {
+  let atStart = 0, atEnd = 0;
+  for (const items of pages.slice(0, 12)) for (const it of items) {
+    const words = it.str.match(/[א-ת]{2,}/g) || [];
+    for (const w of words) { if (FINALS.includes(w[0])) atStart++; if (FINALS.includes(w[w.length - 1])) atEnd++; }
+  }
+  return atStart > atEnd * 1.5 && atStart > 3;
+}
+
+function buildLines(items, reverse) {
+  const sorted = items.slice().sort((a, b) => b.y - a.y);
+  const lines = [];
+  for (const it of sorted) {
+    const L = lines[lines.length - 1];
+    if (L && Math.abs(L.y - it.y) < 0.45 * Math.max(L.size, it.size)) { L.items.push(it); L.size = Math.max(L.size, it.size); }
+    else lines.push({ y: it.y, size: it.size, items: [it] });
+  }
+  const out = [];
+  for (const L of lines) {
+    const raw = L.items.map(i => i.str).join("");
+    const heb = (raw.match(HEB) || []).length, lat = (raw.match(LAT) || []).length;
+    const rtl = heb >= lat;
+    const ltrOrder = reverse || !rtl;
+    const its = L.items.slice().sort((a, b) => ltrOrder ? a.x - b.x : (b.x + b.w) - (a.x + a.w));
+    let s = "", prev = null;
+    for (const it of its) {
+      if (prev) {
+        const gap = ltrOrder ? it.x - (prev.x + prev.w) : prev.x - (it.x + it.w);
+        if (gap > 0.2 * it.size && !/\s$/.test(s) && !/^\s/.test(it.str)) s += " ";
+      }
+      s += it.str; prev = it;
+    }
+    if (reverse && heb > 0) s = fixVisual(s);
+    s = s.replace(/\s+/g, " ").trim();
+    if (!s) continue;
+    const left = Math.min(...L.items.map(i => i.x)), right = Math.max(...L.items.map(i => i.x + i.w));
+    const sizes = L.items.filter(i => i.str.trim()).map(i => i.size);
+    out.push({ text: s, y: L.y, size: median(sizes) || L.size, left, right, rtl: !(lat > heb) });
+  }
+  return out;
+}
+
+const isPageNum = t => /^[\s\-–—.•|\[\]()]*\d{1,4}[\s\-–—.•|\[\]()]*$/.test(t) || /^(עמוד|עמ['׳]?)\s*\d+$/.test(t);
+const normHeader = t => t.replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
+
+function extractBook(pages, opts) {
+  let all = pages.map(items => buildLines(items, opts.reverse));
+  if (opts.cleanup) {
+    all = all.map(lines => {
+      const l = lines.slice();
+      if (l.length && isPageNum(l[0].text)) l.shift();
+      if (l.length && isPageNum(l[l.length - 1].text)) l.pop();
+      return l;
+    });
+    // running headers / footers: same first or last line on many pages
+    const cnt = new Map();
+    const bump = k => cnt.set(k, (cnt.get(k) || 0) + 1);
+    for (const l of all) { if (l.length > 2) { bump("F" + normHeader(l[0].text)); bump("L" + normHeader(l[l.length - 1].text)); } }
+    const lim = Math.max(3, all.length * 0.25);
+    all = all.map(l => {
+      if (l.length > 2 && (cnt.get("F" + normHeader(l[0].text)) || 0) >= lim && l[0].text.length < 90) l = l.slice(1);
+      if (l.length > 2 && (cnt.get("L" + normHeader(l[l.length - 1].text)) || 0) >= lim && l[l.length - 1].text.length < 90) l = l.slice(0, -1);
+      return l;
+    });
+  }
+  // global body font size
+  const allSizes = all.flat().map(l => l.size);
+  const bodySize = median(allSizes) || 10;
+
+  const paras = [];
+  all.forEach((lines, pi) => {
+    const pg = pi + 1;
+    if (!lines.length) return;
+    const body = lines.filter(l => l.size <= bodySize * 1.15);
+    const ref = body.length >= 3 ? body : lines;
+    const minL = pct(ref.map(l => l.left), 0.1), maxR = pct(ref.map(l => l.right), 0.9);
+    const width = Math.max(1, maxR - minL);
+    const gaps = []; for (let i = 1; i < lines.length; i++) gaps.push(lines[i - 1].y - lines[i].y);
+    const lineGap = median(gaps.filter(g => g > 0 && g < bodySize * 3)) || bodySize * 1.4;
+    let cur = null, prevShort = false, prevY = null;
+    const pagePs = [];
+    for (const ln of lines) {
+      const heading = ln.size > bodySize * 1.2 && ln.text.length < 140;
+      const gap = prevY === null ? 0 : prevY - ln.y;
+      const indent = ln.rtl ? ln.right < maxR - Math.max(0.8 * ln.size, width * 0.025) : ln.left > minL + Math.max(0.8 * ln.size, width * 0.025);
+      let start = !cur;
+      if (cur) {
+        if (heading !== cur.heading) start = true;
+        else if (heading) start = gap > lineGap * 2.2;
+        else if (gap > lineGap * 1.55) start = true;
+        else if (prevShort) start = true;
+        else if (indent) start = true;
+      }
+      if (start) { cur = { text: ln.text, heading, pg, indentStart: indent, open: false }; pagePs.push(cur); }
+      else {
+        const t = cur.text;
+        if (/[־]$/.test(t)) cur.text = t + ln.text;
+        else if (/[A-Za-z]-$/.test(t) && /^[a-z]/.test(ln.text)) cur.text = t.slice(0, -1) + ln.text;
+        else cur.text = t + " " + ln.text;
+      }
+      prevShort = ln.rtl ? ln.left > minL + width * 0.15 : ln.right < maxR - width * 0.15;
+      cur.open = !prevShort;
+      prevY = ln.y;
+    }
+    // merge a paragraph that runs over from the previous page
+    if (opts.mergePages && paras.length && pagePs.length) {
+      const last = paras[paras.length - 1], first = pagePs[0];
+      if (last.open && !last.heading && !first.heading && !first.indentStart && !/[.!?:׃…"״”)]$/.test(last.text)) {
+        last.text += (/[־]$/.test(last.text) ? "" : " ") + first.text;
+        last.open = first.open;
+        pagePs.shift();
+      }
+    }
+    paras.push(...pagePs);
+  });
+  return paras.map(p => ({ id: uid(), t: p.heading ? "h" : "p", h: esc(p.text), pg: p.pg }));
+}
+
+/* ---------------- diff ---------------- */
+const TOK_RE = /\s+|[\p{L}\p{N}\p{M}]+(?:['"׳״\-־][\p{L}\p{N}\p{M}]+)*|\S/gu;
+const tokenize = s => s.match(TOK_RE) || [];
+const isWs = t => /^\s+$/.test(t);
+
+function wordDiff(a, b) {
+  const A = tokenize(a), B = tokenize(b);
+  // trim common prefix/suffix
+  let pre = 0; while (pre < A.length && pre < B.length && A[pre] === B[pre]) pre++;
+  let suf = 0; while (suf < A.length - pre && suf < B.length - pre && A[A.length - 1 - suf] === B[B.length - 1 - suf]) suf++;
+  const a2 = A.slice(pre, A.length - suf), b2 = B.slice(pre, B.length - suf);
+  const ops = [];
+  A.slice(0, pre).forEach(t => ops.push(["=", t]));
+  const n = a2.length, m = b2.length;
+  if (n * m > 4e6) { a2.forEach(t => ops.push(["-", t])); b2.forEach(t => ops.push(["+", t])); }
+  else {
+    const W = m + 1, dp = new Uint16Array((n + 1) * W);
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+      dp[i * W + j] = a2[i] === b2[j] ? dp[(i + 1) * W + j + 1] + 1 : Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1]);
+    let i = 0, j = 0;
+    while (i < n && j < m) {
+      if (a2[i] === b2[j]) { ops.push(["=", a2[i]]); i++; j++; }
+      else if (dp[(i + 1) * W + j] >= dp[i * W + j + 1]) ops.push(["-", a2[i++]]);
+      else ops.push(["+", b2[j++]]);
+    }
+    while (i < n) ops.push(["-", a2[i++]]);
+    while (j < m) ops.push(["+", b2[j++]]);
+  }
+  A.slice(A.length - suf).forEach(t => ops.push(["=", t]));
+  // absorb single whitespace between two changes into the changes, for readability
+  for (let k = 1; k < ops.length - 1; k++) {
+    if (ops[k][0] === "=" && isWs(ops[k][1]) && ops[k - 1][0] !== "=" && ops[k + 1][0] !== "=") {
+      const t = ops[k][1]; ops.splice(k, 1, ["-", t], ["+", t]); k++;
+    }
+  }
+  let html = "", ins = 0, del = 0, buf = { "-": "", "+": "" };
+  const flush = () => {
+    if (buf["-"]) html += "<del>" + esc(buf["-"]) + "</del>";
+    if (buf["+"]) html += "<ins>" + esc(buf["+"]) + "</ins>";
+    buf = { "-": "", "+": "" };
+  };
+  for (const [op, t] of ops) {
+    if (op === "=") { flush(); html += esc(t); }
+    else { buf[op] += t; if (!isWs(t)) op === "+" ? ins++ : del++; }
+  }
+  flush();
+  return { html, ins, del };
+}
+
+function diffParas(oldP, newP) {
+  const oldIdx = new Map(oldP.map((p, i) => [p.id, i]));
+  const newIds = new Set(newP.map(p => p.id));
+  const out = []; let ptr = 0;
+  const pushDel = o => out.push({ k: "del", p: o, words: countWords(pText(o)) });
+  for (const p of newP) {
+    const oi = oldIdx.get(p.id);
+    if (oi === undefined) { out.push({ k: "add", p, words: countWords(pText(p)) }); continue; }
+    while (ptr < oi) { if (!newIds.has(oldP[ptr].id)) pushDel(oldP[ptr]); ptr++; }
+    if (oi >= ptr) ptr = oi + 1;
+    const o = oldP[oi], a = pText(o), b = pText(p);
+    if (a === b) out.push({ k: o.t !== p.t || o.h !== p.h ? "fmt" : "same", p, o });
+    else out.push({ k: "mod", p, o, d: wordDiff(a, b) });
+  }
+  while (ptr < oldP.length) { if (!newIds.has(oldP[ptr].id)) pushDel(oldP[ptr]); ptr++; }
+  return out;
+}
+
+function diffStats(entries) {
+  let ins = 0, del = 0, paras = 0;
+  for (const e of entries) {
+    if (e.k === "mod") { ins += e.d.ins; del += e.d.del; paras++; }
+    else if (e.k === "add") { ins += e.words; paras++; }
+    else if (e.k === "del") { del += e.words; paras++; }
+    else if (e.k === "fmt") paras++;
+  }
+  return { ins, del, paras };
+}
+
+/* ---------------- DOCX writer (no dependencies) ---------------- */
+const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_TABLE[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function makeZip(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let offset = 0;
+  const d = new Date(), time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  for (const f of files) {
+    const name = enc.encode(f.name), data = typeof f.data === "string" ? enc.encode(f.data) : f.data, crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint16(10, time, true); h.setUint16(12, date, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true);
+    h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true);
+    c.setUint16(12, time, true); c.setUint16(14, date, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true);
+    c.setUint16(28, name.length, true); c.setUint32(42, offset, true);
+    central.push(new Uint8Array(c.buffer), name);
+    offset += 30 + name.length + data.length;
+  }
+  const cdSize = central.reduce((s, a) => s + a.length, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, cdSize, true); e.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+}
+const xesc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+function runsFromHtml(h) {
+  tmpl.innerHTML = h || ""; const runs = [];
+  (function walk(node, f) {
+    for (const n of node.childNodes) {
+      if (n.nodeType === 3) runs.push({ t: n.nodeValue, ...f });
+      else if (n.nodeName === "BR") runs.push({ br: true });
+      else if (n.nodeType === 1) {
+        const tag = n.nodeName;
+        walk(n, { b: f.b || tag === "B" || tag === "STRONG", i: f.i || tag === "I" || tag === "EM", u: f.u || tag === "U" });
+      }
+    }
+  })(tmpl.content, {});
+  return runs;
+}
+function runXml(r) {
+  if (r.br) return "<w:r><w:br/></w:r>";
+  const out = [];
+  for (const piece of r.t.split(/([A-Za-z][A-Za-z0-9 .,'’\-]*[A-Za-z0-9]|[A-Za-z])/)) {
+    if (!piece) continue;
+    const latin = /^[A-Za-z]/.test(piece);
+    const pr = (r.b ? "<w:b/><w:bCs/>" : "") + (r.i ? "<w:i/><w:iCs/>" : "") + (r.u ? '<w:u w:val="single"/>' : "") + (latin ? "" : "<w:rtl/>");
+    out.push(`<w:r>${pr ? "<w:rPr>" + pr + "</w:rPr>" : ""}<w:t xml:space="preserve">${xesc(piece)}</w:t></w:r>`);
+  }
+  return out.join("");
+}
+function buildDocx(title, paras) {
+  const body = paras.map(p => {
+    const style = p.t === "h" ? '<w:pStyle w:val="Heading1"/>' : "";
+    return `<w:p><w:pPr>${style}<w:bidi/></w:pPr>${runsFromHtml(p.h).map(runXml).join("")}</w:p>`;
+  }).join("");
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${W}><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/><w:bidi/></w:sectPr></w:body></w:document>`;
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="he-IL" w:bidi="he-IL"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:bidi/><w:spacing w:after="160" w:line="360" w:lineRule="auto"/><w:jc w:val="both"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="360" w:after="200"/><w:jc w:val="right"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:bCs/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr></w:style></w:styles>`;
+  const ct = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`;
+  const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`;
+  const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+  const core = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xesc(title)}</dc:title><dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString().replace(/\.\d+Z$/, "Z")}</dcterms:modified></cp:coreProperties>`;
+  return makeZip([
+    { name: "[Content_Types].xml", data: ct }, { name: "_rels/.rels", data: rels },
+    { name: "word/document.xml", data: doc }, { name: "word/styles.xml", data: styles },
+    { name: "word/_rels/document.xml.rels", data: docRels }, { name: "docProps/core.xml", data: core }
+  ]);
+}
+
+function download(blob, name) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const safeName = s => (s || "ספר").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) || "ספר";
+function bufToB64(buf) { const b = new Uint8Array(buf); let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
+function b64ToBuf(s) { const bin = atob(s), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b.buffer; }
+
+/* ---------------- modal ---------------- */
+function openModal(html, { wide = false } = {}) {
+  const root = $("#modalRoot");
+  root.innerHTML = `<div class="modal-back"><div class="modal ${wide ? "wide" : ""}" role="dialog" aria-modal="true">${html}</div></div>`;
+  const back = root.firstElementChild;
+  back.addEventListener("mousedown", e => { if (e.target === back && !back.dataset.lock) closeModal(); });
+  $$("[data-mclose]", back).forEach(b => b.addEventListener("click", closeModal));
+  return back.firstElementChild;
+}
+function closeModal() { $("#modalRoot").innerHTML = ""; }
+
+/* =====================================================================
+   App state
+   ===================================================================== */
+const S = {
+  book: null, baseline: new Map(), dirty: false, lastSave: 0, lastVersionAt: 0, changedSinceVersion: false,
+  pdf: null, pdfPage: 1, zoom: 1, rendering: false, pendingPage: null,
+  find: { matches: [], cur: -1 }
+};
+const editor = $("#editor");
+
+/* ---------------- home ---------------- */
+async function showHome() {
+  if (S.book) await saveNow();
+  S.book = null; S.pdf = null;
+  $("#app").hidden = true; $("#home").hidden = false; closeModal();
+  document.title = "מגיה";
+  renderLibrary();
+}
+async function renderLibrary() {
+  const list = $("#bookList");
+  let books = [];
+  try { books = await DB.all("books"); } catch (e) { list.innerHTML = `<div class="alert">לא ניתן לגשת לאחסון של הדפדפן (${esc(e.message || e)}). ייתכן שמדובר בחלון גלישה פרטית.</div>`; return; }
+  books.sort((a, b) => b.updated - a.updated);
+  if (!books.length) { list.innerHTML = `<p class="muted" style="margin:0">עדיין אין כאן ספרים. מייבאים PDF כדי להתחיל, או פותחים את הספר לדוגמה כדי לראות איך זה עובד.</p>`; return; }
+  list.innerHTML = books.map(b => {
+    const words = (b.paras || []).reduce((s, p) => s + countWords(htmlToText(p.h)), 0);
+    return `<div class="book-row" data-id="${esc(b.id)}">
+      <div><div class="t">${esc(b.title)}</div>
+      <div class="meta num">${words.toLocaleString("he-IL")} מילים${b.pages ? " · " + b.pages + " עמודים במקור" : ""} · עריכה אחרונה ${fmtTime(b.updated)}</div></div>
+      <div class="acts"><button class="btn primary" data-open>פתיחה</button><button class="btn danger" data-del>מחיקה</button></div></div>`;
+  }).join("");
+  $$(".book-row", list).forEach(row => {
+    const id = row.dataset.id;
+    $("[data-open]", row).onclick = () => openBook(id);
+    const del = $("[data-del]", row);
+    del.onclick = async () => {
+      if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "למחוק לצמיתות?"; setTimeout(() => { del.classList.remove("armed"); del.textContent = "מחיקה"; }, 4000); return; }
+      await DB.deleteBook(id); toast("הספר נמחק"); renderLibrary();
+    };
+  });
+}
+
+/* ---------------- import ---------------- */
+async function startImport(file) {
+  if (!window.pdfjsLib) { toast("רכיב קריאת ה-PDF לא נטען. צריך חיבור לאינטרנט בפעם הראשונה."); return; }
+  const buf = await file.arrayBuffer();
+  const m = openModal(`<header><h3>ייבוא: ${esc(file.name)}</h3></header>
+    <div class="mbody"><p class="muted" style="margin:0" id="impStage">קורא את הקובץ…</p><div class="progress"><div id="impBar"></div></div></div>`);
+  m.parentElement.dataset.lock = "1";
+  let pdf, pages;
+  try {
+    pdf = await pdfjsLib.getDocument({ data: buf.slice(0), cMapUrl: PDFJS_BASE + "cmaps/", cMapPacked: true, standardFontDataUrl: PDFJS_BASE + "standard_fonts/" }).promise;
+    $("#impStage").textContent = `מחלץ טקסט מ-${pdf.numPages} עמודים…`;
+    pages = await readPages(pdf, f => { $("#impBar").style.width = Math.round(f * 100) + "%"; });
+  } catch (e) {
+    console.error(e);
+    openModal(`<header><h3>לא הצלחתי לקרוא את הקובץ</h3></header><div class="mbody"><div class="alert">${esc(e.message || String(e))}</div><p style="margin:0">אם הקובץ מוגן בסיסמה, צריך להסיר את ההגנה קודם.</p></div><footer><button class="btn" data-mclose>סגירה</button></footer>`);
+    return;
+  }
+  const totalChars = pages.reduce((s, it) => s + it.reduce((t, i) => t + i.str.length, 0), 0);
+  const scanned = totalChars < pdf.numPages * 40;
+  const rev = detectReversed(pages);
+  const opts = { reverse: rev, cleanup: true, mergePages: true };
+  const sampleIdx = Math.max(0, pages.findIndex(p => p.reduce((t, i) => t + i.str.length, 0) > 300));
+  const mm = openModal(`<header><h3>הגדרות ייבוא</h3><span class="muted num">${pdf.numPages} עמודים</span></header>
+    <div class="mbody">
+      ${scanned ? `<div class="alert">כמעט לא נמצא טקסט בקובץ. כנראה שה-PDF סרוק (תמונות של עמודים), ואז אי אפשר לחלץ ממנו טקסט ישירות. אפשר לייצא את הספר מחדש מ-Word כ-PDF, או להעביר את הסריקה קודם דרך תוכנת OCR.</div>` : ""}
+      <label style="display:grid;gap:4px"><span class="eyebrow">שם הספר</span><input type="text" id="impTitle" value="${esc(file.name.replace(/\.pdf$/i, ""))}"></label>
+      <label class="check"><input type="checkbox" id="oRev" ${rev ? "checked" : ""}><span>תיקון טקסט עברי הפוך${rev ? " <b>(זוהה אוטומטית שהטקסט בקובץ הפוך)</b>" : ""}<br><span class="muted">לסמן אם בתצוגה המקדימה המילים כתובות מהסוף להתחלה.</span></span></label>
+      <label class="check"><input type="checkbox" id="oClean" checked><span>הסרת מספרי עמודים וכותרות רצות<br><span class="muted">שורות שחוזרות בראש או בתחתית של הרבה עמודים.</span></span></label>
+      <label class="check"><input type="checkbox" id="oMerge" checked><span>חיבור פסקאות שנחתכו בין עמודים</span></label>
+      <div><div class="eyebrow" style="margin-bottom:6px">תצוגה מקדימה, עמוד <span class="num">${sampleIdx + 1}</span></div><div class="preview" id="impPrev"></div></div>
+    </div>
+    <footer><button class="btn primary" id="impGo">ייבוא הספר</button><button class="btn" data-mclose>ביטול</button></footer>`);
+  const readOpts = () => { opts.reverse = $("#oRev").checked; opts.cleanup = $("#oClean").checked; opts.mergePages = $("#oMerge").checked; };
+  const preview = () => {
+    readOpts();
+    const ps = extractBook([pages[sampleIdx] || []], { ...opts, cleanup: false, mergePages: false });
+    $("#impPrev").innerHTML = ps.length ? ps.slice(0, 12).map(p => p.t === "h" ? `<h4>${p.h}</h4>` : `<p>${p.h}</p>`).join("") : `<span class="muted">אין טקסט בעמוד הזה.</span>`;
+  };
+  ["#oRev", "#oClean", "#oMerge"].forEach(s => $(s, mm).addEventListener("change", preview));
+  preview();
+  $("#impGo").onclick = async () => {
+    readOpts();
+    const paras = extractBook(pages, opts);
+    if (!paras.length) paras.push({ id: uid(), t: "p", h: "", pg: 1 });
+    const now = Date.now();
+    const book = { id: uid(), title: $("#impTitle").value.trim() || "ספר ללא שם", created: now, updated: now, pages: pdf.numPages, paras, hasPdf: true, lastPos: null };
+    try {
+      await DB.put("pdfs", buf, book.id);
+      await DB.put("books", book);
+      await DB.put("versions", { bookId: book.id, ts: now, kind: "import", note: "הטקסט המקורי כפי שחולץ מה-PDF", paras, stats: null });
+      try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+    } catch (e) { toast("השמירה בדפדפן נכשלה: " + (e.message || e), 5000); return; }
+    closeModal();
+    openBook(book.id);
+  };
+}
+
+async function createSample() {
+  const T = [
+    ["h", "פרק ראשון: הבית שעל הגבעה"],
+    ["p", "בקצה הכפר, במקום שבו הכביש הופך לשביל עפר, עמד בית אבן ישן. איש לא זכר מי בנה אותו, ואיש לא זכר מתי נשארו החלונות שלו פתוחים בפעם האחרונה."],
+    ["p", "נועה הגיעה לשם בסוף הקיץ , עם מזוודה אחת ומחברת  כחולה. היא לא תכננה להישאר יותר משבוע, אבל כבר בערב הראשון הבינה שהבית יודע לשמור סודות טוב יותר ממנה."],
+    ["p", "\"מי גר כאן לפני?\" שאלה את השכן,איש מבוגר שהשקה את העציצים שלו בדיוק בשש בכל בוקר. הוא משך בכתפיו ואמר שזה לא משנה, כי מה שחשוב הוא מי גר כאן עכשיו."],
+    ["h", "פרק שני: המחברת"],
+    ["p", "בעמוד הראשון של המחברת היא כתבה רק משפט אחד: לא לשכוח לשכוח לשאול. היא לא ידעה עדיין מה בדיוק היא רוצה לשאול, ואת מי (אבל היה לה ברור שהשאלה תגיע."],
+    ["p", "בימים הבאים מילאה את הדפים ברשימות קטנות: הצבע של האבן אחרי הגשם, הקולות של הציפורים בשעת בין ערביים, ושמות של אנשים שהזכירו לה מישהו אחר."]
+  ];
+  const now = Date.now();
+  const paras = T.map(([t, s], i) => ({ id: uid(), t, h: esc(s), pg: i < 4 ? 1 : 2 }));
+  const book = { id: uid(), title: "הבית שעל הגבעה (ספר לדוגמה)", created: now, updated: now, pages: 0, paras, hasPdf: false, lastPos: null };
+  await DB.put("books", book);
+  await DB.put("versions", { bookId: book.id, ts: now, kind: "import", note: "טקסט הדוגמה המקורי", paras, stats: null });
+  openBook(book.id);
+}
+
+/* ---------------- open / render ---------------- */
+async function openBook(id) {
+  const book = await DB.get("books", id);
+  if (!book) { toast("הספר לא נמצא"); return renderLibrary(); }
+  S.book = book; S.dirty = false; S.changedSinceVersion = false;
+  const vers = await DB.versionsOf(id);
+  const base = vers.find(v => v.kind === "import") || vers[0];
+  S.baseline = new Map((base ? base.paras : []).map(p => [p.id, pText(p)]));
+  S.lastVersionAt = vers.length ? Math.max(...vers.map(v => v.ts)) : 0;
+  $("#home").hidden = true; $("#app").hidden = false;
+  $("#bookTitle").value = book.title; document.title = book.title + " · מגיה";
+  renderEditor(book.paras);
+  setSaveState("saved");
+  closeSide();
+  // PDF
+  S.pdf = null; S.pdfPage = 1;
+  if (book.hasPdf && window.pdfjsLib) {
+    DB.get("pdfs", id).then(buf => buf && pdfjsLib.getDocument({ data: buf.slice(0), cMapUrl: PDFJS_BASE + "cmaps/", cMapPacked: true, standardFontDataUrl: PDFJS_BASE + "standard_fonts/" }).promise)
+      .then(pdf => { if (pdf && S.book && S.book.id === id) { S.pdf = pdf; if (window.innerWidth > 980) togglePdf(true); } })
+      .catch(e => console.warn("pdf load", e));
+  }
+  $("#tPdf").disabled = !book.hasPdf;
+  // restore position
+  const last = book.lastPos && editor.querySelector(`[data-id="${CSS.escape(book.lastPos)}"]`);
+  if (last) setTimeout(() => { last.scrollIntoView({ block: "center" }); placeCaret(last); }, 50);
+  else $("#sheetScroll").scrollTop = 0;
+}
+
+function blockHtml(p) {
+  const tag = p.t === "h" ? "h2" : "p";
+  return `<${tag} data-id="${esc(p.id)}"${p.pg ? ` data-pg="${p.pg}"` : ""}>${p.h || "<br>"}</${tag}>`;
+}
+function renderEditor(paras) {
+  editor.innerHTML = paras.map(blockHtml).join("") || "<p><br></p>";
+  decorate();
+}
+
+function decorate() {
+  let lastPg = null, edited = 0;
+  for (const el of editor.children) {
+    const pg = el.dataset.pg || null;
+    if (pg && pg !== lastPg) el.dataset.pgmark = pg; else delete el.dataset.pgmark;
+    if (pg) lastPg = pg;
+    if (markEdited(el)) edited++;
+  }
+  updateStatus(edited);
+}
+function markEdited(el) {
+  const id = el.dataset.id;
+  const base = id ? S.baseline.get(id) : undefined;
+  const isAdded = base === undefined;
+  const isEdited = !isAdded && base !== el.textContent;
+  el.classList.toggle("edited", isEdited || isAdded);
+  el.classList.toggle("added", isAdded);
+  return isEdited || isAdded;
+}
+function updateStatus(edited) {
+  if (edited === undefined) edited = editor.querySelectorAll(".edited").length;
+  const words = countWords(editor.textContent);
+  $("#stWords").textContent = words.toLocaleString("he-IL") + " מילים";
+  $("#stParas").textContent = editor.children.length.toLocaleString("he-IL") + " פסקאות";
+  $("#stEdited").textContent = edited === 1 ? "פסקה אחת שונתה מאז הייבוא" : edited.toLocaleString("he-IL") + " פסקאות שונו מאז הייבוא";
+}
+
+/* ---------------- serialize ---------------- */
+const ALLOWED = new Set(["B", "STRONG", "I", "EM", "U", "BR", "SUP", "SUB"]);
+function cleanInline(el) {
+  const c = el.cloneNode(true);
+  (function walk(n) {
+    for (const ch of Array.from(n.childNodes)) {
+      if (ch.nodeType === 3) continue;
+      if (ch.nodeType !== 1) { ch.remove(); continue; }
+      walk(ch);
+      if (!ALLOWED.has(ch.nodeName)) { ch.replaceWith(...ch.childNodes); continue; }
+      for (const a of Array.from(ch.attributes)) ch.removeAttribute(a.name);
+    }
+  })(c);
+  let h = c.innerHTML.replace(/<br>$/, "");
+  if (!c.textContent.trim() && !/<br>/.test(h)) h = c.textContent;
+  return h;
+}
+function normalizeEditor() {
+  // wrap stray root-level text/inline nodes into paragraphs
+  let wrap = null;
+  for (const n of Array.from(editor.childNodes)) {
+    const isBlock = n.nodeType === 1 && /^(P|H1|H2|H3|H4|DIV|BLOCKQUOTE|UL|OL|LI)$/.test(n.nodeName);
+    if (isBlock) { wrap = null; continue; }
+    if (n.nodeType === 3 && !n.nodeValue.trim() && !wrap) { n.remove(); continue; }
+    if (!wrap) { wrap = document.createElement("p"); n.before(wrap); }
+    wrap.appendChild(n);
+  }
+  if (!editor.children.length) editor.innerHTML = "<p><br></p>";
+}
+function serialize() {
+  normalizeEditor();
+  const els = Array.from(editor.children);
+  // resolve duplicated ids (the browser copies attributes when a paragraph is split): the longest keeps the id
+  const groups = new Map();
+  els.forEach(el => { const id = el.dataset.id; if (id) { if (!groups.has(id)) groups.set(id, []); groups.get(id).push(el); } });
+  for (const [, g] of groups) if (g.length > 1) {
+    const base = S.baseline.get(g[0].dataset.id) || "";
+    g.sort((a, b) => (b.textContent === base) - (a.textContent === base) || b.textContent.length - a.textContent.length);
+    g.slice(1).forEach(el => el.dataset.id = uid());
+  }
+  let lastPg = null;
+  return els.map(el => {
+    if (!el.dataset.id) el.dataset.id = uid();
+    let pg = el.dataset.pg || lastPg;
+    if (pg && !el.dataset.pg) el.dataset.pg = pg;
+    lastPg = pg;
+    return { id: el.dataset.id, t: /^H/.test(el.nodeName) ? "h" : "p", h: cleanInline(el), pg: pg ? +pg : null };
+  });
+}
+
+/* ---------------- saving ---------------- */
+function setSaveState(s) {
+  const el = $("#saveState");
+  if (s === "dirty") { el.textContent = "יש שינויים שלא נשמרו…"; el.classList.add("dirty"); }
+  else if (s === "saving") { el.textContent = "שומר…"; }
+  else if (s === "error") { el.textContent = "השמירה נכשלה!"; el.classList.add("dirty"); }
+  else { el.textContent = "נשמר " + fmtClock(S.lastSave || Date.now()); el.classList.remove("dirty"); }
+}
+let saveTimer = null, decoTimer = null;
+function markDirty() {
+  S.dirty = true; S.changedSinceVersion = true; setSaveState("dirty");
+  clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 1200);
+}
+async function saveNow() {
+  clearTimeout(saveTimer);
+  if (!S.book || !S.dirty) return;
+  setSaveState("saving");
+  S.book.paras = serialize();
+  S.book.title = $("#bookTitle").value.trim() || S.book.title;
+  S.book.updated = Date.now();
+  try { await DB.put("books", S.book); S.dirty = false; S.lastSave = Date.now(); setSaveState("saved"); }
+  catch (e) { console.error(e); setSaveState("error"); toast("השמירה נכשלה: " + (e.message || e), 5000); }
+}
+async function createVersion(kind, note) {
+  if (!S.book) return null;
+  if (S.dirty) await saveNow();
+  const paras = stripParas(serialize());
+  const vers = (await DB.versionsOf(S.book.id)).sort((a, b) => a.ts - b.ts);
+  const prev = vers[vers.length - 1];
+  const stats = prev ? diffStats(diffParas(prev.paras, paras)) : null;
+  if (kind === "auto" && stats && !stats.paras) { S.changedSinceVersion = false; return null; }
+  const v = { bookId: S.book.id, ts: Date.now(), kind, note: note || "", paras, stats };
+  await DB.put("versions", v);
+  S.lastVersionAt = v.ts; S.changedSinceVersion = false;
+  // keep the latest 60 automatic versions
+  const autos = vers.filter(x => x.kind === "auto");
+  if (autos.length > 60) for (const x of autos.slice(0, autos.length - 60)) await DB.del("versions", x.vid);
+  if (!$("#pHist").hidden) renderHistory();
+  return v;
+}
+setInterval(() => {
+  if (S.book && S.changedSinceVersion && Date.now() - S.lastVersionAt > 10 * 60 * 1000) createVersion("auto", "שמירה אוטומטית");
+}, 60 * 1000);
+document.addEventListener("visibilitychange", () => { if (document.hidden) saveNow(); });
+window.addEventListener("beforeunload", e => { if (S.dirty) { saveNow(); e.preventDefault(); e.returnValue = ""; } });
+
+/* ---------------- editor events ---------------- */
+try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) {}
+editor.addEventListener("input", () => {
+  const b = currentBlock(); if (b) markEdited(b);
+  clearTimeout(decoTimer); decoTimer = setTimeout(() => { serialize(); decorate(); if (!$("#pFind").hidden) refreshFind(false); }, 500);
+  markDirty();
+});
+editor.addEventListener("paste", e => {
+  const text = e.clipboardData && e.clipboardData.getData("text/plain");
+  if (text == null) return;
+  e.preventDefault();
+  document.execCommand("insertText", false, text.replace(/\r\n?/g, "\n"));
+});
+editor.addEventListener("drop", e => { if (e.dataTransfer && e.dataTransfer.files.length) e.preventDefault(); });
+function currentBlock() {
+  const s = getSelection(); if (!s.rangeCount) return null;
+  let n = s.anchorNode; if (!n || !editor.contains(n) || n === editor) return null;
+  while (n && n.parentNode !== editor) n = n.parentNode;
+  return n && n.nodeType === 1 ? n : null;
+}
+function placeCaret(el, atEnd = false) {
+  const r = document.createRange(); r.selectNodeContents(el); r.collapse(!atEnd);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+let posTimer = null;
+document.addEventListener("selectionchange", () => {
+  if (!S.book) return;
+  const b = currentBlock(); if (!b) return;
+  const pg = b.dataset.pg;
+  $("#stPage").textContent = pg ? "עמוד " + pg + " במקור" : "";
+  if (pg && S.pdf && $("#pdfFollow").checked && !$("#pdfPane").hidden && +pg !== S.pdfPage) showPdfPage(+pg);
+  clearTimeout(posTimer);
+  posTimer = setTimeout(() => { if (S.book && b.dataset.id && S.book.lastPos !== b.dataset.id) { S.book.lastPos = b.dataset.id; S.dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 1500); } }, 800);
+});
+
+$$("[data-cmd]").forEach(b => b.addEventListener("mousedown", e => e.preventDefault()));
+$$("[data-cmd]").forEach(b => b.addEventListener("click", () => { editor.focus(); document.execCommand(b.dataset.cmd); }));
+$$("[data-block]").forEach(b => b.addEventListener("mousedown", e => e.preventDefault()));
+$$("[data-block]").forEach(b => b.addEventListener("click", () => setBlockType(b.dataset.block)));
+function setBlockType(t) {
+  const el = currentBlock(); if (!el) { toast("קודם מציבים את הסמן בתוך פסקה"); return; }
+  const tag = t === "h" ? "H2" : "P"; if (el.nodeName === tag) return;
+  const n = document.createElement(tag);
+  for (const a of el.attributes) n.setAttribute(a.name, a.value);
+  n.append(...el.childNodes); el.replaceWith(n); placeCaret(n, true);
+  markEdited(n); markDirty();
+}
+$("#tMarks").onclick = () => { editor.classList.toggle("show-edits"); $("#tMarks").classList.toggle("on", editor.classList.contains("show-edits")); };
+$("#bookTitle").addEventListener("input", () => { document.title = ($("#bookTitle").value || "ספר") + " · מגיה"; markDirty(); });
+$("#goHome").onclick = showHome;
+
+document.addEventListener("keydown", e => {
+  if ($("#app").hidden) return;
+  const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
+  if (mod && (k === "s" || e.code === "KeyS")) { e.preventDefault(); quickVersion(); }
+  else if (mod && (k === "f" || e.code === "KeyF")) { e.preventDefault(); openSide("pFind"); $("#findQ").focus(); $("#findQ").select(); }
+  else if (mod && (k === "h" || e.code === "KeyH")) { e.preventDefault(); openSide("pFind"); $("#replQ").focus(); }
+  else if (e.key === "F3") { e.preventDefault(); findStep(e.shiftKey ? -1 : 1); }
+  else if (e.key === "Escape" && $("#modalRoot").firstChild && !$("#modalRoot .modal-back").dataset.lock) closeModal();
+});
+async function quickVersion() { const v = await createVersion("manual", "שמירה ידנית"); toast(v ? "גרסה נשמרה" : "אין שינויים מאז הגרסה הקודמת"); }
+$("#saveVerQuick").onclick = quickVersion;
+
+/* ---------------- side panels ---------------- */
+function openSide(id) {
+  $("#side").hidden = false;
+  ["pFind", "pCheck", "pHist"].forEach(p => $("#" + p).hidden = p !== id);
+  $("#tFind").classList.toggle("on", id === "pFind"); $("#tCheck").classList.toggle("on", id === "pCheck"); $("#tHist").classList.toggle("on", id === "pHist");
+  if (id === "pHist") renderHistory();
+  if (id === "pFind") refreshFind(false);
+}
+function closeSide() { $("#side").hidden = true; ["#tFind", "#tCheck", "#tHist"].forEach(s => $(s).classList.remove("on")); clearHighlights(); }
+$$("[data-close]").forEach(b => b.onclick = closeSide);
+const toggleSide = id => () => ($("#side").hidden || $("#" + id).hidden) ? openSide(id) : closeSide();
+$("#tFind").onclick = toggleSide("pFind");
+$("#tCheck").onclick = toggleSide("pCheck");
+$("#tHist").onclick = toggleSide("pHist");
+
+/* ---------------- text ranges inside the editor ---------------- */
+function blockInfo(el, ignoreNiqqud) {
+  const nodes = []; let raw = "";
+  const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let n; (n = w.nextNode());) { nodes.push({ node: n, start: raw.length }); raw += n.nodeValue; }
+  if (!ignoreNiqqud) return { el, nodes, raw, text: raw, map: null };
+  let text = ""; const map = [];
+  for (let i = 0; i < raw.length; i++) if (!isNiqqud(raw[i])) { map.push(i); text += raw[i]; }
+  map.push(raw.length);
+  return { el, nodes, raw, text, map };
+}
+function rawOffset(info, i) { return info.map ? info.map[i] : i; }
+function pointAt(info, off, isEnd) {
+  for (let k = 0; k < info.nodes.length; k++) {
+    const { node, start } = info.nodes[k], len = node.nodeValue.length;
+    if (off < start + len || (isEnd && off === start + len) || k === info.nodes.length - 1) return [node, Math.min(len, Math.max(0, off - start))];
+  }
+  return [info.el, 0];
+}
+function makeRange(info, s, e) {
+  const r = document.createRange();
+  const [sn, so] = pointAt(info, rawOffset(info, s), false);
+  // end: include trailing niqqud of the last matched letter
+  let re = rawOffset(info, e);
+  if (info.map) { const lastRaw = rawOffset(info, e - 1) + 1; re = lastRaw; while (re < info.raw.length && isNiqqud(info.raw[re])) re++; }
+  const [en, eo] = pointAt(info, re, true);
+  r.setStart(sn, so); r.setEnd(en, eo); return r;
+}
+function scanBlocks(regex, ignoreNiqqud) {
+  const out = [];
+  for (const el of editor.children) {
+    const info = blockInfo(el, ignoreNiqqud);
+    if (!info.text) continue;
+    regex.lastIndex = 0;
+    for (let m; (m = regex.exec(info.text));) {
+      if (!m[0].length) { regex.lastIndex++; continue; }
+      out.push({ info, s: m.index, e: m.index + m[0].length, m });
+    }
+  }
+  return out;
+}
+function selectRange(r, el) {
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  const rect = r.getBoundingClientRect(), box = $("#sheetScroll").getBoundingClientRect();
+  if (rect.top < box.top + 40 || rect.bottom > box.bottom - 40) (el || r.startContainer.parentElement).scrollIntoView({ block: "center" });
+}
+function replaceRange(r, text) {
+  editor.focus();
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  if (text) document.execCommand("insertText", false, text); else document.execCommand("delete");
+}
+
+/* ---------------- find & replace ---------------- */
+const hlSupported = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
+function clearHighlights() { if (hlSupported) { CSS.highlights.delete("find-all"); CSS.highlights.delete("find-cur"); } }
+function buildFindRegex() {
+  let q = $("#findQ").value; if (!q) return null;
+  const ig = $("#optNiqqud").checked;
+  if (ig) q = Array.from(q).filter(c => !isNiqqud(c)).join("");
+  let src = $("#optRegex").checked ? q : q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if ($("#optWhole").checked) src = `(?<![\\p{L}\\p{N}\\p{M}])(?:${src})(?![\\p{L}\\p{N}\\p{M}])`;
+  try { return new RegExp(src, "gu"); } catch (e) { return "bad"; }
+}
+function refreshFind(keepCur = true) {
+  const re = buildFindRegex();
+  if (!re) { S.find = { matches: [], cur: -1 }; $("#fCount").textContent = ""; clearHighlights(); return; }
+  if (re === "bad") { $("#fCount").textContent = "ביטוי לא תקין"; return; }
+  const prevCur = S.find.cur;
+  S.find.matches = scanBlocks(re, $("#optNiqqud").checked).map(x => ({ ...x, range: makeRange(x.info, x.s, x.e) }));
+  S.find.cur = keepCur ? Math.min(prevCur, S.find.matches.length - 1) : -1;
+  paintFind();
+}
+function paintFind() {
+  const { matches, cur } = S.find;
+  $("#fCount").textContent = matches.length ? (cur >= 0 ? `${cur + 1} מתוך ${matches.length}` : `${matches.length} תוצאות`) : "לא נמצא";
+  if (!hlSupported) return;
+  CSS.highlights.set("find-all", new Highlight(...matches.map(m => m.range)));
+  if (cur >= 0 && matches[cur]) CSS.highlights.set("find-cur", new Highlight(matches[cur].range)); else CSS.highlights.delete("find-cur");
+}
+function findStep(dir) {
+  if (!S.find.matches.length) refreshFind(false);
+  const ms = S.find.matches; if (!ms.length) return;
+  if (S.find.cur < 0) {
+    // start from the caret position
+    const sel = getSelection(); let idx = 0;
+    if (sel.rangeCount && editor.contains(sel.anchorNode)) {
+      const caret = sel.getRangeAt(0);
+      idx = ms.findIndex(m => m.range.compareBoundaryPoints(Range.START_TO_START, caret) >= 0);
+      if (idx < 0) idx = 0;
+      if (dir < 0) idx = (idx - 1 + ms.length) % ms.length;
+    }
+    S.find.cur = idx;
+  } else S.find.cur = (S.find.cur + dir + ms.length) % ms.length;
+  const m = ms[S.find.cur];
+  selectRange(m.range, m.info.el);
+  paintFind();
+}
+function replacementFor(m) {
+  const r = $("#replQ").value;
+  return $("#optRegex").checked ? m.m[0].replace(new RegExp(m.m[0].length ? buildFindRegex().source : "^", "u"), r) : r;
+}
+$("#findQ").addEventListener("input", () => refreshFind(false));
+$("#findQ").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); findStep(e.shiftKey ? -1 : 1); } });
+["#optNiqqud", "#optWhole", "#optRegex"].forEach(s => $(s).addEventListener("change", () => refreshFind(false)));
+$("#fNext").onclick = () => findStep(1);
+$("#fPrev").onclick = () => findStep(-1);
+$("#fRepl").onclick = () => {
+  const m = S.find.matches[S.find.cur];
+  if (!m) { findStep(1); return; }
+  replaceRange(m.range, replacementFor(m));
+  serialize(); decorate(); markDirty();
+  const next = S.find.cur; refreshFind(false);
+  if (S.find.matches.length) { S.find.cur = Math.min(next, S.find.matches.length - 1) - 1; findStep(1); }
+};
+$("#fReplAll").onclick = () => {
+  refreshFind(false);
+  const ms = S.find.matches; if (!ms.length) return;
+  const n = ms.length;
+  for (let i = ms.length - 1; i >= 0; i--) replaceRange(ms[i].range, replacementFor(ms[i]));
+  serialize(); decorate(); markDirty(); refreshFind(false);
+  toast(`הוחלפו ${n} מופעים`);
+};
+
+/* ---------------- proofreading checks ---------------- */
+const CHECKS = [
+  { id: "dbl", title: "רווח כפול", re: / {2,}/g, fix: () => " " },
+  { id: "spBefore", title: "רווח לפני סימן פיסוק", re: / +(?=[.,;:!?)])/g, fix: () => "" },
+  { id: "noSpAfter", title: "חסר רווח אחרי סימן פיסוק", re: /[,;!?](?=[א-ת])|[.:](?=[א-ת]{2})/g, fix: m => m[0] + " " },
+  { id: "spEdge", title: "רווח בתחילת פסקה או בסופה", re: /^\s+|\s+$/g, fix: () => "" },
+  { id: "rep", title: "מילה כפולה ברצף", re: /(?<![\p{L}\p{M}])([\p{L}\p{M}]{2,})\s+\1(?![\p{L}\p{M}])/gu, fix: m => m[1] },
+  { id: "mixed", title: "אותיות עבריות ולטיניות באותה מילה", re: /[א-ת][A-Za-z]|[A-Za-z][א-ת]/g, fix: null },
+  { id: "paren", title: "סוגריים לא מאוזנים בפסקה", custom: true, fix: null }
+];
+function runChecks() {
+  const box = $("#checkResults");
+  const results = CHECKS.map(c => {
+    let items;
+    if (c.custom) {
+      items = [];
+      for (const el of editor.children) {
+        const t = el.textContent, o = (t.match(/\(/g) || []).length, cl = (t.match(/\)/g) || []).length;
+        if (o !== cl) { const info = blockInfo(el, false); const idx = Math.max(0, t.search(o > cl ? /\(/ : /\)/)); items.push({ info, s: idx, e: idx + 1, m: [t[idx]] }); }
+      }
+    } else items = scanBlocks(new RegExp(c.re.source, c.re.flags), false);
+    return { c, items };
+  }).filter(r => r.items.length);
+  if (!results.length) { box.innerHTML = `<p style="margin:0">לא נמצאו בעיות.</p>`; return; }
+  box.innerHTML = results.map((r, gi) => `<div class="issue-group" data-g="${gi}">
+    <header><div><h4>${esc(r.c.title)}</h4><span class="count num">${plural(r.items.length, "מופע אחד", "מופעים")}</span></div>${r.c.fix ? `<button class="btn small" data-fixall>תיקון הכל</button>` : ""}</header>
+    <div class="issue-list">${r.items.slice(0, 200).map((it, ii) => {
+      const t = it.info.text, a = Math.max(0, it.s - 28), b = Math.min(t.length, it.e + 28);
+      const shown = t.slice(it.s, it.e).replace(/ /g, "·");
+      return `<button class="issue" data-i="${ii}"><span class="pg">${it.info.el.dataset.pg ? "עמ׳ " + it.info.el.dataset.pg : ""}</span>${a > 0 ? "…" : ""}${esc(t.slice(a, it.s))}<mark>${esc(shown) || "·"}</mark>${esc(t.slice(it.e, b))}${b < t.length ? "…" : ""}</button>`;
+    }).join("")}</div></div>`).join("");
+  $$(".issue-group", box).forEach(g => {
+    const r = results[+g.dataset.g];
+    $$(".issue", g).forEach(btn => btn.onclick = () => {
+      const it = r.items[+btn.dataset.i];
+      if (!it.info.el.isConnected) { toast("הטקסט השתנה, מריצים סריקה מחדש"); return runChecks(); }
+      const fresh = blockInfo(it.info.el, false);
+      editor.focus(); selectRange(makeRange(fresh, Math.min(it.s, fresh.text.length), Math.min(it.e, fresh.text.length)), it.info.el);
+    });
+    const fa = $("[data-fixall]", g);
+    if (fa) fa.onclick = () => {
+      const items = scanBlocks(new RegExp(r.c.re.source, r.c.re.flags), false);
+      for (let i = items.length - 1; i >= 0; i--) replaceRange(makeRange(items[i].info, items[i].s, items[i].e), r.c.fix(items[i].m));
+      serialize(); decorate(); markDirty();
+      toast(`תוקנו ${items.length} מופעים: ${r.c.title}`);
+      runChecks();
+    };
+  });
+}
+$("#runChecks").onclick = runChecks;
+
+/* ---------------- history ---------------- */
+const KIND = { import: ["מקור", "import"], manual: ["ידני", ""], auto: ["אוטומטי", "auto"], restore: ["לפני שחזור", "restore"] };
+async function renderHistory() {
+  if (!S.book) return;
+  const vers = (await DB.versionsOf(S.book.id)).sort((a, b) => b.ts - a.ts);
+  const list = $("#verList");
+  list.innerHTML = `<div class="ver cur"><div class="top"><span class="when">הטקסט הנוכחי</span><span class="chip">עכשיו</span></div>
+    <div class="acts"><button class="btn small" data-cmp-base>מה השתנה מאז הייבוא</button></div></div>` +
+    vers.map(v => {
+      const [label, cls] = KIND[v.kind] || [v.kind, ""];
+      const st = v.stats ? `<div class="stats num"><span class="p">+${v.stats.ins}</span> / <span class="m">−${v.stats.del}</span> מילים · ${plural(v.stats.paras, "פסקה אחת", "פסקאות")}</div>` : "";
+      return `<div class="ver" data-vid="${v.vid}"><div class="top"><span class="when num">${fmtTime(v.ts)}</span><span class="chip ${cls}">${label}</span></div>
+        ${v.note ? `<div>${esc(v.note)}</div>` : ""}${st}
+        <div class="acts"><button class="btn small" data-cmp-cur>השוואה לנוכחי</button>${v.stats ? `<button class="btn small" data-cmp-prev>מה השתנה בגרסה</button>` : ""}<button class="btn small danger" data-restore>שחזור</button></div></div>`;
+    }).join("");
+  const byId = new Map(vers.map(v => [v.vid, v]));
+  const asc = vers.slice().sort((a, b) => a.ts - b.ts);
+  $("[data-cmp-base]", list).onclick = () => { const base = asc.find(v => v.kind === "import") || asc[0]; if (base) showDiff(base.paras, serialize(), `הנוסח המקורי ← הטקסט הנוכחי`, true); };
+  $$(".ver[data-vid]", list).forEach(row => {
+    const v = byId.get(+row.dataset.vid);
+    $("[data-cmp-cur]", row).onclick = () => showDiff(v.paras, serialize(), `גרסה מ-${fmtTime(v.ts)} ← הטקסט הנוכחי`, true);
+    const cp = $("[data-cmp-prev]", row);
+    if (cp) cp.onclick = () => { const i = asc.indexOf(v); const prev = asc[i - 1]; if (prev) showDiff(prev.paras, v.paras, `${fmtTime(prev.ts)} ← ${fmtTime(v.ts)}`, false); };
+    const rb = $("[data-restore]", row);
+    rb.onclick = async () => {
+      if (!rb.classList.contains("armed")) { rb.classList.add("armed"); rb.textContent = "לשחזר? הטקסט הנוכחי יישמר כגרסה"; setTimeout(() => { if (rb.isConnected) { rb.classList.remove("armed"); rb.textContent = "שחזור"; } }, 5000); return; }
+      await createVersion("restore", `לפני שחזור לגרסה מ-${fmtTime(v.ts)}`);
+      renderEditor(v.paras); markDirty(); await saveNow();
+      toast("הגרסה שוחזרה"); renderHistory();
+    };
+  });
+}
+$("#saveVer").onclick = async () => {
+  const note = $("#verNote").value.trim();
+  const v = await createVersion("manual", note || "שמירה ידנית");
+  $("#verNote").value = "";
+  toast(v ? "גרסה נשמרה" : "לא נשמרה גרסה");
+};
+
+function showDiff(oldP, newP, title, jumpable) {
+  const entries = diffParas(oldP, newP);
+  const st = diffStats(entries);
+  const m = openModal(`<header><h3>${esc(title)}</h3>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="check" style="align-items:center"><input type="checkbox" id="onlyChanges" checked style="margin:0"> רק פסקאות ששונו</label><button class="btn" data-mclose>סגירה</button></div></header>
+    <div class="mbody">
+      <div class="diff-sum num"><span class="p">+${st.ins} מילים נוספו</span><span class="m">−${st.del} מילים נמחקו</span><span>${st.paras === 1 ? "פסקה אחת שונתה" : st.paras + " פסקאות שונו"}</span></div>
+      <div class="diff-list" id="diffList"></div>
+    </div>`, { wide: true });
+  const lbl = e => `<span class="lbl">${e.p.pg ? "עמ׳ " + e.p.pg + " · " : ""}${{ mod: "שונתה", add: "פסקה חדשה", del: "פסקה שנמחקה", fmt: "שינוי עיצוב או סוג פסקה", same: "" }[e.k]}</span>`;
+  const render = () => {
+    const only = $("#onlyChanges").checked;
+    let html = "", skipped = 0;
+    const flushGap = () => { if (skipped) { html += `<div class="gap-row num">· · · ${plural(skipped, "פסקה אחת", "פסקאות")} ללא שינוי · · ·</div>`; skipped = 0; } };
+    for (const e of entries) {
+      if (e.k === "same") { if (only) { skipped++; continue; } html += `<div class="dpara same">${esc(pText(e.p))}</div>`; continue; }
+      flushGap();
+      const canJump = jumpable && e.k !== "del";
+      const body = e.k === "mod" ? e.d.html : esc(pText(e.p));
+      html += `<div class="dpara ${e.k} ${canJump ? "jump" : ""}" ${canJump ? `data-jump="${esc(e.p.id)}" title="לחיצה מובילה לפסקה בטקסט"` : ""}>${lbl(e)}${body}</div>`;
+    }
+    flushGap();
+    if (!st.paras) html = `<p class="muted">אין הבדלים בין שתי הגרסאות.</p>`;
+    $("#diffList").innerHTML = html;
+    $$("[data-jump]", m).forEach(d => d.onclick = () => {
+      const el = editor.querySelector(`[data-id="${CSS.escape(d.dataset.jump)}"]`);
+      closeModal(); if (!el) return;
+      el.scrollIntoView({ block: "center" }); placeCaret(el, true);
+      el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    });
+  };
+  $("#onlyChanges").addEventListener("change", render);
+  render();
+}
+
+/* ---------------- PDF pane ---------------- */
+function togglePdf(force) {
+  const pane = $("#pdfPane");
+  const show = force !== undefined ? force : pane.hidden;
+  pane.hidden = !show; $("#tPdf").classList.toggle("on", show);
+  if (!show) return;
+  $("#pdfEmpty").hidden = !!S.pdf; $("#canvasWrap").hidden = !S.pdf;
+  if (S.pdf) { const b = currentBlock() || editor.querySelector("[data-pg]"); showPdfPage(b && b.dataset.pg ? +b.dataset.pg : S.pdfPage); }
+}
+$("#tPdf").onclick = () => togglePdf();
+$("#pdfClose").onclick = () => togglePdf(false);
+$("#pgPrev").onclick = () => S.pdf && showPdfPage(Math.max(1, S.pdfPage - 1));
+$("#pgNext").onclick = () => S.pdf && showPdfPage(Math.min(S.pdf.numPages, S.pdfPage + 1));
+$("#zIn").onclick = () => { S.zoom = Math.min(3, S.zoom * 1.2); showPdfPage(S.pdfPage); };
+$("#zOut").onclick = () => { S.zoom = Math.max(0.4, S.zoom / 1.2); showPdfPage(S.pdfPage); };
+async function showPdfPage(n) {
+  if (!S.pdf) return;
+  n = Math.max(1, Math.min(S.pdf.numPages, n || 1));
+  S.pdfPage = n; $("#pgLabel").textContent = `עמוד ${n} מתוך ${S.pdf.numPages}`;
+  if (S.rendering) { S.pendingPage = n; return; }
+  S.rendering = true;
+  try {
+    const page = await S.pdf.getPage(n);
+    const wrap = $("#canvasWrap");
+    const base = page.getViewport({ scale: 1 });
+    const fit = Math.max(200, wrap.clientWidth - 24) / base.width;
+    const vp = page.getViewport({ scale: fit * S.zoom });
+    const dpr = window.devicePixelRatio || 1;
+    const c = $("#pdfCanvas");
+    c.width = Math.floor(vp.width * dpr); c.height = Math.floor(vp.height * dpr);
+    c.style.width = Math.floor(vp.width) + "px"; c.style.height = Math.floor(vp.height) + "px";
+    await page.render({ canvasContext: c.getContext("2d"), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null }).promise;
+  } catch (e) { console.warn(e); }
+  S.rendering = false;
+  if (S.pendingPage !== null) { const p = S.pendingPage; S.pendingPage = null; if (p !== n) showPdfPage(p); }
+}
+window.addEventListener("resize", () => { clearTimeout(showPdfPage._r); showPdfPage._r = setTimeout(() => { if (!$("#pdfPane").hidden) showPdfPage(S.pdfPage); }, 250); });
+
+/* ---------------- export ---------------- */
+$("#tExport").onclick = () => {
+  const m = openModal(`<header><h3>ייצוא</h3><button class="btn" data-mclose>סגירה</button></header>
+    <div class="mbody">
+      <div style="display:grid;gap:6px"><button class="btn primary" id="exDocx" style="justify-self:start">קובץ Word (‎.docx)</button><span class="note">הטקסט המעודכן, עם כותרות, הדגשות וכיווניות מימין לשמאל.</span></div>
+      <div style="display:grid;gap:6px"><button class="btn" id="exTxt" style="justify-self:start">טקסט פשוט (‎.txt)</button></div>
+      <div style="display:grid;gap:6px;border-top:1px solid var(--line);padding-top:14px"><button class="btn" id="exBak" style="justify-self:start">גיבוי מלא (‎.json)</button>
+        <label class="check"><input type="checkbox" id="bakPdf" checked><span>לכלול את קובץ ה-PDF המקורי בגיבוי</span></label>
+        <span class="note">הגיבוי כולל את הטקסט ואת כל היסטוריית הגרסאות. אפשר לשחזר אותו במסך הראשי, גם במחשב אחר.</span></div>
+    </div>`);
+  const name = safeName($("#bookTitle").value);
+  $("#exDocx", m).onclick = async () => { await saveNow(); download(buildDocx(name, serialize()), name + ".docx"); };
+  $("#exTxt", m).onclick = async () => {
+    await saveNow();
+    const txt = serialize().map(p => htmlToText(p.h.replace(/<br>/g, "\n"))).join("\n\n");
+    download(new Blob(["﻿" + txt], { type: "text/plain;charset=utf-8" }), name + ".txt");
+  };
+  $("#exBak", m).onclick = async () => {
+    await saveNow();
+    const vers = await DB.versionsOf(S.book.id);
+    let pdf = null;
+    if ($("#bakPdf").checked && S.book.hasPdf) { const buf = await DB.get("pdfs", S.book.id); if (buf) pdf = bufToB64(buf); }
+    const data = { format: "magiha-backup", v: 1, exported: Date.now(), book: S.book, versions: vers.map(({ vid, ...v }) => v), pdf };
+    download(new Blob([JSON.stringify(data)], { type: "application/json" }), name + " - גיבוי " + new Date().toISOString().slice(0, 10) + ".json");
+  };
+};
+async function restoreBackup(file) {
+  let data;
+  try { data = JSON.parse(await file.text()); } catch (e) { toast("הקובץ אינו קובץ גיבוי תקין"); return; }
+  if (data.format !== "magiha-backup" || !data.book) { toast("הקובץ אינו קובץ גיבוי של מגיה"); return; }
+  const book = data.book;
+  const existing = await DB.get("books", book.id);
+  if (existing) { book.id = uid(); book.title += " (עותק משוחזר)"; }
+  book.hasPdf = !!data.pdf;
+  if (data.pdf) await DB.put("pdfs", b64ToBuf(data.pdf), book.id);
+  await DB.put("books", book);
+  for (const v of data.versions || []) await DB.put("versions", { ...v, bookId: book.id });
+  toast("הגיבוי שוחזר");
+  openBook(book.id);
+}
+
+/* ---------------- home wiring ---------------- */
+$("#pickPdf").onclick = () => $("#pdfInput").click();
+$("#pdfInput").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) startImport(f); };
+$("#pickBackup").onclick = () => $("#backupInput").click();
+$("#backupInput").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) restoreBackup(f); };
+$("#openSample").onclick = createSample;
+const drop = $("#drop");
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove("over")));
+drop.addEventListener("drop", e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  if (/\.json$/i.test(f.name)) restoreBackup(f); else if (/pdf/i.test(f.type) || /\.pdf$/i.test(f.name)) startImport(f); else toast("צריך קובץ PDF");
+});
+
+(async function init() {
+  try { await DB.open(); } catch (e) { $("#bookList").innerHTML = `<div class="alert">הדפדפן לא מאפשר שמירה מקומית (${esc(e.message || e)}). נסו דפדפן אחר או חלון רגיל (לא פרטי).</div>`; return; }
+  renderLibrary();
+})();
+</script>
+</body>
+</html>
