@@ -98,6 +98,12 @@ label.check input { margin-top: .3em; }
 .chap-name { font: 700 1.02rem var(--font-book); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .chap-caret { color: var(--muted); font-size: .8rem; }
 .chap-title.done .chap-name::after { content: " ✓"; color: var(--ins); }
+.chap-figure { max-width: 70ch; margin: 18px auto 0; }
+.fig-add { width: 100%; justify-content: center; min-height: 64px; border-style: dashed; border-width: 2px; color: var(--accent); background: transparent; font-weight: 600; }
+.fig-has { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; }
+.fig-has img { display: block; width: 100%; height: auto; border-radius: 4px; background: #fff; }
+.fig-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .85rem; }
+.fig-acts { display: flex; gap: 6px; }
 .chapfoot { max-width: 70ch; margin: 20px auto 0; display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
 .chapfoot .btn { flex: 1 1 180px; justify-content: center; min-height: 46px; }
 #markDone.on { background: var(--ins-bg); color: var(--ins); border-color: var(--ins); }
@@ -293,6 +299,7 @@ label.check input { margin-top: .3em; }
   /* while the keyboard is up, the bars scroll away so the text gets the room */
   body.typing .topbar, body.typing .chapbar { position: relative; top: 0; }
   .chapfoot { margin: 8px max(18px, env(safe-area-inset-right, 0px)) 0 max(18px, env(safe-area-inset-left, 0px)); }
+  .chap-figure { margin: 8px max(18px, env(safe-area-inset-right, 0px)) 0 max(18px, env(safe-area-inset-left, 0px)); }
   #home { padding-block: 28px 48px; }
   .drop { padding: 20px; }
   .drop .row { width: 100%; }
@@ -425,6 +432,14 @@ label.check input { margin-top: .3em; }
 
     <div class="sheet-scroll" id="sheetScroll">
       <article id="editor" class="show-edits" contenteditable="true" spellcheck="true" lang="he" dir="rtl" aria-label="טקסט הפרק"></article>
+      <figure class="chap-figure" id="chapFig">
+        <div class="fig-empty" id="figEmpty"><button class="btn fig-add" id="figAdd">＋ הוספת איור לסוף הפרק</button></div>
+        <div class="fig-has" id="figHas" hidden>
+          <img id="figImg" alt="איור בסוף הפרק">
+          <figcaption class="fig-bar"><span class="muted" id="figState"></span><span class="fig-acts"><button class="btn small" id="figReplace">החלפה</button><button class="btn small danger" id="figRemove">הסרה</button></span></figcaption>
+        </div>
+        <input type="file" id="figInput" accept="image/*" hidden>
+      </figure>
       <div class="chapfoot" id="chapFoot">
         <button class="btn" id="markDone">סימון הפרק כנבדק</button>
         <button class="btn primary" id="footNext">לפרק הבא ←</button>
@@ -853,22 +868,29 @@ function runXml(r) {
   }
   return out.join("");
 }
-function buildDocx(title, paras) {
+function buildDocx(title, paras, media = []) {
+  const EMU_W = 5600000, EMU_H = 7400000;   // fits A4 with 1" margins
   const body = paras.map(p => {
+    if (p.t === "img") {
+      const m = media[p.m], k = Math.min(EMU_W / m.w, EMU_H / m.h), cx = Math.round(m.w * k), cy = Math.round(m.h * k), n = p.m + 1;
+      return `<w:p><w:pPr><w:bidi/><w:jc w:val="center"/><w:spacing w:before="240" w:after="240"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${n}" name="איור ${n}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${n}" name="image${n}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg${n}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+    }
     const style = p.t === "h" ? '<w:pStyle w:val="Heading1"/>' : p.t === "s" ? '<w:pStyle w:val="Heading2"/>' : "";
     return `<w:p><w:pPr>${style}<w:bidi/></w:pPr>${runsFromHtml(p.h).map(runXml).join("")}</w:p>`;
   }).join("");
-  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
+  const ext = m => m.type === "image/png" ? "png" : "jpeg";
   const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${W}><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/><w:bidi/></w:sectPr></w:body></w:document>`;
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="he-IL" w:bidi="he-IL"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:bidi/><w:spacing w:after="160" w:line="360" w:lineRule="auto"/><w:jc w:val="both"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="360" w:after="200"/><w:jc w:val="right"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:bCs/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="120"/><w:jc w:val="right"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:bCs/><w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr></w:style></w:styles>`;
-  const ct = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`;
+  const ct = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`;
   const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`;
-  const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+  const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${media.map((m, i) => `<Relationship Id="rIdImg${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image${i + 1}.${ext(m)}"/>`).join("")}</Relationships>`;
   const core = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xesc(title)}</dc:title><dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString().replace(/\.\d+Z$/, "Z")}</dcterms:modified></cp:coreProperties>`;
   return makeZip([
     { name: "[Content_Types].xml", data: ct }, { name: "_rels/.rels", data: rels },
     { name: "word/document.xml", data: doc }, { name: "word/styles.xml", data: styles },
-    { name: "word/_rels/document.xml.rels", data: docRels }, { name: "docProps/core.xml", data: core }
+    { name: "word/_rels/document.xml.rels", data: docRels }, { name: "docProps/core.xml", data: core },
+    ...media.map((m, i) => ({ name: `word/media/image${i + 1}.${ext(m)}`, data: m.bytes }))
   ]);
 }
 
@@ -1132,7 +1154,7 @@ function renderChapter(k) {
   S.ci = Math.max(0, Math.min(S.chapters.length - 1, k));
   const c = S.chapters[S.ci];
   editor.innerHTML = S.full.slice(c.start, c.end).map(blockHtml).join("") || "<p><br></p>";
-  decorate(); paintChapter();
+  decorate(); paintChapter(); paintFigure();
 }
 const chapStartId = c => (S.full[c.start] || {}).id;
 const isDone = c => !!(S.book && S.book.done && S.book.done.includes(chapStartId(c)));
@@ -1381,6 +1403,90 @@ function setBlockType(t) {
   n.append(...el.childNodes); el.replaceWith(n); placeCaret(n, true);
   markEdited(n); markDirty();
 }
+/* illustrations: one image at the end of each chapter.
+   Kept on this device (IndexedDB) and, inside claude.ai, uploaded to the artifact's asset store so other devices see it. */
+const figKey = cid => `img:${S.book.id}:${cid}`;
+const figFor = cid => (S.book && S.book.images && cid && S.book.images[cid]) || null;
+let assetsP = null;
+const getAssets = () => inViewer ? (assetsP || (assetsP = window.claude.use("assets").catch(() => null))) : Promise.resolve(null);
+let figUrl = null;
+async function figBlob(cid, fig) {
+  const local = await DB.get("pdfs", figKey(cid));
+  if (local) return local;
+  if (fig && fig.asset) {
+    try {
+      const r = await fetch("/_blob/" + fig.asset);
+      if (r.ok) { const b = await r.blob(); await DB.put("pdfs", b, figKey(cid)); return b; }
+    } catch (e) {}
+  }
+  return null;
+}
+async function paintFigure() {
+  if (!S.chapters || !S.book) return;
+  const cid = chapStartId(S.chapters[S.ci]), fig = figFor(cid);
+  $("#figEmpty").hidden = !!fig; $("#figHas").hidden = !fig;
+  $("#figRemove").classList.remove("armed"); $("#figRemove").textContent = "הסרה";
+  if (figUrl) { URL.revokeObjectURL(figUrl); figUrl = null; }
+  if (!fig) { $("#figImg").removeAttribute("src"); return; }
+  $("#figState").textContent = fig.asset ? "האיור שמור גם בענן" : (inViewer ? "שמור במכשיר הזה" : "שמור במכשיר הזה");
+  const local = await DB.get("pdfs", figKey(cid));
+  if (cid !== chapStartId(S.chapters[S.ci])) return;
+  if (local) { figUrl = URL.createObjectURL(local); $("#figImg").src = figUrl; }
+  else if (fig.asset) $("#figImg").src = "/_blob/" + fig.asset;
+  else { $("#figHas").hidden = true; $("#figEmpty").hidden = false; }
+}
+async function prepareImage(file) {
+  const src = URL.createObjectURL(file);
+  try {
+    const img = new Image(); img.src = src; await img.decode();
+    let w = img.naturalWidth, h = img.naturalHeight, blob = file, type = file.type;
+    const MAX = 3000;
+    if (!/^image\/(jpeg|png)$/.test(type) || file.size > 8e6 || Math.max(w, h) > MAX) {
+      const k = Math.min(1, MAX / Math.max(w, h)), cw = Math.round(w * k), ch = Math.round(h * k);
+      const keepPng = type === "image/png" && file.size <= 8e6;
+      const c = document.createElement("canvas"); c.width = cw; c.height = ch;
+      const ctx = c.getContext("2d");
+      if (!keepPng) { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cw, ch); }
+      ctx.drawImage(img, 0, 0, cw, ch);
+      type = keepPng ? "image/png" : "image/jpeg";
+      blob = await new Promise(r => c.toBlob(r, type, 0.9)); w = cw; h = ch;
+    }
+    return { blob, type, w, h };
+  } finally { URL.revokeObjectURL(src); }
+}
+$("#figAdd").onclick = () => $("#figInput").click();
+$("#figReplace").onclick = () => $("#figInput").click();
+$("#figInput").onchange = async e => {
+  const file = e.target.files[0]; e.target.value = ""; if (!file || !S.book) return;
+  const cid = chapStartId(S.chapters[S.ci]);
+  let prep;
+  try { prep = await prepareImage(file); } catch (err) { toast("לא הצלחתי לפתוח את התמונה. נסו קובץ JPG או PNG.", 4000); return; }
+  const old = figFor(cid);
+  await DB.put("pdfs", prep.blob, figKey(cid));
+  S.book.images = S.book.images || {};
+  S.book.images[cid] = { type: prep.type, w: prep.w, h: prep.h, ts: Date.now(), asset: null };
+  S.dirty = true; S.changedSinceVersion = true; await saveNow();
+  paintFigure(); toast("האיור נוסף לסוף הפרק");
+  const assets = await getAssets();
+  if (!assets) return;
+  try {
+    const res = await assets.upload(prep.blob, { type: prep.type });
+    if (S.book.images[cid] && S.book.images[cid].ts) { S.book.images[cid].asset = res.id; S.dirty = true; await saveNow(); if (cid === chapStartId(S.chapters[S.ci])) paintFigure(); }
+    if (old && old.asset) assets.delete(old.asset).catch(() => {});
+  } catch (err) { console.warn("asset upload", err); if (err && err.code === "quota_or_state") toast("נגמר המקום לאיורים בענן. האיור שמור במכשיר.", 4000); }
+};
+$("#figRemove").onclick = async () => {
+  const b = $("#figRemove");
+  if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "להסיר את האיור?"; setTimeout(() => { b.classList.remove("armed"); b.textContent = "הסרה"; }, 4000); return; }
+  const cid = chapStartId(S.chapters[S.ci]), fig = figFor(cid);
+  if (!fig) return;
+  delete S.book.images[cid];
+  await DB.del("pdfs", figKey(cid));
+  S.dirty = true; S.changedSinceVersion = true; await saveNow();
+  paintFigure(); toast("האיור הוסר");
+  if (fig.asset) { const assets = await getAssets(); if (assets) assets.delete(fig.asset).catch(() => {}); }
+};
+
 /* emphasize (הבלטה) */
 let lastEditorRange = null;
 document.addEventListener("selectionchange", () => {
@@ -1749,7 +1855,22 @@ $("#tExport").onclick = () => {
         <span class="note">הגיבוי כולל את הטקסט ואת כל היסטוריית הגרסאות. אפשר לשחזר אותו במסך הראשי, גם במחשב אחר.</span></div>
     </div>`);
   const name = safeName($("#bookTitle").value);
-  $("#exDocx", m).onclick = async () => { await saveNow(); download(buildDocx(name, fullParas()), name + ".docx"); };
+  $("#exDocx", m).onclick = async () => {
+    await saveNow();
+    const full = fullParas(), chs = computeChapters(full), out = [], media = [];
+    let missing = 0;
+    for (const c of chs) {
+      out.push(...full.slice(c.start, c.end));
+      const fig = figFor(full[c.start] && full[c.start].id);
+      if (!fig) continue;
+      const blob = await figBlob(full[c.start].id, fig);
+      if (!blob) { missing++; continue; }
+      media.push({ bytes: new Uint8Array(await blob.arrayBuffer()), type: fig.type, w: fig.w, h: fig.h });
+      out.push({ t: "img", m: media.length - 1 });
+    }
+    if (missing) toast(`${missing} איורים לא נמצאו במכשיר הזה ולא נכללו`, 4000);
+    download(buildDocx(name, out, media), name + ".docx");
+  };
   $("#exTxt", m).onclick = async () => {
     await saveNow();
     const txt = fullParas().map(p => htmlToText(p.h.replace(/<br>/g, "\n"))).join("\n\n");
@@ -1760,7 +1881,9 @@ $("#tExport").onclick = () => {
     const vers = await DB.versionsOf(S.book.id);
     let pdf = null;
     if ($("#bakPdf").checked && S.book.hasPdf) { const buf = await DB.get("pdfs", S.book.id); if (buf) pdf = bufToB64(buf); }
-    const data = { format: "magiha-backup", v: 1, exported: Date.now(), book: S.book, versions: vers.map(({ vid, ...v }) => v), pdf };
+    const figs = {};
+    for (const [cid, fig] of Object.entries(S.book.images || {})) { const b = await figBlob(cid, fig); if (b) figs[cid] = bufToB64(await b.arrayBuffer()); }
+    const data = { format: "magiha-backup", v: 1, exported: Date.now(), book: S.book, versions: vers.map(({ vid, ...v }) => v), pdf, figs };
     download(new Blob([JSON.stringify(data)], { type: "application/json" }), name + " - גיבוי " + new Date().toISOString().slice(0, 10) + ".json");
   };
 };
@@ -1773,6 +1896,10 @@ async function restoreBackup(file) {
     await createVersion("restore", "לפני שחזור מקובץ גיבוי");
     const have = new Set((await DB.versionsOf(S.book.id)).map(v => v.ts));
     for (const v of data.versions || []) if (!have.has(v.ts)) await DB.put("versions", { ...v, bookId: S.book.id });
+    if (data.book.images) {
+      S.book.images = { ...(S.book.images || {}), ...data.book.images };
+      for (const [cid, b64] of Object.entries(data.figs || {})) { const f = S.book.images[cid]; if (f) await DB.put("pdfs", new Blob([b64ToBuf(b64)], { type: f.type }), figKey(cid)); }
+    }
     renderEditor(data.book.paras || []); markDirty(); await saveNow();
     toast("הטקסט שוחזר מקובץ הגיבוי");
     return;
@@ -1964,7 +2091,7 @@ const Cloud = {
         if (this.sent.get(key) !== json) { await this.col().doc(key).set({ kind: "chunk", book: book.id, i, paras: chunks[i] }); this.sent.set(key, json); }
       }
       const prevN = this.chunkN.get(book.id);
-      await this.col().doc("book_" + book.id).set({ kind: "book", id: book.id, title: book.title, created: book.created, updated: book.updated, pages: book.pages || 0, chunks: chunks.length, lastPos: book.lastPos || null, done: book.done || [] });
+      await this.col().doc("book_" + book.id).set({ kind: "book", id: book.id, title: book.title, created: book.created, updated: book.updated, pages: book.pages || 0, chunks: chunks.length, lastPos: book.lastPos || null, done: book.done || [], images: book.images || {} });
       if (prevN && prevN > chunks.length) for (let i = chunks.length; i < prevN; i++) { await this.col().doc(`c_${book.id}_${i}`).delete(); this.sent.delete(`c_${book.id}_${i}`); }
       this.chunkN.set(book.id, chunks.length);
       this.state = "ok"; this.lastOk = Date.now();
@@ -2008,6 +2135,7 @@ const Cloud = {
         if (S.book.updated > 0) await createVersion("restore", "לפני עדכון מהענן (נערך במכשיר אחר)");
         S.book.title = meta.title; $("#bookTitle").value = meta.title;
         if (Array.isArray(meta.done)) S.book.done = meta.done.slice();
+        if (meta.images) S.book.images = JSON.parse(JSON.stringify(meta.images));
         renderEditor(paras, meta.lastPos || undefined); S.book.paras = paras; S.book.updated = meta.updated;
         await DB.put("books", S.book);
         toast("נטענה הגרסה העדכנית מהענן, שנערכה במכשיר אחר", 4000);
