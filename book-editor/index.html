@@ -1340,14 +1340,49 @@ function markDirty() {
   S.dirty = true; S.changedSinceVersion = true; S.contentChanged = true; setSaveState("dirty");
   clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 1200);
 }
+/* Several windows/tabs may have the book open. Each save carries a revision number; a window whose copy is
+   older than what is stored never writes over it: it takes the newer copy instead (keeping its own unsaved
+   edits as a version). */
+const bc = (() => { try { return new BroadcastChannel("magiha-book"); } catch (e) { return null; } })();
+async function adoptFromOtherWindow(cur) {
+  if (S.adopting) return; S.adopting = true;
+  try {
+    if (S.contentChanged) {
+      const mine = stripParas(fullParas());
+      await DB.put("versions", { bookId: S.book.id, ts: Date.now(), kind: "restore", note: "טקסט מחלון אחר של הספר שלא הספיק להישמר", paras: mine, stats: null });
+    }
+    clearTimeout(saveTimer);
+    S.book = cur; S.dirty = false; S.contentChanged = false;
+    $("#bookTitle").value = cur.title;
+    renderEditor(cur.paras, cur.lastPos || undefined);
+    setSaveState("saved");
+  } finally { S.adopting = false; }
+}
+async function checkOtherWindows() {
+  if (!S.book) return false;
+  try {
+    const cur = await DB.get("books", S.book.id);
+    if (cur && (cur.rev || 0) !== (S.book.rev || 0)) { await adoptFromOtherWindow(cur); return true; }
+  } catch (e) {}
+  return false;
+}
+if (bc) bc.onmessage = e => { const m = e.data || {}; if (S.book && m.id === S.book.id && m.rev !== (S.book.rev || 0) && !S.dirty) checkOtherWindows(); };
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !S.dirty) checkOtherWindows(); });
+window.addEventListener("focus", () => { if (!S.dirty) checkOtherWindows(); });
+async function putBook() {
+  S.book.rev = (S.book.rev || 0) + 1;
+  await DB.put("books", S.book);
+  if (bc) bc.postMessage({ id: S.book.id, rev: S.book.rev });
+}
 async function saveNow() {
   clearTimeout(saveTimer);
-  if (!S.book || !S.dirty) return;
+  if (!S.book || !S.dirty || S.adopting) return;
+  if (await checkOtherWindows()) { toast("הספר נשמר בינתיים בחלון אחר, ונטען ממנו כאן. מה שלא נשמר כאן נמצא בהיסטוריה.", 4500); return; }
   setSaveState("saving");
   S.book.paras = fullParas();
   S.book.title = $("#bookTitle").value.trim() || S.book.title;
   if (S.contentChanged) { S.book.updated = Date.now(); S.contentChanged = false; }
-  try { await DB.put("books", S.book); S.dirty = false; S.lastSave = Date.now(); setSaveState("saved"); Cloud.schedule(); }
+  try { await putBook(); S.dirty = false; S.lastSave = Date.now(); setSaveState("saved"); Cloud.schedule(); }
   catch (e) { console.error(e); setSaveState("error"); toast("השמירה נכשלה: " + (e.message || e), 5000); }
 }
 async function createVersion(kind, note) {
@@ -1760,7 +1795,7 @@ async function renderHistory() {
       const [label, cls] = KIND[v.kind] || [v.kind, ""];
       const st = v.stats ? `<div class="stats num"><span class="p">+${v.stats.ins}</span> / <span class="m">−${v.stats.del}</span> מילים · ${plural(v.stats.paras, "פסקה אחת", "פסקאות")}</div>` : "";
       return `<div class="ver" data-vid="${v.vid}"><div class="top"><span class="when num">${fmtTime(v.ts)}</span><span class="chip ${cls}">${label}</span></div>
-        ${v.note ? `<div>${esc(v.note)}</div>` : ""}${st}
+        ${v.note ? `<div>${esc(v.note)}</div>` : ""}${st}${v.kind === "import" ? "" : (() => { let n = 0; for (const p of v.paras) { const b = S.baseline.get(p.id); if (b === undefined || b !== pText(p)) n++; } return `<div class="stats num">${n ? `<b>${plural(n, "פסקה אחת שונה", "פסקאות שונות")} מהנוסח המקורי</b>` : `<span class="muted">זהה לנוסח המקורי</span>`}</div>`; })()}
         <div class="acts"><button class="btn small" data-cmp-cur>השוואה לנוכחי</button>${v.stats ? `<button class="btn small" data-cmp-prev>מה השתנה בגרסה</button>` : ""}<button class="btn small danger" data-restore>שחזור</button></div></div>`;
     }).join("");
   const byId = new Map(vers.map(v => [v.vid, v]));
@@ -2145,7 +2180,7 @@ const Cloud = {
     renderEditor(paras, S.book.lastPos || meta.lastPos || undefined);
     S.book.paras = paras; S.book.updated = meta.updated; S.book.cloudBase = meta.updated;
     S.dirty = false; S.contentChanged = false;
-    await DB.put("books", S.book); setSaveState("saved");
+    await putBook(); setSaveState("saved");
   },
   async conflict(meta) {
     if (this.conflictOpen) return;
@@ -2165,7 +2200,7 @@ const Cloud = {
       await DB.put("versions", { bookId: S.book.id, ts: Date.now(), kind: "restore", note: `הגרסה מהענן (נערכה במכשיר אחר, ${fmtTime(meta.updated)})`, paras: stripParas(cloudParas), stats: null });
       closeModal(); this.conflictOpen = false;
       S.book.cloudBase = meta.updated; if (!this.hasLocalChanges(S.book)) S.book.updated = meta.updated + 1;
-      await DB.put("books", S.book);
+      await putBook();
       this.push(S.book, true); toast("ממשיכים עם הטקסט שבמכשיר הזה. הגרסה מהענן נשמרה בהיסטוריה.", 4000);
     };
     $("#cfCloud", m).onclick = async () => {
