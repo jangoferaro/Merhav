@@ -1173,7 +1173,7 @@ function setChapterStatus(status) {   // "done" | "refine" | null; the two marks
   S.book.refine = (S.book.refine || []).filter(x => x !== id);
   if (status === "done") S.book.done.push(id);
   if (status === "refine") S.book.refine.push(id);
-  paintChapter(); S.dirty = true; saveNow();
+  paintChapter(); S.dirty = true; S.contentChanged = true; saveNow();
   if (status) toast(status === "done" ? "הפרק סומן כנבדק" : "הפרק סומן: לדייק");
 }
 function paintChapter() {
@@ -1337,7 +1337,7 @@ function setSaveState(s) {
 }
 let saveTimer = null, decoTimer = null;
 function markDirty() {
-  S.dirty = true; S.changedSinceVersion = true; setSaveState("dirty");
+  S.dirty = true; S.changedSinceVersion = true; S.contentChanged = true; setSaveState("dirty");
   clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 1200);
 }
 async function saveNow() {
@@ -1346,7 +1346,7 @@ async function saveNow() {
   setSaveState("saving");
   S.book.paras = fullParas();
   S.book.title = $("#bookTitle").value.trim() || S.book.title;
-  S.book.updated = Date.now();
+  if (S.contentChanged) { S.book.updated = Date.now(); S.contentChanged = false; }
   try { await DB.put("books", S.book); S.dirty = false; S.lastSave = Date.now(); setSaveState("saved"); Cloud.schedule(); }
   catch (e) { console.error(e); setSaveState("error"); toast("השמירה נכשלה: " + (e.message || e), 5000); }
 }
@@ -1482,7 +1482,7 @@ $("#figInput").onchange = async e => {
   await DB.put("pdfs", prep.blob, figKey(cid));
   S.book.images = S.book.images || {};
   S.book.images[cid] = { type: prep.type, w: prep.w, h: prep.h, ts: Date.now(), asset: null };
-  S.dirty = true; S.changedSinceVersion = true; await saveNow();
+  S.dirty = true; S.changedSinceVersion = true; S.contentChanged = true; await saveNow();
   paintFigure(); toast("האיור נוסף לסוף הפרק");
   const assets = await getAssets();
   if (!assets) return;
@@ -1499,7 +1499,7 @@ $("#figRemove").onclick = async () => {
   if (!fig) return;
   delete S.book.images[cid];
   await DB.del("pdfs", figKey(cid));
-  S.dirty = true; S.changedSinceVersion = true; await saveNow();
+  S.dirty = true; S.changedSinceVersion = true; S.contentChanged = true; await saveNow();
   paintFigure(); toast("האיור הוסר");
   if (fig.asset) { const assets = await getAssets(); if (assets) assets.delete(fig.asset).catch(() => {}); }
 };
@@ -2097,11 +2097,24 @@ const Cloud = {
     return out;
   },
   schedule() { if (!this.ready || !S.book) return; clearTimeout(this.timer); this.timer = setTimeout(() => S.book && this.push(S.book), 5000); },
-  async push(book) {
-    if (!this.ready || !book) return;
+  // book.cloudBase = the `updated` stamp of the cloud copy this device's text is based on.
+  hasLocalChanges(book) { return (book.updated || 0) > (book.cloudBase || 0); },
+  async push(book, force) {
+    if (!this.ready || !book || this.conflictOpen) return;
+    if (!this.checked.has(book.id)) return;            // never write before this device has looked at the cloud copy
+    if (!this.hasLocalChanges(book)) return;
     if (this.busy) { this.again = book; return; }
     this.busy = true; this.state = "sync"; this.paint();
     try {
+      if (!force) {
+        const snap = await this.col().doc("book_" + book.id).get();
+        if (snap.exists && snap.data().updated !== (book.cloudBase || 0)) {
+          // the cloud copy changed on another device since we last synced: stop and ask
+          this.busy = false; this.state = "ok"; this.paint();
+          if (S.book && S.book.id === book.id) this.conflict(snap.data());
+          return;
+        }
+      }
       const chunks = this.chunks(book.paras || []);
       for (let i = 0; i < chunks.length; i++) {
         const key = `c_${book.id}_${i}`, json = JSON.stringify(chunks[i]);
@@ -2111,6 +2124,8 @@ const Cloud = {
       await this.col().doc("book_" + book.id).set({ kind: "book", id: book.id, title: book.title, created: book.created, updated: book.updated, pages: book.pages || 0, chunks: chunks.length, lastPos: book.lastPos || null, done: book.done || [], refine: book.refine || [], images: book.images || {} });
       if (prevN && prevN > chunks.length) for (let i = chunks.length; i < prevN; i++) { await this.col().doc(`c_${book.id}_${i}`).delete(); this.sent.delete(`c_${book.id}_${i}`); }
       this.chunkN.set(book.id, chunks.length);
+      book.cloudBase = book.updated;
+      try { const cur = await DB.get("books", book.id); if (cur) { cur.cloudBase = book.updated; await DB.put("books", cur); } } catch (e) {}
       this.state = "ok"; this.lastOk = Date.now();
     } catch (e) {
       console.warn("cloud push", e); this.state = "err";
@@ -2118,6 +2133,46 @@ const Cloud = {
     }
     this.busy = false; this.paint();
     if (this.again) { const b = this.again; this.again = false; this.push(b); }
+  },
+  checked: new Set(), conflictOpen: false,
+  async applyCloud(meta, paras, note) {
+    // replace this device's text with the cloud copy; the current text is kept as a version first
+    if (S.book.updated > 0 && (this.hasLocalChanges(S.book) || note)) await createVersion("restore", note || "לפני טעינת הגרסה מהענן");
+    S.book.title = meta.title; $("#bookTitle").value = meta.title;
+    if (Array.isArray(meta.done)) S.book.done = meta.done.slice();
+    if (Array.isArray(meta.refine)) S.book.refine = meta.refine.slice();
+    if (meta.images) S.book.images = JSON.parse(JSON.stringify(meta.images));
+    renderEditor(paras, S.book.lastPos || meta.lastPos || undefined);
+    S.book.paras = paras; S.book.updated = meta.updated; S.book.cloudBase = meta.updated;
+    S.dirty = false; S.contentChanged = false;
+    await DB.put("books", S.book); setSaveState("saved");
+  },
+  async conflict(meta) {
+    if (this.conflictOpen) return;
+    this.conflictOpen = true;
+    let cloudParas;
+    try { cloudParas = await this.fetchParas(meta); } catch (e) { this.conflictOpen = false; return; }
+    const m = openModal(`<header><h3>יש שתי גרסאות שונות של הספר</h3></header>
+      <div class="mbody">
+        <p style="margin:0">בענן שמורה גרסה שנערכה במכשיר אחר (${fmtTime(meta.updated)}), ובמכשיר הזה יש שינויים שעוד לא עלו לענן (${fmtTime(S.book.updated)}).</p>
+        <p style="margin:0">לא משנה מה תבחר, הגרסה השנייה תישמר בהיסטוריית הגרסאות ואפשר יהיה לחזור אליה.</p>
+        <button class="btn" id="cfCompare" style="justify-self:start">מה ההבדל ביניהן?</button>
+      </div>
+      <footer><button class="btn primary" id="cfLocal">להמשיך עם הטקסט שבמכשיר הזה</button><button class="btn" id="cfCloud">לטעון את הגרסה מהענן</button></footer>`);
+    m.parentElement.dataset.lock = "1";
+    $("#cfCompare", m).onclick = () => { const back = this.conflictOpen; showDiff(cloudParas, fullParas(), "הגרסה בענן ← הטקסט במכשיר הזה", false); const reopen = () => { this.conflictOpen = false; this.conflict(meta); }; const obs = new MutationObserver(() => { if (!$("#modalRoot").firstChild) { obs.disconnect(); reopen(); } }); obs.observe($("#modalRoot"), { childList: true }); };
+    $("#cfLocal", m).onclick = async () => {
+      await DB.put("versions", { bookId: S.book.id, ts: Date.now(), kind: "restore", note: `הגרסה מהענן (נערכה במכשיר אחר, ${fmtTime(meta.updated)})`, paras: stripParas(cloudParas), stats: null });
+      closeModal(); this.conflictOpen = false;
+      S.book.cloudBase = meta.updated; if (!this.hasLocalChanges(S.book)) S.book.updated = meta.updated + 1;
+      await DB.put("books", S.book);
+      this.push(S.book, true); toast("ממשיכים עם הטקסט שבמכשיר הזה. הגרסה מהענן נשמרה בהיסטוריה.", 4000);
+    };
+    $("#cfCloud", m).onclick = async () => {
+      closeModal(); this.conflictOpen = false;
+      await this.applyCloud(meta, cloudParas, "לפני טעינת הגרסה מהענן (הטקסט שהיה במכשיר הזה)");
+      toast("נטענה הגרסה מהענן. הטקסט הקודם נשמר בהיסטוריה.", 4000);
+    };
   },
   async fetchParas(meta) {
     const paras = [];
@@ -2138,26 +2193,27 @@ const Cloud = {
     await DB.put("versions", { bookId: book.id, ts: Date.now(), kind: "import", note: "הטקסט כפי שהורד מהגיבוי בענן", paras, stats: null });
   },
   async reconcile(id) {
-    // another device edited this book more recently: bring its text here, keeping ours as a version
+    // compare with the cloud copy before this device is allowed to write anything
     if (!this.ready) return;
     try {
       const snap = await this.col().doc("book_" + id).get();
       if (!S.book || S.book.id !== id) return;
-      if (!snap.exists) { this.push(S.book); return; }
+      if (!snap.exists) { this.checked.add(id); this.push(S.book); return; }
       const meta = snap.data();
       this.chunkN.set(id, meta.chunks);
-      if (meta.updated > S.book.updated + 2000 && !S.dirty) {
+      if (S.dirty) await saveNow();
+      if (meta.updated === (S.book.cloudBase || 0)) { this.checked.add(id); this.push(S.book); return; }   // in step; send ours if any
+      if (!this.hasLocalChanges(S.book) || !S.book.updated) {
+        // nothing unsent here: just take the newer cloud copy
         const paras = await this.fetchParas(meta);
-        if (!S.book || S.book.id !== id || S.dirty) return;
-        if (S.book.updated > 0) await createVersion("restore", "לפני עדכון מהענן (נערך במכשיר אחר)");
-        S.book.title = meta.title; $("#bookTitle").value = meta.title;
-        if (Array.isArray(meta.done)) S.book.done = meta.done.slice();
-        if (Array.isArray(meta.refine)) S.book.refine = meta.refine.slice();
-        if (meta.images) S.book.images = JSON.parse(JSON.stringify(meta.images));
-        renderEditor(paras, meta.lastPos || undefined); S.book.paras = paras; S.book.updated = meta.updated;
-        await DB.put("books", S.book);
-        toast("נטענה הגרסה העדכנית מהענן, שנערכה במכשיר אחר", 4000);
+        if (!S.book || S.book.id !== id) return;
+        await this.applyCloud(meta, paras, S.book.updated > 0 ? "לפני עדכון מהענן (נערך במכשיר אחר)" : null);
+        this.checked.add(id);
+        if (S.book.updated > 0) toast("נטענה הגרסה העדכנית מהענן", 3500);
+        return;
       }
+      this.checked.add(id);
+      this.conflict(meta);   // both sides changed: the person decides
     } catch (e) { console.warn("cloud reconcile", e); }
   },
   async remove(id) {
