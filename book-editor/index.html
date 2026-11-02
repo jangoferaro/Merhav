@@ -1789,6 +1789,7 @@ $("#runChecks").onclick = runChecks;
 const KIND = { import: ["מקור", "import"], manual: ["ידני", ""], auto: ["אוטומטי", "auto"], restore: ["לפני שחזור", "restore"] };
 async function renderHistory() {
   if (!S.book) return;
+  if (Cloud.ready) Cloud.backfillVersions(S.book.id);
   const vers = (await DB.versionsOf(S.book.id)).sort((a, b) => b.ts - a.ts);
   const list = $("#verList");
   list.innerHTML = `<div class="ver cur"><div class="top"><span class="when">הטקסט הנוכחי</span><span class="chip">עכשיו</span></div>
@@ -2302,6 +2303,7 @@ const Cloud = {
     try {
       const snap = await this.col().doc("book_" + id).get();
       if (!S.book || S.book.id !== id) return;
+      this.backfillVersions(id);
       if (!snap.exists) { this.checked.add(id); this.push(S.book); return; }
       const meta = snap.data();
       this.chunkN.set(id, meta.chunks);
