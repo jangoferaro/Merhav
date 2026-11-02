@@ -1349,6 +1349,7 @@ async function adoptFromOtherWindow(cur) {
   try {
     if (S.contentChanged) {
       const mine = stripParas(fullParas());
+      Cloud.pushVersion({ ts: Date.now() + 1, kind: "restore", note: "טקסט מחלון אחר של הספר שלא הספיק להישמר", paras: mine, stats: null });
       await DB.put("versions", { bookId: S.book.id, ts: Date.now(), kind: "restore", note: "טקסט מחלון אחר של הספר שלא הספיק להישמר", paras: mine, stats: null });
     }
     clearTimeout(saveTimer);
@@ -1395,6 +1396,7 @@ async function createVersion(kind, note) {
   if (kind === "auto" && stats && !stats.paras) { S.changedSinceVersion = false; return null; }
   const v = { bookId: S.book.id, ts: Date.now(), kind, note: note || "", paras, stats };
   await DB.put("versions", v);
+  Cloud.pushVersion(v);
   S.lastVersionAt = v.ts; S.changedSinceVersion = false;
   // keep the latest 60 automatic versions
   const autos = vers.filter(x => x.kind === "auto");
@@ -1814,6 +1816,35 @@ async function renderHistory() {
       toast("הגרסה שוחזרה"); renderHistory();
     };
   });
+  if (!Cloud.ready) return;
+  // versions kept in the cloud that this browser does not have (e.g. after its storage was cleared)
+  let cloudOnly = [];
+  try { const localTs = new Set(vers.map(v => v.ts)); cloudOnly = (await Cloud.listVersions(S.book.id)).filter(m => !localTs.has(m.ts)).sort((a, b) => b.ts - a.ts); } catch (e) { return; }
+  if (!cloudOnly.length || !list.isConnected) return;
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "display:grid;gap:10px";
+  wrap.innerHTML = `<div class="eyebrow" style="margin-top:6px">גרסאות שמורות בענן</div>` + cloudOnly.map(m => {
+    const [label, cls] = KIND[m.vkind] || [m.vkind, ""];
+    return `<div class="ver" data-cts="${m.ts}"><div class="top"><span class="when num">${fmtTime(m.ts)}</span><span class="chip ${cls}">${label}</span><span class="chip">בענן</span></div>
+      ${m.note ? `<div>${esc(m.note)}</div>` : ""}<div class="stats num" data-dist>…</div>
+      <div class="acts"><button class="btn small" data-ccmp>השוואה לנוכחי</button><button class="btn small danger" data-crestore>שחזור</button></div></div>`;
+  }).join("");
+  list.appendChild(wrap);
+  const cache = new Map();
+  const get = async m => cache.get(m.ts) || (cache.set(m.ts, await Cloud.fetchVersion(m)), cache.get(m.ts));
+  for (const row of $$("[data-cts]", wrap)) {
+    const m = cloudOnly.find(x => x.ts === +row.dataset.cts);
+    $("[data-ccmp]", row).onclick = async () => { try { showDiff(await get(m), fullParas(), `גרסה מ-${fmtTime(m.ts)} ← הטקסט הנוכחי`, true); } catch (e) { toast("לא הצלחתי לטעון את הגרסה מהענן"); } };
+    const rb = $("[data-crestore]", row);
+    rb.onclick = async () => {
+      if (!rb.classList.contains("armed")) { rb.classList.add("armed"); rb.textContent = "לשחזר? הטקסט הנוכחי יישמר כגרסה"; setTimeout(() => { if (rb.isConnected) { rb.classList.remove("armed"); rb.textContent = "שחזור"; } }, 5000); return; }
+      let paras; try { paras = await get(m); } catch (e) { toast("לא הצלחתי לטעון את הגרסה מהענן"); return; }
+      await createVersion("restore", `לפני שחזור לגרסה מ-${fmtTime(m.ts)}`);
+      renderEditor(paras); markDirty(); await saveNow();
+      toast("הגרסה שוחזרה"); renderHistory();
+    };
+    get(m).then(paras => { let n = 0; for (const p of paras) { const b = S.baseline.get(p.id); if (b === undefined || b !== pText(p)) n++; } const el = $("[data-dist]", row); if (el) el.innerHTML = n ? `<b>${plural(n, "פסקה אחת שונה", "פסקאות שונות")} מהנוסח המקורי</b>` : `<span class="muted">זהה לנוסח המקורי</span>`; }).catch(() => {});
+  }
 }
 $("#saveVer").onclick = async () => {
   const note = $("#verNote").value.trim();
@@ -2113,7 +2144,7 @@ const Cloud = {
       if (!id) return;
       this.db = db; this.uid = id; this.ready = true; this.paint();
       if (!$("#home").hidden) renderLibrary();
-      if (S.book) { this.reconcile(S.book.id); this.schedule(); }
+      if (S.book) { this.reconcile(S.book.id); this.schedule(); this.backfillVersions(S.book.id); }
     } catch (e) { console.warn("cloud init", e); }
   },
   col() { return this.db.collection("data/users/" + this.uid); },
@@ -2170,6 +2201,43 @@ const Cloud = {
     if (this.again) { const b = this.again; this.again = false; this.push(b); }
   },
   checked: new Set(), conflictOpen: false,
+  /* versions are copied to the cloud too, so the history survives even if this browser loses its storage */
+  async pushVersion(v) {
+    if (!this.ready || !S.book || !v || !v.paras || v.kind === "import") return;
+    const id = S.book.id, col = this.col();
+    try {
+      const chunks = this.chunks(v.paras);
+      for (let i = 0; i < chunks.length; i++) await col.doc(`vc_${id}_${v.ts}_${i}`).set({ kind: "vchunk", book: id, ts: v.ts, i, paras: chunks[i] });
+      await col.doc(`vm_${id}_${v.ts}`).set({ kind: "version", book: id, ts: v.ts, vkind: v.kind, note: v.note || "", stats: v.stats || null, chunks: chunks.length });
+      const all = (await this.listVersions(id)).sort((a, b) => b.ts - a.ts);
+      const keep = new Set(all.filter(x => x.vkind !== "auto").slice(0, 25).concat(all.filter(x => x.vkind === "auto").slice(0, 15)).map(x => x.ts));
+      for (const old of all) if (!keep.has(old.ts)) {
+        for (let i = 0; i < old.chunks; i++) await col.doc(`vc_${id}_${old.ts}_${i}`).delete();
+        await col.doc(`vm_${id}_${old.ts}`).delete();
+      }
+    } catch (e) { console.warn("cloud version", e); }
+  },
+  async listVersions(id) {
+    const q = await this.col().where("kind", "==", "version").get();
+    return q.docs.map(d => d.data()).filter(x => x && x.book === id);
+  },
+  async fetchVersion(m) {
+    const paras = [];
+    for (let i = 0; i < m.chunks; i++) {
+      const snap = await this.col().doc(`vc_${m.book}_${m.ts}_${i}`).get();
+      if (!snap.exists) throw new Error("missing");
+      paras.push(...snap.data().paras.map(p => ({ ...p })));
+    }
+    return paras;
+  },
+  async backfillVersions(id) {
+    // copy this device's recent versions that the cloud does not have yet
+    try {
+      const have = new Set((await this.listVersions(id)).map(x => x.ts));
+      const local = (await DB.versionsOf(id)).filter(v => v.kind !== "import" && !have.has(v.ts)).sort((a, b) => b.ts - a.ts).slice(0, 15);
+      for (const v of local.reverse()) await this.pushVersion(v);
+    } catch (e) { console.warn("backfill", e); }
+  },
   async applyCloud(meta, paras, note) {
     // replace this device's text with the cloud copy; the current text is kept as a version first
     if (S.book.updated > 0 && (this.hasLocalChanges(S.book) || note)) await createVersion("restore", note || "לפני טעינת הגרסה מהענן");
@@ -2197,6 +2265,7 @@ const Cloud = {
     m.parentElement.dataset.lock = "1";
     $("#cfCompare", m).onclick = () => { const back = this.conflictOpen; showDiff(cloudParas, fullParas(), "הגרסה בענן ← הטקסט במכשיר הזה", false); const reopen = () => { this.conflictOpen = false; this.conflict(meta); }; const obs = new MutationObserver(() => { if (!$("#modalRoot").firstChild) { obs.disconnect(); reopen(); } }); obs.observe($("#modalRoot"), { childList: true }); };
     $("#cfLocal", m).onclick = async () => {
+      Cloud.pushVersion({ ts: Date.now() + 1, kind: "restore", note: `הגרסה מהענן (נערכה במכשיר אחר, ${fmtTime(meta.updated)})`, paras: stripParas(cloudParas), stats: null });
       await DB.put("versions", { bookId: S.book.id, ts: Date.now(), kind: "restore", note: `הגרסה מהענן (נערכה במכשיר אחר, ${fmtTime(meta.updated)})`, paras: stripParas(cloudParas), stats: null });
       closeModal(); this.conflictOpen = false;
       S.book.cloudBase = meta.updated; if (!this.hasLocalChanges(S.book)) S.book.updated = meta.updated + 1;
