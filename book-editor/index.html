@@ -552,11 +552,31 @@ const DB = {
         const v = d.createObjectStore("versions", { keyPath: "vid", autoIncrement: true });
         v.createIndex("book", "bookId");
       };
-      r.onsuccess = () => { this.db = r.result; res(); };
+      r.onsuccess = () => {
+        this.db = r.result;
+        // iOS may close the connection (app in background, storage process restarted): reopen on next use
+        this.db.onclose = () => { this.db = null; };
+        this.db.onversionchange = () => { try { this.db.close(); } catch (e) {} this.db = null; };
+        res();
+      };
       r.onerror = () => rej(r.error);
     });
   },
-  req(store, mode, fn) {
+  async req(store, mode, fn, retry = true) {
+    if (!this.db) await this.open();
+    try { return await this._req(store, mode, fn); }
+    catch (e) {
+      const msg = ((e && e.name) || "") + " " + ((e && e.message) || "");
+      if (retry && /clos|InvalidState|connection|UnknownError|AbortError/i.test(msg)) {
+        try { this.db && this.db.close(); } catch (x) {}
+        this.db = null;
+        await new Promise(r => setTimeout(r, 150));
+        return this.req(store, mode, fn, false);
+      }
+      throw e;
+    }
+  },
+  _req(store, mode, fn) {
     return new Promise((res, rej) => {
       const t = this.db.transaction(store, mode), s = t.objectStore(store);
       let out; const r = fn(s);
@@ -1363,7 +1383,7 @@ async function checkOtherWindows() {
   if (!S.book) return false;
   try {
     const cur = await DB.get("books", S.book.id);
-    if (cur && (cur.rev || 0) !== (S.book.rev || 0)) { await adoptFromOtherWindow(cur); return true; }
+    if (cur && (cur.rev || 0) > (S.book.rev || 0)) { await adoptFromOtherWindow(cur); return true; }
   } catch (e) {}
   return false;
 }
@@ -1371,8 +1391,9 @@ if (bc) bc.onmessage = e => { const m = e.data || {}; if (S.book && m.id === S.b
 document.addEventListener("visibilitychange", () => { if (!document.hidden && !S.dirty) checkOtherWindows(); });
 window.addEventListener("focus", () => { if (!S.dirty) checkOtherWindows(); });
 async function putBook() {
-  S.book.rev = (S.book.rev || 0) + 1;
-  await DB.put("books", S.book);
+  const prev = S.book.rev || 0;
+  S.book.rev = prev + 1;
+  try { await DB.put("books", S.book); } catch (e) { S.book.rev = prev; throw e; }
   if (bc) bc.postMessage({ id: S.book.id, rev: S.book.rev });
 }
 async function saveNow() {
@@ -1384,7 +1405,16 @@ async function saveNow() {
   S.book.title = $("#bookTitle").value.trim() || S.book.title;
   if (S.contentChanged) { S.book.updated = Date.now(); S.contentChanged = false; }
   try { await putBook(); S.dirty = false; S.lastSave = Date.now(); setSaveState("saved"); Cloud.schedule(); }
-  catch (e) { console.error(e); setSaveState("error"); toast("השמירה נכשלה: " + (e.message || e), 5000); }
+  catch (e) {
+    // the device storage refused the write: the text is still sent to the cloud, and saving is retried
+    console.error(e); setSaveState("error");
+    S.saveFails = (S.saveFails || 0) + 1;
+    Cloud.schedule(1000);
+    clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 3000);
+    if (S.saveFails === 3) toast("השמירה במכשיר נכשלה, אבל הטקסט נשמר בענן. כדאי לרענן את הדף.", 6000);
+    return;
+  }
+  S.saveFails = 0;
 }
 async function createVersion(kind, note) {
   if (!S.book) return null;
@@ -2163,7 +2193,7 @@ const Cloud = {
     if (cur.length) out.push(cur);
     return out;
   },
-  schedule() { if (!this.ready || !S.book) return; clearTimeout(this.timer); this.timer = setTimeout(() => S.book && this.push(S.book), 5000); },
+  schedule(ms = 5000) { if (!this.ready || !S.book) return; clearTimeout(this.timer); this.timer = setTimeout(() => S.book && this.push(S.book), ms); },
   // book.cloudBase = the `updated` stamp of the cloud copy this device's text is based on.
   hasLocalChanges(book) { return (book.updated || 0) > (book.cloudBase || 0); },
   async push(book, force) {
@@ -2262,7 +2292,9 @@ const Cloud = {
         <p style="margin:0">לא משנה מה תבחר, הגרסה השנייה תישמר בהיסטוריית הגרסאות ואפשר יהיה לחזור אליה.</p>
         <button class="btn" id="cfCompare" style="justify-self:start">מה ההבדל ביניהן?</button>
       </div>
-      <footer><button class="btn primary" id="cfLocal">להמשיך עם הטקסט שבמכשיר הזה</button><button class="btn" id="cfCloud">לטעון את הגרסה מהענן</button></footer>`);
+      <footer>${meta.updated >= S.book.updated
+        ? `<button class="btn primary" id="cfCloud">לטעון את הגרסה מהענן (החדשה יותר)</button><button class="btn" id="cfLocal">להמשיך עם הטקסט שבמכשיר הזה</button>`
+        : `<button class="btn primary" id="cfLocal">להמשיך עם הטקסט שבמכשיר הזה (החדש יותר)</button><button class="btn" id="cfCloud">לטעון את הגרסה מהענן</button>`}</footer>`);
     m.parentElement.dataset.lock = "1";
     $("#cfCompare", m).onclick = () => { const back = this.conflictOpen; showDiff(cloudParas, fullParas(), "הגרסה בענן ← הטקסט במכשיר הזה", false); const reopen = () => { this.conflictOpen = false; this.conflict(meta); }; const obs = new MutationObserver(() => { if (!$("#modalRoot").firstChild) { obs.disconnect(); reopen(); } }); obs.observe($("#modalRoot"), { childList: true }); };
     $("#cfLocal", m).onclick = async () => {
@@ -2319,6 +2351,17 @@ const Cloud = {
         return;
       }
       this.checked.add(id);
+      const cloudParas = await this.fetchParas(meta);
+      const sameText = JSON.stringify(cloudParas.map(p => [p.id, p.t, p.h])) === JSON.stringify(fullParas().map(p => [p.id, p.t, p.h]));
+      if (sameText) {
+        // nothing really differs (e.g. the device failed to record that it had already synced)
+        S.book.cloudBase = meta.updated; S.book.updated = meta.updated;
+        if (Array.isArray(meta.done)) S.book.done = meta.done.slice();
+        if (Array.isArray(meta.refine)) S.book.refine = meta.refine.slice();
+        if (meta.images) S.book.images = JSON.parse(JSON.stringify(meta.images));
+        paintChapter(); try { await putBook(); } catch (e) {}
+        return;
+      }
       this.conflict(meta);   // both sides changed: the person decides
     } catch (e) { console.warn("cloud reconcile", e); }
   },
