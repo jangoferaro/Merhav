@@ -114,6 +114,14 @@ label.check input { margin-top: .3em; }
 #markRefine.on { background: var(--refine); color: var(--refine-ink); border-color: var(--refine); }
 #markRefine:not(.on) { border-color: var(--refine); }
 .chap-progress { display: flex; }
+/* the chapter window keeps its summary in view; only the list scrolls */
+.chap-sheet { display: flex; flex-direction: column; overflow: hidden; }
+.chap-sheet > #chList { overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+.chap-pct { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; padding: 12px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
+.pct-main { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
+.pct-big { font: 700 2.2rem/1 var(--font-ui); color: var(--ins); }
+.pct-side { font-size: .9rem; color: var(--muted); }
+.pct-side b { color: var(--final); }
 #chBarR { height: 100%; background: var(--refine); transition: width .2s; }
 #chBarF { height: 100%; background: var(--final); transition: width .2s; }
 #markFinal { border-color: var(--final); }
@@ -536,6 +544,7 @@ label.check input { margin-top: .3em; }
 <div class="sheet-back" id="chapSheet" hidden>
   <div class="sheet chap-sheet" role="dialog" aria-label="פרקים">
     <div class="sheet-head"><div><div class="sheet-title">פרקים</div><div class="muted num" id="chProgress"></div></div><button class="btn small" data-chap-close>סגירה</button></div>
+    <div class="chap-pct"><div class="pct-main"><span class="pct-big num" id="pctTouched">0%</span><span>מהספר עבר עריכה</span></div><div class="pct-side num" id="pctFinal"></div></div>
     <div class="progress chap-progress"><div id="chBarF"></div><div id="chBar"></div><div id="chBarR"></div><div id="chBarU"></div></div>
     <div class="chap-legend"><span><i style="background:var(--accent)"></i>עוד לא נבדק</span><span><i style="background:var(--refine)"></i>לדייק</span><span><i style="background:var(--ins)"></i>נבדק</span><span><i style="background:var(--final)"></i>עבר מבחן הקראה</span><span><i style="background:var(--unsure)"></i>לא בטוח אם להוסיף</span><span><i style="background:var(--arch)"></i>גנוז</span></div>
     <div id="chList" class="menu-list"></div>
@@ -1276,24 +1285,38 @@ function goToPara(id) {
 function openChapters() {
   const full = fullParas();
   const list = $("#chList"), n = S.chapters.length;
-  let done = 0, refine = 0, fin = 0, arch = 0, uns = 0;
+  let done = 0, refine = 0, fin = 0, arch = 0, uns = 0, wAll = 0, wTouched = 0, wFin = 0, wDone = 0, wRef = 0, wUns = 0;
   list.innerHTML = S.chapters.map((c, k) => {
     let edited = false;
     for (let i = c.start; i < c.end && !edited; i++) { const b = S.baseline.get(full[i].id); edited = b === undefined || b !== pText(full[i]); }
     const st = chapStatus(c), d = st === "done", r = st === "refine";
     if (d) done++; if (r) refine++; if (st === "final") fin++; if (st === "archived") arch++; if (st === "unsure") uns++;
+    let w = 0; for (let i = c.start; i < c.end; i++) w += countWords(pText(full[i]));   // progress is weighted by words
+    if (st !== "archived") { wAll += w; if (st) wTouched += w; if (st === "final") wFin += w; if (st === "done") wDone += w; if (st === "refine") wRef += w; if (st === "unsure") wUns += w; }
     const icon = { done: "✓", refine: "✎", final: "★", archived: "⊘", unsure: "?" }[st] || (k + 1);
     return `<button class="chap-item${st ? " is-" + st : ""}${k === S.ci ? " cur" : ""}" data-k="${k}"><span class="n num">${icon}</span><span class="ct">${esc(c.title)}</span><span class="cm num">${k === S.ci ? "פתוח עכשיו<br>" : ""}${edited ? "נערך · " : ""}עמ׳ ${full[c.start].pg || "—"}</span></button>`;
   }).join("");
   const live = Math.max(1, n - arch);
   $("#chProgress").textContent = `${fin === 1 ? "אחד עבר הקראה" : fin + " עברו הקראה"} · ${done === 1 ? "אחד נבדק" : done + " נבדקו"} · ${refine} לדייק · ${n - arch - fin - done - refine - uns} עוד לא נבדקו` + (uns ? ` · ${uns} בספק` : "") + (arch ? ` · ${arch === 1 ? "גנוז אחד" : arch + " גנוזים"}` : "");
-  $("#chBarF").style.width = (fin / live * 100) + "%";
-  $("#chBar").style.width = (done / live * 100) + "%";
-  $("#chBarR").style.width = (refine / live * 100) + "%";
-  $("#chBarU").style.width = (uns / live * 100) + "%";
+  const W = Math.max(1, wAll), pct = x => Math.round(x / W * 100);
+  $("#pctTouched").textContent = pct(wTouched) + "%";
+  $("#pctFinal").innerHTML = `<b>${pct(wFin)}%</b> סופי (עבר הקראה) · ${wTouched.toLocaleString("he-IL")} מתוך ${wAll.toLocaleString("he-IL")} מילים`;
+  $("#chBarF").style.width = (wFin / W * 100) + "%";
+  $("#chBar").style.width = (wDone / W * 100) + "%";
+  $("#chBarR").style.width = (wRef / W * 100) + "%";
+  $("#chBarU").style.width = (wUns / W * 100) + "%";
   $$("[data-k]", list).forEach(b => b.onclick = () => goChapter(+b.dataset.k));
   $("#chapSheet").hidden = false;
   const cur = $(".chap-item.cur", list); if (cur) cur.scrollIntoView({ block: "center" });
+}
+function bookPercent() {
+  const full = fullParas(); let all = 0, touched = 0;
+  for (const c of S.chapters) {
+    const st = chapStatus(c); if (st === "archived") continue;
+    let w = 0; for (let i = c.start; i < c.end; i++) w += countWords(pText(full[i]));
+    all += w; if (st) touched += w;
+  }
+  return Math.round(touched / Math.max(1, all) * 100);
 }
 function closeChapters() { $("#chapSheet").hidden = true; }
 $("#chTitle").onclick = openChapters;
@@ -2200,7 +2223,7 @@ $$("[data-size]").forEach(b => b.onclick = () => { sizeIdx = Math.max(0, Math.mi
 function openMenu() {
   $("#menuTitle").textContent = $("#bookTitle").value;
   const words = countWords(editor.textContent), ed = editor.querySelectorAll(".edited").length;
-  $("#menuStats").textContent = `${words.toLocaleString("he-IL")} מילים · ${ed === 1 ? "פסקה אחת שונתה" : ed.toLocaleString("he-IL") + " פסקאות שונו"}`;
+  $("#menuStats").textContent = `${bookPercent()}% מהספר עבר עריכה · בפרק הזה ${words.toLocaleString("he-IL")} מילים`;
   $("#marksState").textContent = editor.classList.contains("show-edits") ? "פעיל" : "כבוי";
   $("#menuCloud").textContent = Cloud.label();
   $("#menuSheet").hidden = false;
