@@ -1135,11 +1135,12 @@ function computeChapters(paras) {
   }
   if (!starts.length || starts[0] !== 0) starts.unshift(0);
   const raw = starts.map((s, k) => ({ start: s, end: k + 1 < starts.length ? starts[k + 1] : paras.length }));
+  const hasLabel = c => { for (let i = Math.max(1, c.start); i < c.end; i++) if (paras[i].t === "h" && paras[i - 1].t === "p" && /^\d{2,3}$/.test(T[i - 1].trim())) return true; return false; };
   const body = c => { let n = 0; for (let i = c.start; i < c.end; i++) if (paras[i].t === "p" && T[i].length > 40) n += T[i].length; return n; };
   const merged = [];
   for (let k = 0; k < raw.length; k++) {   // a heading with no text of its own (part titles, the title page) joins the next chapter
     const c = { ...raw[k] };
-    while (body(c) < 80 && k + 1 < raw.length) { k++; c.end = raw[k].end; }
+    while (body(c) < 80 && c.end - c.start <= 6 && !hasLabel(c) && k + 1 < raw.length) { k++; c.end = raw[k].end; }
     merged.push(c);
   }
   const titled = merged.map(c => {
@@ -2404,15 +2405,30 @@ document.addEventListener("visibilitychange", () => { if (document.hidden && Clo
    updates chapter numbers in the notes, and keeps chapter marks and illustrations on their chapters. */
 const ADD = window.MAGIHA_ADDITIONS || null;
 let merging = false;
+async function dropTableOfContents() {
+  const KEY = "drop-toc-1";
+  if (!S.book || !S.chapters || (S.book.applied || []).includes(KEY)) return;
+  const ps = fullParas(), i = ps.findIndex(p => p.t === "h" && htmlToText(p.h).trim() === "תוכן העניינים");
+  S.book.applied = S.book.applied || [];
+  if (i >= 0) {
+    await createVersion("restore", "לפני הסרת תוכן העניינים");
+    let end = i + 1; while (end < ps.length && ps[end].t !== "h") end++;
+    const out = ps.slice(0, i).concat(ps.slice(end));
+    S.book.applied.push(KEY);
+    renderEditor(out, S.book.lastPos || undefined);
+    markDirty(); await saveNow();
+    toast("תוכן העניינים הוסר. פתח הדבר הוא עכשיו פרק נפרד.", 4500);
+  } else { S.book.applied.push(KEY); S.dirty = true; await saveNow(); }
+}
 async function maybeMergeAdditions() {
   if (!ADD || merging || !S.book || !S.chapters) return;
   S.book.applied = S.book.applied || [];
-  if (S.book.applied.includes(ADD.key)) return;
+  if (S.book.applied.includes(ADD.key)) return dropTableOfContents();
   merging = true;
   try {
     const cur = fullParas();
     const firstCode = ADD.groups[0].chapters[0].code;
-    if (cur.some(p => p.id && p.id.startsWith(firstCode + "_"))) { S.book.applied.push(ADD.key); S.dirty = true; await saveNow(); return; }  // already merged (e.g. text came from the cloud)
+    if (cur.some(p => p.id && p.id.startsWith(firstCode + "_"))) { S.book.applied.push(ADD.key); S.dirty = true; await saveNow(); merging = false; return dropTableOfContents(); }  // already merged (e.g. text came from the cloud)
     await createVersion("restore", "לפני הוספת " + ADD.count + " התרגומים");
     const res = mergeAdditionsInto(fullParas());
     // move chapter marks and illustrations whose chapter now starts elsewhere
@@ -2431,6 +2447,7 @@ async function maybeMergeAdditions() {
     renderEditor(res.paras, S.book.lastPos || undefined);
     markDirty(); await saveNow();
     toast(`נוספו ${ADD.count} פרקים חדשים. הם מסומנים בכחול ברשימת הפרקים.`, 6000);
+    setTimeout(dropTableOfContents, 500);
   } catch (e) { console.error("merge additions", e); toast("הוספת הפרקים החדשים נכשלה. הספר לא השתנה.", 5000); }
   finally { merging = false; }
 }
