@@ -26,6 +26,8 @@
   --warn-bg: #fdf1d6;
   --hl: #ffe58a;
   --refine: #f2c230; --refine-ink: #2b2100;
+  --final: #6b3fb8; --final-ink: #ffffff;    /* passed the read-aloud test */
+  --arch: #8b91a1; --arch-ink: #ffffff;      /* shelved */
   --shadow: 0 1px 2px rgba(27,33,48,.06), 0 8px 24px rgba(27,33,48,.07);
   --font-book: "Frank Ruhl Libre", "David", "Times New Roman", serif;
   --font-ui: "Assistant", "Segoe UI", "Arial Hebrew", Arial, sans-serif;
@@ -36,7 +38,7 @@
     --desk: #12151c; --paper: #1b1f29; --ink: #e5e8ef; --muted: #9aa2b4; --line: #2f3545;
     --accent: #84a5ff; --accent-soft: #233056; --accent-ink: #0d1220;
     --ins: #6fd59a; --ins-bg: #173826; --del: #ff8f86; --del-bg: #45201d;
-    --warn: #f3c25b; --warn-bg: #3b2f12; --hl: #6b5a14; --refine: #e9bf3c; --refine-ink: #1f1800;
+    --warn: #f3c25b; --warn-bg: #3b2f12; --hl: #6b5a14; --refine: #e9bf3c; --refine-ink: #1f1800; --final: #b99cff; --final-ink: #1a1030; --arch: #4b5162; --arch-ink: #e5e8ef;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
     color-scheme: dark;
   }
@@ -45,7 +47,7 @@
   --desk: #12151c; --paper: #1b1f29; --ink: #e5e8ef; --muted: #9aa2b4; --line: #2f3545;
   --accent: #84a5ff; --accent-soft: #233056; --accent-ink: #0d1220;
   --ins: #6fd59a; --ins-bg: #173826; --del: #ff8f86; --del-bg: #45201d;
-  --warn: #f3c25b; --warn-bg: #3b2f12; --hl: #6b5a14; --refine: #e9bf3c; --refine-ink: #1f1800;
+  --warn: #f3c25b; --warn-bg: #3b2f12; --hl: #6b5a14; --refine: #e9bf3c; --refine-ink: #1f1800; --final: #b99cff; --final-ink: #1a1030; --arch: #4b5162; --arch-ink: #e5e8ef;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
   color-scheme: dark;
 }
@@ -112,6 +114,21 @@ label.check input { margin-top: .3em; }
 #markRefine:not(.on) { border-color: var(--refine); }
 .chap-progress { display: flex; }
 #chBarR { height: 100%; background: var(--refine); transition: width .2s; }
+#chBarF { height: 100%; background: var(--final); transition: width .2s; }
+#markFinal { border-color: var(--final); }
+#markFinal.on { background: var(--final); color: var(--final-ink); }
+#markArchive { border-color: var(--arch); color: var(--muted); }
+#markArchive.on { background: var(--arch); color: var(--arch-ink); }
+#markArchive.armed { background: var(--del); color: var(--paper); border-color: var(--del); }
+.chap-item.is-final { background: var(--final); color: var(--final-ink); }
+.chap-item.is-archived { background: var(--arch); color: var(--arch-ink); opacity: .8; }
+.chap-item.is-archived .ct { text-decoration: line-through; }
+.chap-title.final .chap-name::after { content: " ★"; color: var(--final); }
+.chap-title.archived .chap-name { text-decoration: line-through; color: var(--muted); }
+.arch-banner { max-width: 70ch; margin: 0 auto 12px; padding: 10px 14px; border-radius: 8px; background: var(--arch); color: var(--arch-ink); font-size: .92rem; }
+#editor.archived { opacity: .6; }
+.chapfoot { display: grid; grid-template-columns: 1fr 1fr; }
+#footNext { grid-column: 1 / -1; }
 .chap-item.is-refine { background: var(--refine); color: var(--refine-ink); }
 .chap-title.refine .chap-name::after { content: " · לדייק"; color: var(--warn); font: 600 .8rem var(--font-ui); }
 .chap-progress { margin: 12px max(16px, env(safe-area-inset-right, 0px)) 6px max(16px, env(safe-area-inset-left, 0px)); }
@@ -438,6 +455,7 @@ label.check input { margin-top: .3em; }
     </aside>
 
     <div class="sheet-scroll" id="sheetScroll">
+      <div class="arch-banner" id="archBanner" hidden>הפרק הזה גנוז. הוא נשמר כאן, אבל לא נכלל בייצוא. אפשר לבטל את הגניזה בכפתור בסוף הפרק.</div>
       <article id="editor" class="show-edits" contenteditable="true" spellcheck="true" lang="he" dir="rtl" aria-label="טקסט הפרק"></article>
       <figure class="chap-figure" id="chapFig">
         <div class="fig-empty" id="figEmpty"><button class="btn fig-add" id="figAdd">＋ הוספת איור לסוף הפרק</button></div>
@@ -450,6 +468,8 @@ label.check input { margin-top: .3em; }
       <div class="chapfoot" id="chapFoot">
         <button class="btn" id="markRefine">נבדק, לדייק</button>
         <button class="btn" id="markDone">סימון הפרק כנבדק</button>
+        <button class="btn" id="markFinal">עבר מבחן הקראה</button>
+        <button class="btn" id="markArchive">גניזת הפרק</button>
         <button class="btn primary" id="footNext">לפרק הבא ←</button>
       </div>
     </div>
@@ -504,8 +524,8 @@ label.check input { margin-top: .3em; }
 <div class="sheet-back" id="chapSheet" hidden>
   <div class="sheet chap-sheet" role="dialog" aria-label="פרקים">
     <div class="sheet-head"><div><div class="sheet-title">פרקים</div><div class="muted num" id="chProgress"></div></div><button class="btn small" data-chap-close>סגירה</button></div>
-    <div class="progress chap-progress"><div id="chBar"></div><div id="chBarR"></div></div>
-    <div class="chap-legend"><span><i style="background:var(--accent)"></i>עוד לא נבדק</span><span><i style="background:var(--refine)"></i>לדייק</span><span><i style="background:var(--ins)"></i>נבדק</span></div>
+    <div class="progress chap-progress"><div id="chBarF"></div><div id="chBar"></div><div id="chBarR"></div></div>
+    <div class="chap-legend"><span><i style="background:var(--accent)"></i>עוד לא נבדק</span><span><i style="background:var(--refine)"></i>לדייק</span><span><i style="background:var(--ins)"></i>נבדק</span><span><i style="background:var(--final)"></i>עבר מבחן הקראה</span><span><i style="background:var(--arch)"></i>גנוז</span></div>
     <div id="chList" class="menu-list"></div>
   </div>
 </div>
@@ -1187,26 +1207,34 @@ function renderChapter(k) {
   decorate(); paintChapter(); paintFigure();
 }
 const chapStartId = c => (S.full[c.start] || {}).id;
-const isDone = c => !!(S.book && S.book.done && S.book.done.includes(chapStartId(c)));
-const isRefine = c => !!(S.book && S.book.refine && S.book.refine.includes(chapStartId(c)));
-function setChapterStatus(status) {   // "done" | "refine" | null; the two marks exclude each other
+/* chapter states, one at a time: refine (yellow) -> done (green) -> final (purple, passed the read-aloud test); archived (grey) is set aside */
+const STATUS_KEYS = ["archived", "final", "done", "refine"];
+const chapStatusById = id => { if (!S.book) return null; for (const k of STATUS_KEYS) if (S.book[k] && S.book[k].includes(id)) return k; return null; };
+const chapStatus = c => chapStatusById(chapStartId(c));
+const isDone = c => chapStatus(c) === "done";
+const isRefine = c => chapStatus(c) === "refine";
+const STATUS_TOAST = { done: "הפרק סומן כנבדק", refine: "הפרק סומן: לדייק", final: "★ הפרק עבר מבחן הקראה", archived: "הפרק נגנז. הוא לא ייכלל בייצוא." };
+function setChapterStatus(status) {
   const id = chapStartId(S.chapters[S.ci]);
-  S.book.done = (S.book.done || []).filter(x => x !== id);
-  S.book.refine = (S.book.refine || []).filter(x => x !== id);
-  if (status === "done") S.book.done.push(id);
-  if (status === "refine") S.book.refine.push(id);
+  for (const k of STATUS_KEYS) S.book[k] = (S.book[k] || []).filter(x => x !== id);
+  if (status) S.book[status].push(id);
   paintChapter(); S.dirty = true; S.contentChanged = true; saveNow();
-  if (status) toast(status === "done" ? "הפרק סומן כנבדק" : "הפרק סומן: לדייק");
+  toast(status ? STATUS_TOAST[status] : "הסימון בוטל");
 }
 function paintChapter() {
   const c = S.chapters[S.ci], n = S.chapters.length;
   $("#chNum").textContent = `${S.ci + 1}/${n}`;
   $("#chName").textContent = c.title;
-  $("#chTitle").classList.toggle("done", isDone(c));
-  $("#chTitle").classList.toggle("refine", isRefine(c));
-  const rf = isRefine(c);
-  $("#markRefine").classList.toggle("on", rf);
-  $("#markRefine").textContent = rf ? "✎ סומן: לדייק" : "נבדק, לדייק";
+  const st = chapStatus(c);
+  for (const k of ["done", "refine", "final", "archived"]) $("#chTitle").classList.toggle(k, st === k);
+  $("#markRefine").classList.toggle("on", st === "refine");
+  $("#markRefine").textContent = st === "refine" ? "✎ סומן: לדייק" : "נבדק, לדייק";
+  $("#markFinal").classList.toggle("on", st === "final");
+  $("#markFinal").textContent = st === "final" ? "★ עבר מבחן הקראה" : "עבר מבחן הקראה";
+  const ab = $("#markArchive"); ab.classList.remove("armed");
+  ab.classList.toggle("on", st === "archived");
+  ab.textContent = st === "archived" ? "ביטול הגניזה" : "גניזת הפרק";
+  $("#archBanner").hidden = st !== "archived"; editor.classList.toggle("archived", st === "archived");
   $("#chPrev").disabled = S.ci === 0; $("#chNext").disabled = S.ci === n - 1;
   $("#footNext").hidden = S.ci === n - 1;
   const d = isDone(c);
@@ -1234,16 +1262,20 @@ function goToPara(id) {
 function openChapters() {
   const full = fullParas();
   const list = $("#chList"), n = S.chapters.length;
-  let done = 0, refine = 0;
+  let done = 0, refine = 0, fin = 0, arch = 0;
   list.innerHTML = S.chapters.map((c, k) => {
     let edited = false;
     for (let i = c.start; i < c.end && !edited; i++) { const b = S.baseline.get(full[i].id); edited = b === undefined || b !== pText(full[i]); }
-    const d = isDone(c), r = !d && isRefine(c); if (d) done++; if (r) refine++;
-    return `<button class="chap-item${d ? " is-done" : ""}${r ? " is-refine" : ""}${k === S.ci ? " cur" : ""}" data-k="${k}"><span class="n num">${d ? "✓" : r ? "✎" : k + 1}</span><span class="ct">${esc(c.title)}</span><span class="cm num">${k === S.ci ? "פתוח עכשיו<br>" : ""}${edited ? "נערך · " : ""}עמ׳ ${full[c.start].pg || "—"}</span></button>`;
+    const st = chapStatus(c), d = st === "done", r = st === "refine";
+    if (d) done++; if (r) refine++; if (st === "final") fin++; if (st === "archived") arch++;
+    const icon = { done: "✓", refine: "✎", final: "★", archived: "⊘" }[st] || (k + 1);
+    return `<button class="chap-item${st ? " is-" + st : ""}${k === S.ci ? " cur" : ""}" data-k="${k}"><span class="n num">${icon}</span><span class="ct">${esc(c.title)}</span><span class="cm num">${k === S.ci ? "פתוח עכשיו<br>" : ""}${edited ? "נערך · " : ""}עמ׳ ${full[c.start].pg || "—"}</span></button>`;
   }).join("");
-  $("#chProgress").textContent = `${done} נבדקו · ${refine} לדייק · ${n - done - refine} עוד לא נבדקו`;
-  $("#chBar").style.width = (done / n * 100) + "%";
-  $("#chBarR").style.width = (refine / n * 100) + "%";
+  const live = Math.max(1, n - arch);
+  $("#chProgress").textContent = `${fin === 1 ? "אחד עבר הקראה" : fin + " עברו הקראה"} · ${done === 1 ? "אחד נבדק" : done + " נבדקו"} · ${refine} לדייק · ${n - arch - fin - done - refine} עוד לא נבדקו` + (arch ? ` · ${arch === 1 ? "גנוז אחד" : arch + " גנוזים"}` : "");
+  $("#chBarF").style.width = (fin / live * 100) + "%";
+  $("#chBar").style.width = (done / live * 100) + "%";
+  $("#chBarR").style.width = (refine / live * 100) + "%";
   $$("[data-k]", list).forEach(b => b.onclick = () => goChapter(+b.dataset.k));
   $("#chapSheet").hidden = false;
   const cur = $(".chap-item.cur", list); if (cur) cur.scrollIntoView({ block: "center" });
@@ -1256,6 +1288,13 @@ $("#chNext").onclick = () => goChapter(S.ci + 1);
 $("#footNext").onclick = () => goChapter(S.ci + 1);
 $("#markDone").onclick = () => setChapterStatus(isDone(S.chapters[S.ci]) ? null : "done");
 $("#markRefine").onclick = () => setChapterStatus(isRefine(S.chapters[S.ci]) ? null : "refine");
+$("#markFinal").onclick = () => setChapterStatus(chapStatus(S.chapters[S.ci]) === "final" ? null : "final");
+$("#markArchive").onclick = () => {
+  const b = $("#markArchive");
+  if (chapStatus(S.chapters[S.ci]) === "archived") return setChapterStatus(null);
+  if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "לגנוז? לחיצה נוספת לאישור"; setTimeout(() => { if (b.classList.contains("armed")) paintChapter(); }, 4000); return; }
+  setChapterStatus("archived");
+};
 
 function decorate() {
   let lastPg = null, edited = 0;
@@ -1975,7 +2014,9 @@ $("#tExport").onclick = () => {
     await saveNow();
     const full = fullParas(), chs = computeChapters(full), out = [], media = [];
     let missing = 0;
+    let skipped = 0;
     for (const c of chs) {
+      if (chapStatusById(full[c.start].id) === "archived") { skipped++; continue; }
       out.push(...full.slice(c.start, c.end));
       const fig = figFor(full[c.start] && full[c.start].id);
       if (!fig) continue;
@@ -1985,11 +2026,14 @@ $("#tExport").onclick = () => {
       out.push({ t: "img", m: media.length - 1 });
     }
     if (missing) toast(`${missing} איורים לא נמצאו במכשיר הזה ולא נכללו`, 4000);
+    else if (skipped) toast(`${skipped} פרקים גנוזים לא נכללו בקובץ`, 4000);
     download(buildDocx(name, out, media), name + ".docx");
   };
   $("#exTxt", m).onclick = async () => {
     await saveNow();
-    const txt = fullParas().map(p => htmlToText(p.h.replace(/<br>/g, "\n"))).join("\n\n");
+    const full = fullParas(), keep = [];
+    for (const c of computeChapters(full)) if (chapStatusById(full[c.start].id) !== "archived") keep.push(...full.slice(c.start, c.end));
+    const txt = keep.map(p => htmlToText(p.h.replace(/<br>/g, "\n"))).join("\n\n");
     download(new Blob(["﻿" + txt], { type: "text/plain;charset=utf-8" }), name + ".txt");
   };
   $("#exBak", m).onclick = async () => {
@@ -2220,7 +2264,7 @@ const Cloud = {
         if (this.sent.get(key) !== json) { await this.col().doc(key).set({ kind: "chunk", book: book.id, i, paras: chunks[i] }); this.sent.set(key, json); }
       }
       const prevN = this.chunkN.get(book.id);
-      await this.col().doc("book_" + book.id).set({ kind: "book", id: book.id, title: book.title, created: book.created, updated: book.updated, pages: book.pages || 0, chunks: chunks.length, lastPos: book.lastPos || null, done: book.done || [], refine: book.refine || [], images: book.images || {} });
+      await this.col().doc("book_" + book.id).set({ kind: "book", id: book.id, title: book.title, created: book.created, updated: book.updated, pages: book.pages || 0, chunks: chunks.length, lastPos: book.lastPos || null, done: book.done || [], refine: book.refine || [], final: book.final || [], archived: book.archived || [], images: book.images || {} });
       if (prevN && prevN > chunks.length) for (let i = chunks.length; i < prevN; i++) { await this.col().doc(`c_${book.id}_${i}`).delete(); this.sent.delete(`c_${book.id}_${i}`); }
       this.chunkN.set(book.id, chunks.length);
       book.cloudBase = book.updated;
@@ -2277,6 +2321,7 @@ const Cloud = {
     S.book.title = meta.title; $("#bookTitle").value = meta.title;
     if (Array.isArray(meta.done)) S.book.done = meta.done.slice();
     if (Array.isArray(meta.refine)) S.book.refine = meta.refine.slice();
+    for (const k of ["final", "archived"]) if (Array.isArray(meta[k])) S.book[k] = meta[k].slice();
     if (meta.images) S.book.images = JSON.parse(JSON.stringify(meta.images));
     renderEditor(paras, S.book.lastPos || meta.lastPos || undefined);
     S.book.paras = paras; S.book.updated = meta.updated; S.book.cloudBase = meta.updated;
@@ -2380,6 +2425,7 @@ const Cloud = {
         S.book.cloudBase = meta.updated; S.book.updated = meta.updated;
         if (Array.isArray(meta.done)) S.book.done = meta.done.slice();
         if (Array.isArray(meta.refine)) S.book.refine = meta.refine.slice();
+    for (const k of ["final", "archived"]) if (Array.isArray(meta[k])) S.book[k] = meta[k].slice();
         if (meta.images) S.book.images = JSON.parse(JSON.stringify(meta.images));
         paintChapter(); try { await putBook(); } catch (e) {}
         return;
@@ -2433,7 +2479,7 @@ async function maybeMergeAdditions() {
     const res = mergeAdditionsInto(fullParas());
     // move chapter marks and illustrations whose chapter now starts elsewhere
     const rm = res.remap, mv = x => rm[x] !== undefined ? rm[x] : x;   // applied all at once, so chains cannot collide
-    for (const k of ["done", "refine"]) if (S.book[k]) S.book[k] = S.book[k].map(mv);
+    for (const k of ["done", "refine", "final", "archived"]) if (S.book[k]) S.book[k] = S.book[k].map(mv);
     if (S.book.images) {
       const blobs = {};
       for (const from of Object.keys(rm)) if (S.book.images[from]) { try { blobs[from] = await DB.get("pdfs", `img:${S.book.id}:${from}`); } catch (e) {} }
