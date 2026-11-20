@@ -324,8 +324,9 @@ label.check input { margin-top: .3em; }
   body.typing .topbar, body.typing .chapbar { position: relative; top: 0; }
   /* while typing, the formatting bar sits at the top: the keyboard can never cover it
      (inside an app or home-screen view iOS does not tell the page where the keyboard is) */
-  body.typing .formatbar { top: env(safe-area-inset-top, 0px); bottom: auto; transform: none !important; border-top: 0; border-bottom: 1px solid var(--line); padding-block: 6px; box-shadow: var(--shadow); }
-  body.typing .sheet-scroll { padding-top: 58px; }
+  /* while typing, the formatting bar floats in the page just above the line being edited, so it moves with
+     the text however iOS shifts the screen for the keyboard */
+  body.typing .formatbar { position: absolute; bottom: auto; transform: none !important; border: 1px solid var(--line); border-radius: 12px; margin-inline: 8px; padding-block: 6px; box-shadow: var(--shadow); left: 0; right: 0; }
   .chapfoot { margin: 8px max(18px, env(safe-area-inset-right, 0px)) 0 max(18px, env(safe-area-inset-left, 0px)); }
   .chap-figure { margin: 8px max(18px, env(safe-area-inset-right, 0px)) 0 max(18px, env(safe-area-inset-left, 0px)); }
   #home { padding-block: 28px 48px; }
@@ -2086,7 +2087,7 @@ const isMobile = () => mq.matches;
 const typing = () => document.body.classList.contains("typing");
 function topInset() {
   if (!isMobile()) return $("#sheetScroll").getBoundingClientRect().top;
-  if (typing()) return $("#formatbar").getBoundingClientRect().bottom;
+  if (typing()) return ($("#formatbar").offsetHeight || 56) + 16;   // room for the floating bar above the line
   return Math.max($("#topbar").getBoundingClientRect().bottom, $("#chapbar").getBoundingClientRect().bottom);
 }
 function bottomLimit() {
@@ -2142,7 +2143,18 @@ function caretRect() {
   const lh = parseFloat(getComputedStyle(n).lineHeight) || 30;
   return { top: b.top, bottom: Math.min(b.bottom, b.top + lh) };
 }
+function placeTypingBar() {
+  const fb = $("#formatbar");
+  if (!isMobile() || !typing()) { fb.style.top = ""; return; }
+  const r = caretRect(); if (!r) return;
+  const h = fb.offsetHeight || 56;
+  let top = r.top + window.scrollY - h - 12;                       // just above the line
+  const edTop = editor.getBoundingClientRect().top + window.scrollY;
+  if (top < edTop - h) top = r.bottom + window.scrollY + 12;     // no room above: just below
+  fb.style.top = Math.round(top) + "px";
+}
 function keepCaretVisible() {
+  placeTypingBar();
   if (!isMobile() || document.activeElement !== editor) return;
   const r = caretRect(); if (!r) return;
   const bottom = bottomLimit() - 24;
@@ -2158,7 +2170,7 @@ editor.addEventListener("focus", () => {
   [80, 300, 600, 1000].forEach(t => setTimeout(keepCaretVisible, t));   // follow the keyboard animation
 });
 editor.addEventListener("blur", () => setTimeout(() => {
-  if (document.activeElement !== editor && !(document.activeElement && document.activeElement.closest && document.activeElement.closest("#formatbar"))) document.body.classList.remove("typing");
+  if (document.activeElement !== editor && !(document.activeElement && document.activeElement.closest && document.activeElement.closest("#formatbar"))) { document.body.classList.remove("typing"); placeTypingBar(); }
 }, 250));
 editor.addEventListener("input", scheduleCaret);
 document.addEventListener("selectionchange", () => { if (document.activeElement === editor) scheduleCaret(); });
