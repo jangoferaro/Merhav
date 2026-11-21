@@ -2508,7 +2508,8 @@ document.addEventListener("visibilitychange", () => { if (document.hidden && Clo
    window.MAGIHA_ADDITIONS = { key, parts:[ids], appendix:id, toc:id, groups:[{after|before:id, chapters:[{code,title,paras}]}] }
    Inserted into whatever text the device has, renumbers the chapters, rebuilds the table of contents,
    updates chapter numbers in the notes, and keeps chapter marks and illustrations on their chapters. */
-const ADD = window.MAGIHA_ADDITIONS || null;
+// packages of new material, applied once each, in order
+const ADDS = [].concat(window.MAGIHA_ADDITIONS || [], window.MAGIHA_ADDITIONS_2 || []);
 let merging = false;
 async function dropTableOfContents() {
   const KEY = "drop-toc-1";
@@ -2526,16 +2527,17 @@ async function dropTableOfContents() {
   } else { S.book.applied.push(KEY); S.dirty = true; await saveNow(); }
 }
 async function maybeMergeAdditions() {
-  if (!ADD || merging || !S.book || !S.chapters) return;
+  if (merging || !S.book || !S.chapters) return;
   S.book.applied = S.book.applied || [];
-  if (S.book.applied.includes(ADD.key)) return dropTableOfContents();
+  const ADD = ADDS.find(a => !S.book.applied.includes(a.key));
+  if (!ADD) return dropTableOfContents();
   merging = true;
   try {
     const cur = fullParas();
     const firstCode = ADD.groups[0].chapters[0].code;
-    if (cur.some(p => p.id && p.id.startsWith(firstCode + "_"))) { S.book.applied.push(ADD.key); S.dirty = true; await saveNow(); merging = false; return dropTableOfContents(); }  // already merged (e.g. text came from the cloud)
-    await createVersion("restore", "לפני הוספת " + ADD.count + " התרגומים");
-    const res = mergeAdditionsInto(fullParas());
+    if (cur.some(p => p.id && p.id.startsWith(firstCode + "_"))) { S.book.applied.push(ADD.key); S.dirty = true; await saveNow(); merging = false; return maybeMergeAdditions(); }  // already merged (e.g. text came from the cloud)
+    await createVersion("restore", "לפני הוספת " + ADD.count + " התרגומים" + (ADD.label ? " (" + ADD.label + ")" : ""));
+    const res = mergeAdditionsInto(fullParas(), ADD);
     // move chapter marks and illustrations whose chapter now starts elsewhere
     const rm = res.remap, mv = x => rm[x] !== undefined ? rm[x] : x;   // applied all at once, so chains cannot collide
     for (const k of ["done", "refine", "final", "archived", "unsure"]) if (S.book[k]) S.book[k] = S.book[k].map(mv);
@@ -2548,29 +2550,46 @@ async function maybeMergeAdditions() {
       for (const from of Object.keys(blobs)) { try { await DB.del("pdfs", `img:${S.book.id}:${from}`); } catch (e) {} }
       for (const [from, b] of Object.entries(blobs)) if (b) { try { await DB.put("pdfs", b, `img:${S.book.id}:${rm[from]}`); } catch (e) {} }
     }
+    // pieces that still need their source completed start as "to refine" (yellow)
+    for (const code of ADD.markRefine || []) {
+      const id = code + "_n";
+      if (!res.paras.some(p => p.id === id)) continue;
+      for (const k of STATUS_KEYS) S.book[k] = (S.book[k] || []).filter(x => x !== id);
+      S.book.refine.push(id);
+    }
     S.book.applied.push(ADD.key);
     renderEditor(res.paras, S.book.lastPos || undefined);
     markDirty(); await saveNow();
-    toast(`נוספו ${ADD.count} פרקים חדשים. הם מסומנים בכחול ברשימת הפרקים.`, 6000);
-    setTimeout(dropTableOfContents, 500);
+    toast(ADD.toast || `נוספו ${ADD.count} פרקים חדשים. הם מסומנים בכחול ברשימת הפרקים.`, 7000);
+    merging = false;
+    setTimeout(maybeMergeAdditions, 800);   // next package, then the one-time table-of-contents removal
   } catch (e) { console.error("merge additions", e); toast("הוספת הפרקים החדשים נכשלה. הספר לא השתנה.", 5000); }
   finally { merging = false; }
 }
-function mergeAdditionsInto(src) {
+function mergeAdditionsInto(src, ADD) {
   let ps = src.slice();
   const idx = id => ps.findIndex(p => p.id === id);
   const txt = p => htmlToText(p.h).trim();
   const isLabel = p => !!p && p.t === "p" && /^\d{2,3}$/.test(txt(p));
   const before = computeChapters(ps).map(c => ({ start: ps[c.start].id, title: c.titleId }));
-  // 1. insert the new chapters
+  // 1. insert the new material
+  //    after: right after a paragraph · before: before a chapter (its number) · afterChapter: at the end of a chapter
+  //    inside: inside a chapter, before a paragraph · appendTo: at the end of a chapter, inside it
   for (const g of ADD.groups) {
     let at;
     if (g.after) { const i = idx(g.after); if (i < 0) continue; at = i + 1; }
-    else { const i = idx(g.before); if (i < 0) continue; at = isLabel(ps[i - 1]) ? i - 1 : i; }
+    else if (g.before) { const i = idx(g.before); if (i < 0) continue; at = isLabel(ps[i - 1]) ? i - 1 : i; }
+    else if (g.inside) { const i = idx(g.inside); if (i < 0) continue; at = i; }
+    else {
+      const h = idx(g.afterChapter || g.appendTo); if (h < 0) continue;
+      const c = computeChapters(ps).find(c => h >= c.start && h < c.end); if (!c) continue;
+      at = c.end;
+    }
     const pg = (ps[at - 1] && ps[at - 1].pg) || null, ins = [];
+    const inline = !!(g.inside || g.appendTo);
     for (const ch of g.chapters) {
-      ins.push({ id: ch.code + "_n", t: "p", h: "00", pg });
-      ch.paras.forEach((p, k) => ins.push({ id: `${ch.code}_${k}`, t: p.t, h: p.h, pg }));
+      if (!inline) ins.push({ id: ch.code + "_n", t: "p", h: "00", pg });
+      ch.paras.forEach((p, k) => ins.push({ id: `${ch.code}_${k}`, t: inline && p.t === "h" ? "s" : p.t, h: p.h, pg }));
     }
     ps.splice(at, 0, ...ins);
   }
@@ -2612,7 +2631,9 @@ function mergeAdditionsInto(src) {
   // a chapter is followed by its title heading; if its first paragraph is now different, its marks move with it
   const after = computeChapters(ps), pos = new Map(ps.map((p, i) => [p.id, i]));
   const remap = {};
+  const startTitle = new Map(after.map(c => [ps[c.start].id, c.titleId]));
   for (const b of before) {
+    if (startTitle.get(b.start) === b.title) continue;            // same chapter still starts here (also keeps split parts apart)
     const ti = pos.get(b.title); if (ti === undefined) continue;
     const c = after.find(c => ti >= c.start && ti < c.end);
     if (c && ps[c.start].id !== b.start) remap[b.start] = ps[c.start].id;
