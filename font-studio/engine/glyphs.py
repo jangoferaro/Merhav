@@ -142,10 +142,11 @@ def het(g):
 
 
 def tet(g):
-    fold = g.w * 0.50
-    fold_end = min(g.H * 0.56, g.H - g.bar - g.H * 0.12)
-    return [S((g.R, g.H), (g.R, g.B, g.soft), (g.L, g.B, g.soft),
-              (g.L, g.T, g.tight), (fold, g.T, g.tight), (fold, fold_end))]
+    # tall straight right side; the left side rises and ends in a short
+    # inward hook at the top-left, leaving the top open
+    hook_x = g.L + g.stem / 2 + g.w * 0.17
+    return [S((g.R, g.H), (g.R, g.B, g.round), (g.L, g.B, g.round),
+              (g.L, g.T, g.mid * 0.8), (hook_x, g.T), caps=("p", "v"))]
 
 
 def yod(g):
@@ -219,18 +220,28 @@ def pe(g):
     return [S(*_tongue(g), (g.R, g.T, g.soft), (g.R, g.B, g.soft), (0, g.B))]
 
 
+def _diag_point(p0, p1, t):
+    return (p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t)
+
+
 def tsadi(g):
+    # long stroke from top-left down to the bottom-RIGHT corner, base running
+    # left; the short right arm comes down to meet the long stroke
+    top = (g.L + g.w * 0.04, g.H)
+    corner = (g.R - g.w * 0.04, g.B)
     return [
-        S((g.L, g.H), (g.L, g.B, g.soft), (g.w, g.B)),
-        S((g.R, g.H), (g.R, g.H * 0.62, g.mid), (g.L, g.H * 0.34), caps=("p", "p")),
+        S(top, (corner[0], corner[1], g.tight), (0, g.B), caps=("h", "p")),
+        S((g.R, g.H), _diag_point(top, corner, 0.52), caps=("h", "p")),
     ]
 
 
 def finaltsadi(g):
-    sx = g.L + g.w * 0.06
+    # two arms meeting right of centre; the stem descends from the meeting point
+    sx = g.w * 0.56
+    join = (sx, g.H * 0.40)
     return [
-        S((sx, g.H), (sx, -g.D)),
-        S((g.R, g.H), (g.R, g.H * 0.62, g.mid), (sx, g.H * 0.36)),
+        S((g.L + g.w * 0.02, g.H), (sx, g.H * 0.40, g.tight), (sx, -g.D), caps=("h", "p")),
+        S((g.R, g.H), (sx, g.H * 0.46), caps=("h", "p")),
     ]
 
 
