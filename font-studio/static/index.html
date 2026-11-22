@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>סטודיו פונטים</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">א</span>
+      <div>
+        <h1>סטודיו פונטים</h1>
+        <p class="sub">יצירת פונט עברי מקורי — לאתר ולאפליקציה</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <label class="family">
+        <span>שם הפונט (באנגלית)</span>
+        <input id="family" type="text" maxlength="40" value="Otiyot" dir="ltr" spellcheck="false">
+      </label>
+      <button id="export" class="primary">הורדת הפונט (ZIP)</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel" aria-label="הגדרות">
+      <section>
+        <h2>סגנונות מוכנים</h2>
+        <div id="presets" class="presets"></div>
+      </section>
+
+      <section>
+        <h2>משקל לתצוגה</h2>
+        <p class="hint">הפונט משתנה — הוא מכיל את כל המשקלים 100–900. הסליידר הזה רק מציג משקל, הוא לא משנה את העיצוב.</p>
+        <div class="ctl">
+          <label for="wght">משקל <output id="wght-out">400</output></label>
+          <input id="wght" type="range" min="100" max="900" step="1" value="400">
+        </div>
+      </section>
+
+      <section>
+        <h2>צורת האותיות</h2>
+        <div id="controls-shape"></div>
+      </section>
+
+      <section>
+        <h2>פרטים</h2>
+        <div id="controls-detail"></div>
+      </section>
+
+      <section class="row-actions">
+        <button id="reset" class="ghost">איפוס</button>
+        <button id="save-json" class="ghost">שמירת הגדרות</button>
+        <label class="ghost file-btn">טעינת הגדרות<input id="load-json" type="file" accept="application/json,.json" hidden></label>
+      </section>
+    </aside>
+
+    <section class="stage">
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="text" aria-selected="true">טקסט</button>
+        <button role="tab" data-tab="alphabet" aria-selected="false">אלפבית</button>
+        <button role="tab" data-tab="reference" aria-selected="false">השוואה לרפרנס</button>
+        <span id="status" class="status" aria-live="polite"></span>
+      </nav>
+
+      <div class="tab" id="tab-text">
+        <div class="preview display" contenteditable="true" spellcheck="false">מרחב — מקום לנשום בו</div>
+        <div class="preview paragraph" contenteditable="true" spellcheck="false">כל מילה שכתובה כאן אפשר לערוך: פשוט לחצו ותקלידו. פונט טוב לטקסט רץ צריך להיות נוח לעין גם בפסקאות ארוכות, עם ריווח אחיד, אותיות ברורות ושוני מספיק בין צורות דומות כמו ב׳ ו־כ׳, ד׳ ו־ר׳, ה׳ ו־ח׳, ו׳ ו־ז׳, ם ו־ס. איך זה נראה? אפשר לשנות כל פרמטר ולראות מיד.</div>
+        <div id="waterfall" class="waterfall"></div>
+      </div>
+
+      <div class="tab" id="tab-alphabet" hidden>
+        <div id="alphabet" class="alphabet"></div>
+        <div class="pairs">
+          <h3>זוגות שקל להתבלבל ביניהם</h3>
+          <div class="preview pairline">ב כ · ד ר · ה ח ת · ו ז ן · ם ס · ע צ · ג נ</div>
+        </div>
+      </div>
+
+      <div class="tab" id="tab-reference" hidden>
+        <div class="ref-controls">
+          <label class="primary file-btn">העלאת תמונת רפרנס<input id="ref-file" type="file" accept="image/*" hidden></label>
+          <div class="ctl inline"><label for="ref-opacity">שקיפות הרפרנס</label><input id="ref-opacity" type="range" min="0" max="1" step="0.01" value="0.5"></div>
+          <div class="ctl inline"><label for="ref-size">גודל הטקסט</label><input id="ref-size" type="range" min="40" max="400" step="1" value="160"></div>
+          <div class="ctl inline"><label for="ref-x">הזזה ימינה/שמאלה</label><input id="ref-x" type="range" min="-400" max="400" step="1" value="0"></div>
+          <div class="ctl inline"><label for="ref-y">הזזה למעלה/למטה</label><input id="ref-y" type="range" min="-300" max="300" step="1" value="0"></div>
+          <div class="ctl inline"><label for="ref-mode">תצוגה</label>
+            <select id="ref-mode"><option value="overlay">שכבה מעל הרפרנס</option><option value="side">זה לצד זה</option></select>
+          </div>
+        </div>
+        <p class="hint">העלו תמונה של אותיות שאתם אוהבים: סקיצה, כתב יד או צילום. כתבו מעליה את אותן אותיות ושנו את הפרמטרים עד שהצורה קרובה. התמונה נשארת בדפדפן שלכם בלבד.</p>
+        <div id="ref-stage" class="ref-stage overlay">
+          <div class="ref-img-wrap"><img id="ref-img" alt="" hidden><div id="ref-empty" class="ref-empty">עוד לא הועלתה תמונה</div></div>
+          <div id="ref-text" class="preview ref-text" contenteditable="true" spellcheck="false">אבגד</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
