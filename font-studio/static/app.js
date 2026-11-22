@@ -13,11 +13,11 @@ const SHAPE = [
   { key: "slant", label: "נטייה (מעלות)", min: -14, max: 14, step: 0.5 },
 ];
 const DETAIL = [
-  { key: "spacing", label: "ריווח בין אותיות", min: 0.5, max: 1.8, step: 0.01 },
+  { key: "spacing", label: "ריווח בין אותיות", min: 0.3, max: 1.8, step: 0.01 },
   { key: "weight_scale", label: "טווח העובי (דק ↔ עבה)", min: 0.6, max: 1.25, step: 0.01, hint: "מזיז את כל המשקלים יחד" },
-  { key: "head", label: "ראש ו׳ / י׳ / נ׳", min: 0.12, max: 0.4, step: 0.01 },
-  { key: "ascender", label: "גובה הזנב של ל׳", min: 0.25, max: 0.6, step: 0.01 },
-  { key: "descender", label: "עומק ך ן ף ץ ק", min: 0.25, max: 0.6, step: 0.01 },
+  { key: "head", label: "ראש ו׳ / י׳ / נ׳", min: 0.05, max: 0.4, step: 0.01 },
+  { key: "ascender", label: "גובה הזנב של ל׳", min: 0.15, max: 0.6, step: 0.01 },
+  { key: "descender", label: "עומק ך ן ף ץ ק", min: 0.15, max: 0.6, step: 0.01 },
 ];
 
 const PRESETS = [
@@ -228,7 +228,102 @@ function download(blob, name) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 
+const VARIATIONS = [
+  { name: "קרוב למקור", hint: "בסיס המדידה", f: (b) => ({}) },
+  { name: "רך יותר", hint: "פינות עגולות", f: (b) => ({ roundness: Math.min(1, b.roundness + 0.35), contrast: (b.contrast + 1) / 2 }) },
+  { name: "חד יותר", hint: "פינות ישרות", f: (b) => ({ roundness: Math.max(0, b.roundness - 0.35), contrast: b.contrast * 1.12 }) },
+  { name: "עברית קלאסית", hint: "אופקיים עבים", f: (b) => ({ contrast: Math.max(1.55, b.contrast * 1.3), roundness: b.roundness * 0.6 }) },
+  { name: "רחב ופתוח", hint: "נוח לקריאה", f: (b) => ({ width: b.width + 0.15, spacing: b.spacing + 0.15, height: b.height - 25 }) },
+  { name: "צר ודחוס", hint: "לכותרות", f: (b) => ({ width: b.width - 0.13, height: b.height + 40, spacing: b.spacing - 0.08 }) },
+];
+let inspireBase = null;
+let inspireFace = null;
+
+function clampParams(p) {
+  const all = [...SHAPE, ...DETAIL];
+  for (const d of all) p[d.key] = Math.min(d.max, Math.max(d.min, Number(p[d.key])));
+  return p;
+}
+
+function inspiration() {
+  $("#insp-file").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    setStatus("מנתח את הפונט…");
+    try {
+      const buf = await f.arrayBuffer();
+      const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: buf });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      // show the inspiration font locally, for comparison only (never stored)
+      try {
+        const face = new FontFace("InspirationFont", buf);
+        await face.load();
+        if (inspireFace) document.fonts.delete(inspireFace);
+        document.fonts.add(face);
+        inspireFace = face;
+      } catch (_) { /* browser could not display it; comparison shows fallback */ }
+      inspireBase = { ...DEFAULTS, family: params.family, ...data.params };
+      renderSummary(data, f.name);
+      renderVariations();
+      applyVariation(0);
+      $("#insp-result").hidden = false;
+    } catch (err) {
+      setStatus(`הניתוח נכשל: ${err.message}`, true);
+    }
+  });
+}
+
+function renderSummary(data, fileName) {
+  const m = data.measured;
+  const box = $("#insp-summary");
+  box.innerHTML = "";
+  const title = document.createElement("div");
+  title.textContent = `נותח: ${data.source.family || fileName} · משקל ${data.source.weight}${data.source.variable ? " · פונט משתנה" : ""}`;
+  box.appendChild(title);
+  const dl = document.createElement("dl");
+  const items = [
+    ["גובה אותיות", m.letter_height], ["עובי קו אנכי", m.stem], ["עובי קו אופקי", m.bar],
+    ["רדיוס פינה", m.corner_radius], ["נטייה", `${m.slant_degrees}°`],
+  ];
+  for (const [k, v] of items) {
+    const dt = document.createElement("dt"); dt.textContent = k;
+    const dd = document.createElement("dd"); dd.textContent = v;
+    const wrap = document.createElement("div"); wrap.append(dt, dd); dl.appendChild(wrap);
+  }
+  box.appendChild(dl);
+  if (data.missing_letters.length) {
+    const w = document.createElement("div");
+    w.className = "hint";
+    w.textContent = "חלק מהאותיות חסרות בפונט המקורי, אז חלק מהמדידות הן הערכה.";
+    box.appendChild(w);
+  }
+}
+
+function renderVariations() {
+  const box = $("#insp-variations");
+  box.innerHTML = "";
+  VARIATIONS.forEach((v, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.innerHTML = `<span></span><small></small>`;
+    b.querySelector("span").textContent = v.name;
+    b.querySelector("small").textContent = v.hint;
+    b.addEventListener("click", () => applyVariation(i));
+    box.appendChild(b);
+  });
+}
+
+function applyVariation(i) {
+  if (!inspireBase) return;
+  params = clampParams({ ...inspireBase, ...VARIATIONS[i].f(inspireBase), family: params.family });
+  document.querySelectorAll("#insp-variations button").forEach((b, j) => b.setAttribute("aria-pressed", i === j));
+  syncControls();
+  scheduleBuild();
+}
+
 function init() {
+  inspiration();
   buildControls($("#controls-shape"), SHAPE);
   buildControls($("#controls-detail"), DETAIL);
   buildPresets();

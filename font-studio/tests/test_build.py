@@ -13,8 +13,8 @@ from engine.build import Params, build_variable, static_instance, to_bytes  # no
 
 RANGES = {
     "height": (420, 680), "width": (0.7, 1.4), "contrast": (0.6, 2.0),
-    "roundness": (0.0, 1.0), "slant": (-14, 14), "spacing": (0.5, 1.8),
-    "head": (0.12, 0.40), "ascender": (0.25, 0.60), "descender": (0.25, 0.60),
+    "roundness": (0.0, 1.0), "slant": (-14, 14), "spacing": (0.3, 1.8),
+    "head": (0.05, 0.40), "ascender": (0.15, 0.60), "descender": (0.15, 0.60),
     "weight_scale": (0.6, 1.25),
 }
 

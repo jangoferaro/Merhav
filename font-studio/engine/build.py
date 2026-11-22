@@ -67,10 +67,10 @@ class Params:
         self.contrast = c(self.contrast, 0.6, 2.0)
         self.roundness = c(self.roundness, 0.0, 1.0)
         self.slant = c(self.slant, -14, 14)
-        self.spacing = c(self.spacing, 0.5, 1.8)
-        self.head = c(self.head, 0.12, 0.40)
-        self.ascender = c(self.ascender, 0.25, 0.60)
-        self.descender = c(self.descender, 0.25, 0.60)
+        self.spacing = c(self.spacing, 0.3, 1.8)
+        self.head = c(self.head, 0.05, 0.40)
+        self.ascender = c(self.ascender, 0.15, 0.60)
+        self.descender = c(self.descender, 0.15, 0.60)
         self.weight_scale = c(self.weight_scale, 0.6, 1.25)
         name = re.sub(r"[^\w \-֐-׿]", "", self.family).strip()
         self.family = name or "Otiyot"
@@ -146,7 +146,7 @@ def master_outlines(p: Params, stem_frac: float):
     ctx.round = H * (0.20 + 0.22 * rho)
     ctx.dotr = rho * max(stem, bar) * 0.56
     base_w = H * 0.95 * p.width
-    sb = p.spacing * H * 0.075 + stem * 0.28
+    sb = p.spacing * H * 0.085 + stem * 0.20
     skew = math.tan(math.radians(p.slant))
 
     out = {}

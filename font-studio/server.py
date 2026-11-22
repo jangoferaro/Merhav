@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from engine.analyze import MAX_FONT_BYTES, AnalyzeError, analyze  # noqa: E402
 from engine.build import Params, build_variable, export_zip, to_bytes, _ps_name  # noqa: E402
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -62,7 +63,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _error(self, code, msg):
-        self._send(code, json.dumps({"error": msg}).encode(), "application/json")
+        self._send(code, json.dumps({"error": msg}, ensure_ascii=False).encode(), "application/json; charset=utf-8")
 
     def do_GET(self):
         path = self.path.split("?", 1)[0]
@@ -85,7 +86,24 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(n) if n else b"{}"
         return Params.from_dict(json.loads(raw or b"{}"))
 
+    def _analyze(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        if n <= 0:
+            return self._error(400, "לא התקבל קובץ")
+        if n > MAX_FONT_BYTES:
+            return self._error(413, "הקובץ גדול מדי (מעל 15MB)")
+        data = self.rfile.read(n)
+        try:
+            result = analyze(data)
+        except AnalyzeError as e:
+            return self._error(422, str(e))
+        except Exception:
+            return self._error(422, "לא הצלחתי לנתח את הפונט הזה")
+        self._send(200, json.dumps(result, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+
     def do_POST(self):
+        if self.path == "/api/analyze":
+            return self._analyze()
         try:
             p = self._params()
         except (ValueError, TypeError) as e:

@@ -59,11 +59,30 @@
 
     <section class="stage">
       <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="inspire" aria-selected="false">השראה מפונט</button>
         <button role="tab" data-tab="text" aria-selected="true">טקסט</button>
         <button role="tab" data-tab="alphabet" aria-selected="false">אלפבית</button>
         <button role="tab" data-tab="reference" aria-selected="false">השוואה לרפרנס</button>
         <span id="status" class="status" aria-live="polite"></span>
       </nav>
+
+      <div class="tab" id="tab-inspire" hidden>
+        <div class="inspire-head">
+          <label class="primary file-btn">העלאת פונט שאהבתם<input id="insp-file" type="file" accept=".ttf,.otf,.woff,.woff2,font/*" hidden></label>
+          <p class="hint">הכלי <strong>מודד</strong> את הסגנון של הפונט: גובה, עובי, ניגודיות, רוחב, עיגול פינות, נטייה וריווח. אחר כך הוא בונה אותיות <strong>חדשות לגמרי</strong> לפי המדידות. קווי המתאר של הפונט המקורי לא מועתקים, כך שהתוצאה מקורית ושלכם. הקובץ לא נשמר בשרת. כדאי לתת לפונט שם משלכם, לא את השם של המקור.</p>
+        </div>
+        <div id="insp-result" hidden>
+          <div id="insp-summary" class="insp-summary"></div>
+          <h3>כמה רחוק מהמקור? בחרו כיוון, והמשיכו לכוונן בסליידרים</h3>
+          <div id="insp-variations" class="variations"></div>
+          <div class="compare">
+            <div class="cmp-row"><span class="cmp-lbl">ההשראה</span><div class="cmp-txt src" contenteditable="true" spellcheck="false">אבגדהוזחטיכלמנסעפצקרשת</div></div>
+            <div class="cmp-row"><span class="cmp-lbl">הפונט שלכם</span><div class="cmp-txt mine preview" contenteditable="true" spellcheck="false">אבגדהוזחטיכלמנסעפצקרשת</div></div>
+            <div class="cmp-row"><span class="cmp-lbl">ההשראה</span><div class="cmp-txt src small" contenteditable="true" spellcheck="false">שלום, זהו משפט לדוגמה כדי להשוות קריאות.</div></div>
+            <div class="cmp-row"><span class="cmp-lbl">הפונט שלכם</span><div class="cmp-txt mine small preview" contenteditable="true" spellcheck="false">שלום, זהו משפט לדוגמה כדי להשוות קריאות.</div></div>
+          </div>
+        </div>
+      </div>
 
       <div class="tab" id="tab-text">
         <div class="preview display" contenteditable="true" spellcheck="false">מרחב — מקום לנשום בו</div>
