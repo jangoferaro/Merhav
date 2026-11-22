@@ -60,6 +60,7 @@
     <section class="stage">
       <nav class="tabs" role="tablist">
         <button role="tab" data-tab="inspire" aria-selected="true">השראה</button>
+        <button role="tab" data-tab="edit" aria-selected="false">עריכת פונט קיים</button>
         <button role="tab" data-tab="text" aria-selected="false">טקסט</button>
         <button role="tab" data-tab="alphabet" aria-selected="false">אלפבית</button>
         <button role="tab" data-tab="reference" aria-selected="false">השוואה לרפרנס</button>
@@ -111,6 +112,42 @@
             <div class="cmp-row mine-row"><span class="cmp-lbl">הפונט שלכם</span><div class="cmp-txt mine preview" contenteditable="true" spellcheck="false">אבגדהוזחטיכלמנסעפצקרשת</div></div>
             <div class="cmp-row src-row"><span class="cmp-lbl">ההשראה</span><div class="cmp-txt src small" contenteditable="true" spellcheck="false">שלום, זהו משפט לדוגמה כדי להשוות קריאות.</div></div>
             <div class="cmp-row mine-row"><span class="cmp-lbl">הפונט שלכם</span><div class="cmp-txt mine small preview" contenteditable="true" spellcheck="false">שלום, זהו משפט לדוגמה כדי להשוות קריאות.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab" id="tab-edit" hidden>
+        <div class="edit-load">
+          <p class="lead">איזה פונט לערוך?</p>
+          <div class="edit-sources">
+            <label class="primary file-btn">העלאת קובץ פונט<input id="edit-file" type="file" accept=".ttf,.otf,.woff,.woff2,font/*" hidden></label>
+            <span class="or">או</span>
+            <div class="url-row">
+              <input id="edit-url" type="url" dir="ltr" placeholder="https://fonts.google.com/specimen/Rubik" spellcheck="false">
+              <button type="button" id="edit-url-go" class="ghost">טעינה מקישור</button>
+            </div>
+          </div>
+          <p class="hint">משנים את הצורות האמיתיות של הפונט. הניקוד וה-kerning זזים יחד עם האותיות. שינוי פונט מותר רק אם הרישיון שלו מתיר זאת. פונטים חופשיים (OFL, למשל כל הפונטים העבריים ב-Google Fonts) מותר לשנות, גם לשימוש מסחרי, בתנאי שנותנים להם שם חדש. הקובץ נשמר בזיכרון השרת לזמן העבודה בלבד.</p>
+        </div>
+
+        <div id="edit-main" hidden>
+          <div id="edit-info" class="insp-summary"></div>
+          <div class="edit-grid">
+            <div class="edit-controls" id="edit-controls"></div>
+            <div class="edit-preview">
+              <div class="cmp-row"><span class="cmp-lbl">מקור</span><div class="cmp-txt ed-orig" contenteditable="true" spellcheck="false">בְּרֵאשִׁית בָּרָא אֱלֹהִים</div></div>
+              <div class="cmp-row"><span class="cmp-lbl">אחרי עריכה</span><div class="cmp-txt ed-new" contenteditable="true" spellcheck="false">בְּרֵאשִׁית בָּרָא אֱלֹהִים</div></div>
+              <div class="cmp-row"><span class="cmp-lbl">מקור</span><div class="cmp-txt ed-orig" contenteditable="true" spellcheck="false">אבגדהוזחטיכךלמםנןסעפףצץקרשת</div></div>
+              <div class="cmp-row"><span class="cmp-lbl">אחרי עריכה</span><div class="cmp-txt ed-new" contenteditable="true" spellcheck="false">אבגדהוזחטיכךלמםנןסעפףצץקרשת</div></div>
+              <div class="cmp-row"><span class="cmp-lbl">מקור</span><div class="cmp-txt small ed-orig" contenteditable="true" spellcheck="false">פונט טוב לטקסט רץ צריך להיות נוח לעין גם בפסקאות ארוכות. 0123456789 Hello!</div></div>
+              <div class="cmp-row"><span class="cmp-lbl">אחרי עריכה</span><div class="cmp-txt small ed-new" contenteditable="true" spellcheck="false">פונט טוב לטקסט רץ צריך להיות נוח לעין גם בפסקאות ארוכות. 0123456789 Hello!</div></div>
+            </div>
+          </div>
+          <div class="edit-export">
+            <label class="field"><span>שם לפונט החדש (באנגלית, שונה מהמקור)</span>
+              <input id="edit-family" type="text" dir="ltr" maxlength="40" spellcheck="false" placeholder="MyFont"></label>
+            <label id="edit-confirm-wrap" class="confirm" hidden><input id="edit-confirm" type="checkbox"> אני מאשר/ת שיש לי זכות לשנות את הפונט הזה (למשל, יש לי רישיון שמתיר זאת)</label>
+            <button id="edit-export" class="primary">הורדת הפונט הערוך (ZIP)</button>
           </div>
         </div>
       </div>

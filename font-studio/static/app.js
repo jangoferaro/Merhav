@@ -172,6 +172,7 @@ function tabs() {
     b.addEventListener("click", () => {
       document.querySelectorAll(".tabs [data-tab]").forEach((x) => x.setAttribute("aria-selected", x === b));
       document.querySelectorAll(".tab").forEach((t) => { t.hidden = t.id !== `tab-${b.dataset.tab}`; });
+      document.body.classList.toggle("editing", b.dataset.tab === "edit");
     });
   });
 }
@@ -418,8 +419,197 @@ function applyVariation(i) {
   scheduleBuild();
 }
 
+// ---------------------------------------------------------------------------
+// Editing an existing font
+// ---------------------------------------------------------------------------
+
+const EDIT_DEFAULTS = {
+  base_wght: 0, weight: 0, contrast: 0, width: 1, height: 1, keep_strokes: true,
+  slant: 0, tracking: 0, corners: 0, outline: 0, line_height: 1,
+};
+const EDIT_CONTROLS = [
+  { key: "weight", label: "עובי", min: -60, max: 140, step: 1, hint: "מעבה או מדקק את כל הקווים" },
+  { key: "contrast", label: "ניגודיות", min: -80, max: 80, step: 1, hint: "ימינה: קווים אופקיים עבים יותר · שמאלה: אנכיים" },
+  { key: "width", label: "רוחב", min: 0.6, max: 1.6, step: 0.01 },
+  { key: "height", label: "גובה", min: 0.75, max: 1.3, step: 0.01 },
+  { key: "keep_strokes", label: "לשמור על עובי הקווים בשינוי רוחב/גובה", type: "check" },
+  { key: "slant", label: "נטייה (מעלות)", min: -15, max: 15, step: 0.5 },
+  { key: "tracking", label: "ריווח בין אותיות", min: -80, max: 250, step: 1 },
+  { key: "corners", label: "עיגול פינות", min: 0, max: 120, step: 1, hint: "בפינות ישרות בלבד" },
+  { key: "outline", label: "אפקט קו מתאר (0 = כבוי)", min: 0, max: 60, step: 1 },
+  { key: "line_height", label: "רווח בין שורות", min: 1, max: 2, step: 0.01 },
+];
+const edit = { token: null, buf: null, url: null, summary: null, params: { ...EDIT_DEFAULTS }, faceNew: null, faceOrig: null, timer: null, ctrl: null };
+
+function editControls() {
+  const box = $("#edit-controls");
+  box.innerHTML = "";
+  const axes = (edit.summary.axes || []).find((a) => a.tag === "wght");
+  const defs = [...EDIT_CONTROLS];
+  if (axes) defs.unshift({ key: "base_wght", label: "משקל בסיס (פונט משתנה)", min: axes.min, max: axes.max, step: 1 });
+  for (const d of defs) {
+    const wrap = document.createElement("div");
+    if (d.type === "check") {
+      wrap.className = "check";
+      wrap.innerHTML = `<input type="checkbox" id="e-${d.key}"><label for="e-${d.key}"></label>`;
+      wrap.querySelector("label").textContent = d.label;
+      const cb = wrap.querySelector("input");
+      cb.checked = !!edit.params[d.key];
+      cb.addEventListener("change", () => { edit.params[d.key] = cb.checked; scheduleEdit(); });
+    } else {
+      wrap.className = "ctl";
+      wrap.innerHTML = `<label for="e-${d.key}"><span></span> <output></output></label>
+        <input id="e-${d.key}" type="range" min="${d.min}" max="${d.max}" step="${d.step}">${d.hint ? "<small></small>" : ""}`;
+      wrap.querySelector("label span").textContent = d.label;
+      if (d.hint) wrap.querySelector("small").textContent = d.hint;
+      const input = wrap.querySelector("input");
+      if (d.key === "base_wght" && !edit.params.base_wght) edit.params.base_wght = axes.default;
+      input.value = edit.params[d.key];
+      const out = wrap.querySelector("output");
+      out.textContent = fmt(input.value, d.step);
+      input.addEventListener("input", () => {
+        edit.params[d.key] = Number(input.value);
+        out.textContent = fmt(input.value, d.step);
+        scheduleEdit();
+      });
+    }
+    box.appendChild(wrap);
+  }
+  const reset = document.createElement("button");
+  reset.className = "ghost";
+  reset.textContent = "איפוס השינויים";
+  reset.addEventListener("click", () => { edit.params = { ...EDIT_DEFAULTS }; editControls(); scheduleEdit(); });
+  box.appendChild(reset);
+}
+
+function renderEditInfo() {
+  const s = edit.summary;
+  const box = $("#edit-info");
+  box.innerHTML = "";
+  const title = document.createElement("div");
+  const feats = [s.hebrew && "עברית", s.niqqud && "ניקוד", s.latin && "לטינית"].filter(Boolean).join(" · ");
+  title.textContent = `${s.family} ${s.style || ""} · ${s.glyphs} תווים · ${feats}${s.axes.length ? " · פונט משתנה" : ""}`;
+  box.appendChild(title);
+  const lic = document.createElement("div");
+  lic.style.marginTop = "8px";
+  const badge = document.createElement("span");
+  const L = s.license;
+  badge.className = `badge ${L.free ? "ok" : "warn"}`;
+  badge.textContent = L.free ? `רישיון חופשי: ${L.kind}` : "לא נמצא רישיון חופשי";
+  const txt = document.createElement("span");
+  txt.className = "hint";
+  txt.style.marginInlineStart = "8px";
+  txt.textContent = L.free
+    ? "מותר לשנות ולהשתמש, גם מסחרית. הפונט החדש יישאר תחת אותו רישיון, וחייב לקבל שם חדש."
+      + (L.reserved_names.length ? ` שמות שמורים שאסור להשתמש בהם: ${L.reserved_names.join(", ")}.` : "")
+    : "ייתכן שזה פונט בתשלום שאסור לשנות. אפשר לנסות ולראות תצוגה, אבל לפני ההורדה צריך לאשר שיש לכם זכות לשנות אותו.";
+  lic.append(badge, txt);
+  box.appendChild(lic);
+  if (!s.hebrew) {
+    const w = document.createElement("div"); w.className = "note"; w.textContent = "בפונט הזה אין אותיות עבריות.";
+    box.appendChild(w);
+  }
+  $("#edit-confirm-wrap").hidden = L.free;
+}
+
+async function editLoaded(data, buf, url) {
+  Object.assign(edit, { token: data.token, summary: data.summary, buf, url, params: { ...EDIT_DEFAULTS } });
+  renderEditInfo();
+  editControls();
+  $("#edit-main").hidden = false;
+  await Promise.all([loadEditFace("orig", EDIT_DEFAULTS), loadEditFace("new", edit.params)]);
+}
+
+async function editFetch(path, payload, asJson = false) {
+  let res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  if (res.status === 410) { // server forgot the font: upload it again
+    await reuploadEdit();
+    payload.token = edit.token;
+    res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  }
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { msg = (await res.json()).error || msg; } catch (_) { /* binary */ }
+    throw new Error(msg);
+  }
+  return asJson ? res.json() : res;
+}
+
+async function reuploadEdit() {
+  let data;
+  if (edit.buf) data = await postAnalyze("/api/edit/upload", edit.buf, { "Content-Type": "application/octet-stream" });
+  else data = await postAnalyze("/api/edit/upload-url", JSON.stringify({ url: edit.url }), { "Content-Type": "application/json" });
+  edit.token = data.token;
+}
+
+async function loadEditFace(which, p) {
+  const res = await editFetch("/api/edit/preview", { token: edit.token, params: p });
+  const buf = await res.arrayBuffer();
+  const fam = which === "orig" ? "EditOriginal" : "EditNew";
+  const face = new FontFace(fam, buf);
+  await face.load();
+  const key = which === "orig" ? "faceOrig" : "faceNew";
+  if (edit[key]) document.fonts.delete(edit[key]);
+  document.fonts.add(face);
+  edit[key] = face;
+}
+
+function scheduleEdit() {
+  clearTimeout(edit.timer);
+  edit.timer = setTimeout(async () => {
+    setStatus("מעדכן…");
+    const t0 = performance.now();
+    try {
+      await loadEditFace("new", edit.params);
+      setStatus(`מוכן · ${Math.round(performance.now() - t0)} ms`);
+    } catch (e) { setStatus(`שגיאה: ${e.message}`, true); }
+  }, 140);
+}
+
+function editing() {
+  $("#edit-file").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    await run(async () => {
+      const buf = await f.arrayBuffer();
+      const data = await postAnalyze("/api/edit/upload", buf, { "Content-Type": "application/octet-stream" });
+      await editLoaded(data, buf, null);
+      setStatus("מוכן");
+    });
+  });
+  const fromUrl = async () => {
+    const url = $("#edit-url").value.trim();
+    if (!url) return;
+    await run(async () => {
+      setStatus("מוריד את הפונט…");
+      const data = await postAnalyze("/api/edit/upload-url", JSON.stringify({ url }), { "Content-Type": "application/json" });
+      await editLoaded(data, null, url);
+      setStatus("מוכן");
+    });
+  };
+  $("#edit-url-go").addEventListener("click", fromUrl);
+  $("#edit-url").addEventListener("keydown", (e) => { if (e.key === "Enter") fromUrl(); });
+  $("#edit-export").addEventListener("click", async () => {
+    const btn = $("#edit-export");
+    btn.disabled = true;
+    try {
+      const res = await editFetch("/api/edit/export", {
+        token: edit.token, confirm_rights: $("#edit-confirm").checked,
+        params: { ...edit.params, family: $("#edit-family").value },
+      });
+      const cd = res.headers.get("Content-Disposition") || "";
+      const m = cd.match(/filename="([^"]+)"/);
+      download(await res.blob(), m ? m[1] : "font.zip");
+      setStatus("הפונט הורד");
+    } catch (e) {
+      setStatus(`ההורדה נכשלה: ${e.message}`, true);
+    } finally { btn.disabled = false; }
+  });
+}
+
 function init() {
   inspiration();
+  editing();
   buildControls($("#controls-shape"), SHAPE);
   buildControls($("#controls-detail"), DETAIL);
   buildPresets();

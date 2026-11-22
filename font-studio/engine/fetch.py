@@ -60,9 +60,9 @@ class _SafeRedirect(urllib.request.HTTPRedirectHandler):
 _opener = urllib.request.build_opener(_SafeRedirect)
 
 
-def download(url: str, limit: int):
+def download(url: str, limit: int, ua: str = UA):
     url = _check_url(url)
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
+    req = urllib.request.Request(url, headers={"User-Agent": ua, "Accept": "*/*"})
     try:
         with _opener.open(req, timeout=TIMEOUT) as r:
             ctype = (r.headers.get("Content-Type") or "").lower()
@@ -234,3 +234,46 @@ def analyze_url(url: str, text: str = "") -> dict:
     note = ("בעמוד נמצאו כמה פונטים: " + ", ".join(families[:6]) + ". נותח הראשון שתומך בעברית."
             if len(families) > 1 else "")
     return _try_faces(faces, note)
+
+
+def fetch_font(url: str):
+    """Download a whole font file from a link, for editing. Returns (bytes, url)."""
+    from fontTools.ttLib import TTFont
+    import io as _io
+
+    url = (url or "").strip()
+    if not url:
+        raise AnalyzeError("לא הוזן קישור")
+    if "://" not in url:
+        url = "https://" + url
+    google = _google_css_url(url)
+    if google or "fonts.googleapis.com" in url:
+        # a plain client gets one complete TTF instead of per-script woff2 slices
+        ctype, data, final = download(google or url, MAX_PAGE_BYTES, ua="FontStudio/1.0")
+    else:
+        ctype, data, final = download(url, max(MAX_FONT_BYTES, MAX_PAGE_BYTES))
+    if _is_font(data, ctype):
+        return data, final
+    if _is_image(data, ctype):
+        raise AnalyzeError("הקישור מוביל לתמונה. כדי לערוך צריך קובץ פונט; תמונה אפשר להעלות בלשונית השראה")
+    body = data[:MAX_PAGE_BYTES].decode("utf-8", "replace")
+    if "text/css" in ctype or "@font-face" in body[:20000]:
+        faces = font_faces(body, final)
+    else:
+        links, inline = _stylesheets(body, final)
+        faces = font_faces(inline, final)
+        for css_url in links:
+            try:
+                _c, css, css_final = download(css_url, MAX_PAGE_BYTES)
+                faces.extend(font_faces(css.decode("utf-8", "replace"), css_final))
+            except AnalyzeError:
+                continue
+    for f in faces[:6]:
+        try:
+            _c, fdata, furl = download(f["url"], MAX_FONT_BYTES)
+            cmap = TTFont(_io.BytesIO(fdata), lazy=True).getBestCmap() or {}
+            if any(0x05D0 <= cp <= 0x05EA for cp in cmap):
+                return fdata, furl
+        except Exception:
+            continue
+    raise AnalyzeError("לא מצאתי בקישור קובץ פונט עם אותיות עבריות")
