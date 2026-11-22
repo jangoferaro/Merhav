@@ -28,6 +28,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   margin: 0;
   background: var(--bg);
@@ -121,6 +122,22 @@ select { font: inherit; padding: 6px; border-radius: 6px; border: 1px solid var(
 .ref-stage.side .ref-text { position: static; color: var(--ink); border-inline-start: 1px solid var(--line); }
 
 .inspire-head { display: grid; gap: 10px; padding: 20px 0 8px; max-width: 70ch; justify-items: start; }
+.lead { margin: 0; font-weight: 600; font-size: 16px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { border: none; border-radius: 0; padding: 9px 18px; background: var(--surface); }
+.seg button + button { border-inline-start: 1px solid var(--line); }
+.seg button[aria-pressed=true] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.mode { display: grid; gap: 10px; justify-items: start; width: 100%; }
+.field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); width: 100%; }
+.field input, .url-row input { font: inherit; font-size: 16px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; }
+.url-row { display: flex; gap: 8px; width: 100%; }
+.legal { border-top: 1px solid var(--line); padding-top: 10px; }
+.cmp-image { position: relative; display: inline-block; max-width: 100%; background: #fff; border-radius: 8px; border: 1px solid var(--line); }
+.cmp-image img { display: block; max-width: 100%; max-height: 360px; }
+.cmp-image .box { position: absolute; border: 1.5px solid rgba(47, 93, 80, .9); border-radius: 2px; }
+.cmp-image .box span { position: absolute; top: -18px; inset-inline-start: 0; font-size: 12px; background: rgba(47, 93, 80, .9); color: #fff; padding: 0 3px; border-radius: 3px; }
+.cmp-image .box.unmatched { border-color: rgba(192, 57, 43, .85); }
+.insp-summary .note { margin-top: 8px; color: #b9770e; font-size: 13px; }
 .insp-summary { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 8px 0 18px; font-size: 14px; }
 .insp-summary dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 16px; margin: 8px 0 0; }
 .insp-summary dt { color: var(--muted); font-size: 12px; }

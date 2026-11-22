@@ -1,2 +1,4 @@
 fonttools[woff]>=4.50
 skia-pathops>=0.8
+pillow>=10
+numpy>=1.24

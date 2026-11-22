@@ -17,14 +17,10 @@ from fontTools.pens.boundsPen import BoundsPen
 from fontTools.ttLib import TTFont
 
 from .build import MASTERS, Params
-from .glyphs import WIDTH
+from .glyphs import LETTERS, WIDTH
 
 MAX_FONT_BYTES = 15 * 1024 * 1024
-HEB = {name: cp for name, cp in [
-    ("alef", 0x05D0), ("bet", 0x05D1), ("dalet", 0x05D3), ("he", 0x05D4), ("vav", 0x05D5),
-    ("het", 0x05D7), ("kaf", 0x05DB), ("lamed", 0x05DC), ("finalnun", 0x05DF),
-    ("resh", 0x05E8), ("tav", 0x05EA), ("finalkaf", 0x05DA), ("qof", 0x05E7),
-]}
+HEB = {name: cp for name, cp, _fn in LETTERS}
 
 
 class AnalyzeError(ValueError):
@@ -157,6 +153,7 @@ def _name(font: TTFont) -> str:
 
 
 def analyze(data: bytes) -> dict:
+    """Analyse a font file (TTF / OTF / WOFF / WOFF2)."""
     font = _load(data)
     cmap = font.getBestCmap() or {}
     missing = [n for n, cp in HEB.items() if cp not in cmap]
@@ -183,7 +180,26 @@ def analyze(data: bytes) -> dict:
 
     g = {n: get(n) for n in HEB}
     g = {k: v for k, v in g.items() if v is not None}
+    weight = _weight_of(font)
+    italic_angle = float(getattr(font.get("post"), "italicAngle", 0) or 0)
+    params, measured = measure(g, weight=weight, italic_angle=italic_angle)
+    return {
+        "params": params,
+        "source": {"kind": "font", "family": _name(font), "weight": weight,
+                   "variable": "fvar" in font},
+        "measured": measured,
+        "missing_letters": missing,
+    }
 
+
+def measure(g: dict, *, weight: int = 400, italic_angle: float = 0.0,
+            sb_override: float | None = None, with_height: bool = True):
+    """Measure style from glyph-like objects keyed by letter name.
+
+    A glyph-like object offers xmin/xmax/ymin/ymax/width/advance, runs() and
+    inside() (see Glyph). Works for font outlines and for scanned images.
+    Returns (params dict, measured dict).
+    """
     # --- letter height --------------------------------------------------
     H = _med([g[n].ymax for n in ("he", "het", "dalet", "resh", "tav", "kaf") if n in g])
     if not H or H < 150:
@@ -191,7 +207,6 @@ def analyze(data: bytes) -> dict:
 
     # --- slant (vav stem centre at two heights) -------------------------
     slant = 0.0
-    italic_angle = float(getattr(font.get("post"), "italicAngle", 0) or 0)
     if abs(italic_angle) >= 1:
         slant = -italic_angle
     else:
@@ -239,7 +254,6 @@ def analyze(data: bytes) -> dict:
     if not stem or not bar:
         raise AnalyzeError("לא הצלחתי למדוד את עובי הקווים")
 
-    weight = _weight_of(font)
     weight_scale = stem / (H * _stem_frac(weight))
     reg_stem = H * MASTERS[400] * weight_scale
 
@@ -276,14 +290,21 @@ def analyze(data: bytes) -> dict:
     desc = _med([-g[n].ymin / H for n in ("finalnun", "finalkaf", "qof") if n in g and g[n].ymin < 0])
 
     # --- spacing ----------------------------------------------------------
-    sbs = [(g[n].advance - g[n].width) / 2 for n in ("he", "resh", "het", "dalet") if n in g]
-    sb = _med(sbs)
-    spacing = (sb - stem * 0.20) / (0.085 * H) if sb is not None else 1.0
+    if sb_override is not None:
+        sb = sb_override
+    else:
+        sb = _med([(g[n].advance - g[n].width) / 2 for n in ("he", "resh", "het", "dalet")
+                   if n in g and g[n].advance is not None])
+    spacing = (sb - stem * 0.20) / (0.085 * H) if sb is not None else None
 
     raw = {
-        "height": H, "width": width, "contrast": bar / stem, "roundness": roundness,
-        "slant": slant, "spacing": spacing, "weight_scale": weight_scale,
+        "width": width, "contrast": bar / stem, "roundness": roundness,
+        "slant": slant, "weight_scale": weight_scale,
     }
+    if with_height:
+        raw["height"] = H
+    if spacing is not None:
+        raw["spacing"] = spacing
     if head is not None:
         raw["head"] = head
     if asc is not None:
@@ -293,16 +314,8 @@ def analyze(data: bytes) -> dict:
     p = Params.from_dict(raw)
     params = {k: round(getattr(p, k), 3) for k in raw}
 
-    return {
-        "params": params,
-        "source": {
-            "family": _name(font),
-            "weight": weight,
-            "variable": "fvar" in font,
-        },
-        "measured": {
-            "letter_height": round(H), "stem": round(stem), "bar": round(bar),
-            "corner_radius": round(r_soft), "slant_degrees": round(slant, 1),
-        },
-        "missing_letters": missing,
+    measured = {
+        "letter_height": round(H), "stem": round(stem), "bar": round(bar),
+        "corner_radius": round(r_soft), "slant_degrees": round(slant, 1),
     }
+    return params, measured

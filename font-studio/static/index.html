@@ -59,32 +59,63 @@
 
     <section class="stage">
       <nav class="tabs" role="tablist">
-        <button role="tab" data-tab="inspire" aria-selected="false">השראה מפונט</button>
-        <button role="tab" data-tab="text" aria-selected="true">טקסט</button>
+        <button role="tab" data-tab="inspire" aria-selected="true">השראה</button>
+        <button role="tab" data-tab="text" aria-selected="false">טקסט</button>
         <button role="tab" data-tab="alphabet" aria-selected="false">אלפבית</button>
         <button role="tab" data-tab="reference" aria-selected="false">השוואה לרפרנס</button>
         <span id="status" class="status" aria-live="polite"></span>
       </nav>
 
-      <div class="tab" id="tab-inspire" hidden>
+      <div class="tab" id="tab-inspire">
         <div class="inspire-head">
-          <label class="primary file-btn">העלאת פונט שאהבתם<input id="insp-file" type="file" accept=".ttf,.otf,.woff,.woff2,font/*" hidden></label>
-          <p class="hint">הכלי <strong>מודד</strong> את הסגנון של הפונט: גובה, עובי, ניגודיות, רוחב, עיגול פינות, נטייה וריווח. אחר כך הוא בונה אותיות <strong>חדשות לגמרי</strong> לפי המדידות. קווי המתאר של הפונט המקורי לא מועתקים, כך שהתוצאה מקורית ושלכם. הקובץ לא נשמר בשרת. כדאי לתת לפונט שם משלכם, לא את השם של המקור.</p>
+          <p class="lead">מאיפה ההשראה?</p>
+          <div class="seg" role="radiogroup" aria-label="סוג ההשראה">
+            <button type="button" data-mode="image" aria-pressed="true">תמונה</button>
+            <button type="button" data-mode="link" aria-pressed="false">קישור</button>
+            <button type="button" data-mode="file" aria-pressed="false">קובץ פונט</button>
+          </div>
+
+          <div class="mode" id="mode-image">
+            <label class="primary file-btn">העלאת תמונה של אותיות<input id="insp-image" type="file" accept="image/*" hidden></label>
+            <label class="field">
+              <span>מה כתוב בתמונה? (בדיוק לפי הסדר, אפשר כמה שורות)</span>
+              <input id="insp-text" type="text" dir="rtl" value="אבגדהוזחטיכךלמםנןסעפףצץקרשת" spellcheck="false">
+            </label>
+            <button type="button" id="insp-reimage" class="ghost" hidden>לנתח שוב עם הטקסט המתוקן</button>
+            <p class="hint">לתוצאה הכי מדויקת: צילום מסך של כל האלפבית, אות אחרי אות, באותיות כהות על רקע בהיר. אפשר גם מילים או משפט, ובלבד שתכתבו כאן בדיוק מה מופיע בתמונה.</p>
+          </div>
+
+          <div class="mode" id="mode-link" hidden>
+            <div class="url-row">
+              <input id="insp-url" type="url" dir="ltr" placeholder="https://fonts.google.com/specimen/Heebo" spellcheck="false">
+              <button type="button" id="insp-go" class="primary">ניתוח</button>
+            </div>
+            <p class="hint">אפשר להדביק: עמוד של פונט ב-Google Fonts, קישור ישיר לקובץ פונט, אתר שמשתמש בפונט שאהבתם, או קישור לתמונה של אותיות. בקישור לתמונה, השתמשו בשדה "מה כתוב בתמונה" שבלשונית "תמונה".</p>
+          </div>
+
+          <div class="mode" id="mode-file" hidden>
+            <label class="primary file-btn">העלאת קובץ פונט<input id="insp-file" type="file" accept=".ttf,.otf,.woff,.woff2,font/*" hidden></label>
+            <p class="hint">TTF, OTF, WOFF או WOFF2.</p>
+          </div>
+
+          <p class="hint legal">הכלי <strong>מודד</strong> את הסגנון: גובה, עובי, ניגודיות, רוחב, עיגול פינות, נטייה וריווח. אחר כך הוא בונה אותיות <strong>חדשות לגמרי</strong> לפי המדידות. קווי המתאר של המקור לא מועתקים, כך שהתוצאה מקורית ושלכם. שום דבר לא נשמר בשרת. כדאי לתת לפונט שם משלכם, לא את השם של המקור.</p>
         </div>
         <div id="insp-result" hidden>
           <div id="insp-summary" class="insp-summary"></div>
           <h3>כמה רחוק מהמקור? בחרו כיוון, והמשיכו לכוונן בסליידרים</h3>
           <div id="insp-variations" class="variations"></div>
           <div class="compare">
-            <div class="cmp-row"><span class="cmp-lbl">ההשראה</span><div class="cmp-txt src" contenteditable="true" spellcheck="false">אבגדהוזחטיכלמנסעפצקרשת</div></div>
-            <div class="cmp-row"><span class="cmp-lbl">הפונט שלכם</span><div class="cmp-txt mine preview" contenteditable="true" spellcheck="false">אבגדהוזחטיכלמנסעפצקרשת</div></div>
-            <div class="cmp-row"><span class="cmp-lbl">ההשראה</span><div class="cmp-txt src small" contenteditable="true" spellcheck="false">שלום, זהו משפט לדוגמה כדי להשוות קריאות.</div></div>
-            <div class="cmp-row"><span class="cmp-lbl">הפונט שלכם</span><div class="cmp-txt mine small preview" contenteditable="true" spellcheck="false">שלום, זהו משפט לדוגמה כדי להשוות קריאות.</div></div>
+            <div id="cmp-image" class="cmp-image" hidden><img id="cmp-img" alt="תמונת ההשראה"><div id="cmp-boxes"></div></div>
+            <div class="cmp-row" id="cmp-mine-from-image" hidden><span class="cmp-lbl">הפונט שלכם</span><div class="cmp-txt mine preview" id="cmp-image-text" contenteditable="true" spellcheck="false"></div></div>
+            <div class="cmp-row src-row"><span class="cmp-lbl">ההשראה</span><div class="cmp-txt src" contenteditable="true" spellcheck="false">אבגדהוזחטיכלמנסעפצקרשת</div></div>
+            <div class="cmp-row mine-row"><span class="cmp-lbl">הפונט שלכם</span><div class="cmp-txt mine preview" contenteditable="true" spellcheck="false">אבגדהוזחטיכלמנסעפצקרשת</div></div>
+            <div class="cmp-row src-row"><span class="cmp-lbl">ההשראה</span><div class="cmp-txt src small" contenteditable="true" spellcheck="false">שלום, זהו משפט לדוגמה כדי להשוות קריאות.</div></div>
+            <div class="cmp-row mine-row"><span class="cmp-lbl">הפונט שלכם</span><div class="cmp-txt mine small preview" contenteditable="true" spellcheck="false">שלום, זהו משפט לדוגמה כדי להשוות קריאות.</div></div>
           </div>
         </div>
       </div>
 
-      <div class="tab" id="tab-text">
+      <div class="tab" id="tab-text" hidden>
         <div class="preview display" contenteditable="true" spellcheck="false">מרחב — מקום לנשום בו</div>
         <div class="preview paragraph" contenteditable="true" spellcheck="false">כל מילה שכתובה כאן אפשר לערוך: פשוט לחצו ותקלידו. פונט טוב לטקסט רץ צריך להיות נוח לעין גם בפסקאות ארוכות, עם ריווח אחיד, אותיות ברורות ושוני מספיק בין צורות דומות כמו ב׳ ו־כ׳, ד׳ ו־ר׳, ה׳ ו־ח׳, ו׳ ו־ז׳, ם ו־ס. איך זה נראה? אפשר לשנות כל פרמטר ולראות מיד.</div>
         <div id="waterfall" class="waterfall"></div>

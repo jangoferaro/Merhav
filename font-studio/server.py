@@ -17,6 +17,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from engine.analyze import MAX_FONT_BYTES, AnalyzeError, analyze  # noqa: E402
+from engine.fetch import analyze_url  # noqa: E402
+from engine.image_analyze import MAX_IMAGE_BYTES, analyze_image  # noqa: E402
+from urllib.parse import parse_qs, urlsplit  # noqa: E402
 from engine.build import Params, build_variable, export_zip, to_bytes, _ps_name  # noqa: E402
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -86,24 +89,34 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(n) if n else b"{}"
         return Params.from_dict(json.loads(raw or b"{}"))
 
-    def _analyze(self):
+    def _read_upload(self, limit):
         n = int(self.headers.get("Content-Length") or 0)
         if n <= 0:
-            return self._error(400, "לא התקבל קובץ")
-        if n > MAX_FONT_BYTES:
-            return self._error(413, "הקובץ גדול מדי (מעל 15MB)")
-        data = self.rfile.read(n)
+            raise AnalyzeError("לא התקבל קובץ")
+        if n > limit:
+            raise AnalyzeError("הקובץ גדול מדי (מעל 15MB)")
+        return self.rfile.read(n)
+
+    def _analyze(self, path, query):
         try:
-            result = analyze(data)
+            if path == "/api/analyze":
+                result = analyze(self._read_upload(MAX_FONT_BYTES))
+            elif path == "/api/analyze-image":
+                text = (query.get("text") or [""])[0][:400]
+                result = analyze_image(self._read_upload(MAX_IMAGE_BYTES), text)
+            else:  # /api/analyze-url
+                body = json.loads(self._read_upload(MAX_BODY) or b"{}")
+                result = analyze_url(str(body.get("url", ""))[:2000], str(body.get("text", ""))[:400])
         except AnalyzeError as e:
             return self._error(422, str(e))
         except Exception:
-            return self._error(422, "לא הצלחתי לנתח את הפונט הזה")
+            return self._error(422, "לא הצלחתי לנתח את ההשראה הזו")
         self._send(200, json.dumps(result, ensure_ascii=False).encode(), "application/json; charset=utf-8")
 
     def do_POST(self):
-        if self.path == "/api/analyze":
-            return self._analyze()
+        u = urlsplit(self.path)
+        if u.path in ("/api/analyze", "/api/analyze-image", "/api/analyze-url"):
+            return self._analyze(u.path, parse_qs(u.query))
         try:
             p = self._params()
         except (ValueError, TypeError) as e:

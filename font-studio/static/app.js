@@ -245,33 +245,119 @@ function clampParams(p) {
   return p;
 }
 
+function setMode(mode) {
+  document.querySelectorAll(".seg [data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));
+  ["image", "link", "file"].forEach((m) => { $(`#mode-${m}`).hidden = m !== mode; });
+}
+
+async function postAnalyze(url, body, headers) {
+  const res = await fetch(url, { method: "POST", headers, body });
+  let data;
+  try { data = await res.json(); } catch (_) { throw new Error(res.statusText); }
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+async function loadInspirationFont(src) {
+  try {
+    const face = new FontFace("InspirationFont", src);
+    await face.load();
+    if (inspireFace) document.fonts.delete(inspireFace);
+    document.fonts.add(face);
+    inspireFace = face;
+    return true;
+  } catch (_) { return false; } // e.g. the site does not allow it; comparison falls back
+}
+
+let lastImage = null;
+
 function inspiration() {
+  document.querySelectorAll(".seg [data-mode]").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+  // --- font file
   $("#insp-file").addEventListener("change", async (e) => {
     const f = e.target.files[0];
     if (!f) return;
-    setStatus("מנתח את הפונט…");
-    try {
+    await run(async () => {
       const buf = await f.arrayBuffer();
-      const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: buf });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || res.statusText);
-      // show the inspiration font locally, for comparison only (never stored)
-      try {
-        const face = new FontFace("InspirationFont", buf);
-        await face.load();
-        if (inspireFace) document.fonts.delete(inspireFace);
-        document.fonts.add(face);
-        inspireFace = face;
-      } catch (_) { /* browser could not display it; comparison shows fallback */ }
-      inspireBase = { ...DEFAULTS, family: params.family, ...data.params };
-      renderSummary(data, f.name);
-      renderVariations();
-      applyVariation(0);
-      $("#insp-result").hidden = false;
-    } catch (err) {
-      setStatus(`הניתוח נכשל: ${err.message}`, true);
-    }
+      const data = await postAnalyze("/api/analyze", buf, { "Content-Type": "application/octet-stream" });
+      await loadInspirationFont(buf);
+      showResult(data, { label: f.name });
+    });
   });
+
+  // --- image
+  const analyzeImage = async () => {
+    if (!lastImage) return;
+    await run(async () => {
+      const text = $("#insp-text").value;
+      const data = await postAnalyze(`/api/analyze-image?text=${encodeURIComponent(text)}`, lastImage.buf,
+        { "Content-Type": "application/octet-stream" });
+      showResult(data, { label: lastImage.name, imageUrl: lastImage.url, text });
+    });
+  };
+  $("#insp-image").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    if (lastImage) URL.revokeObjectURL(lastImage.url);
+    lastImage = { buf: await f.arrayBuffer(), url: URL.createObjectURL(f), name: f.name };
+    $("#insp-reimage").hidden = false;
+    analyzeImage();
+  });
+  $("#insp-reimage").addEventListener("click", analyzeImage);
+
+  // --- link
+  const analyzeLink = async () => {
+    const url = $("#insp-url").value.trim();
+    if (!url) return;
+    await run(async () => {
+      const text = $("#insp-text").value;
+      const data = await postAnalyze("/api/analyze-url", JSON.stringify({ url, text }), { "Content-Type": "application/json" });
+      if (data.source.kind === "image") {
+        showResult(data, { label: url, imageUrl: data.source.url, text });
+      } else {
+        const ok = data.source.url ? await loadInspirationFont(`url(${JSON.stringify(data.source.url)})`) : false;
+        showResult(data, { label: url, fontShown: ok });
+      }
+    });
+  };
+  $("#insp-go").addEventListener("click", analyzeLink);
+  $("#insp-url").addEventListener("keydown", (e) => { if (e.key === "Enter") analyzeLink(); });
+}
+
+async function run(fn) {
+  setStatus("מנתח את ההשראה…");
+  try {
+    await fn();
+  } catch (err) {
+    setStatus(`הניתוח נכשל: ${err.message}`, true);
+  }
+}
+
+function showResult(data, opts) {
+  inspireBase = { ...DEFAULTS, family: params.family, ...params, ...data.params };
+  renderSummary(data, opts.label);
+  const isImage = data.source.kind === "image";
+  $("#cmp-image").hidden = !isImage;
+  $("#cmp-mine-from-image").hidden = !isImage;
+  document.querySelectorAll(".src-row").forEach((r) => { r.hidden = isImage || opts.fontShown === false; });
+  document.querySelectorAll(".mine-row").forEach((r) => { r.hidden = isImage; });
+  if (isImage) {
+    $("#cmp-img").src = opts.imageUrl;
+    $("#cmp-image-text").textContent = opts.text || "אבגדהוזחטיכלמנסעפצקרשת";
+    const boxes = $("#cmp-boxes");
+    boxes.innerHTML = "";
+    for (const b of data.boxes || []) {
+      const d = document.createElement("div");
+      d.className = `box${b.label ? "" : " unmatched"}`;
+      Object.assign(d.style, { left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` });
+      if (b.label) { const sp = document.createElement("span"); sp.textContent = b.label; d.appendChild(sp); }
+      boxes.appendChild(d);
+    }
+  }
+  renderVariations();
+  applyVariation(0);
+  $("#insp-result").hidden = false;
 }
 
 function renderSummary(data, fileName) {
@@ -279,20 +365,30 @@ function renderSummary(data, fileName) {
   const box = $("#insp-summary");
   box.innerHTML = "";
   const title = document.createElement("div");
-  title.textContent = `נותח: ${data.source.family || fileName} · משקל ${data.source.weight}${data.source.variable ? " · פונט משתנה" : ""}`;
+  title.textContent = data.source.kind === "image"
+    ? `נותחה תמונה: ${fileName} · ${data.found_letters} אותיות זוהו${data.matched ? " והותאמו לטקסט" : ""}`
+    : `נותח: ${data.source.family || fileName} · משקל ${data.source.weight}${data.source.variable ? " · פונט משתנה" : ""}`;
   box.appendChild(title);
   const dl = document.createElement("dl");
   const items = [
     ["גובה אותיות", m.letter_height], ["עובי קו אנכי", m.stem], ["עובי קו אופקי", m.bar],
     ["רדיוס פינה", m.corner_radius], ["נטייה", `${m.slant_degrees}°`],
   ];
+  if (data.source.kind === "image") items.shift(); // height in a picture has no absolute scale
   for (const [k, v] of items) {
+    if (v === null || v === undefined || v === "null°") continue;
     const dt = document.createElement("dt"); dt.textContent = k;
     const dd = document.createElement("dd"); dd.textContent = v;
     const wrap = document.createElement("div"); wrap.append(dt, dd); dl.appendChild(wrap);
   }
   box.appendChild(dl);
-  if (data.missing_letters.length) {
+  if (data.note) {
+    const n = document.createElement("div");
+    n.className = "note";
+    n.textContent = data.note;
+    box.appendChild(n);
+  }
+  if (data.source.kind !== "image" && data.missing_letters.length) {
     const w = document.createElement("div");
     w.className = "hint";
     w.textContent = "חלק מהאותיות חסרות בפונט המקורי, אז חלק מהמדידות הן הערכה.";
