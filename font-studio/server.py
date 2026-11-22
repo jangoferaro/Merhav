@@ -5,6 +5,8 @@ Run:  python server.py        then open http://localhost:8000
 
 from __future__ import annotations
 
+import base64
+import hmac
 import json
 import os
 import re
@@ -31,6 +33,7 @@ STATIC = Path(__file__).resolve().parent / "static"
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
          ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml"}
 MAX_BODY = 16 * 1024
+PASSWORD = os.environ.get("FONT_STUDIO_PASSWORD", "")
 
 
 class LRU:
@@ -113,12 +116,32 @@ class Handler(BaseHTTPRequestHandler):
     def _error(self, code, msg):
         self._send(code, json.dumps({"error": msg}, ensure_ascii=False).encode(), "application/json; charset=utf-8")
 
+    def _authorized(self) -> bool:
+        """Optional password (FONT_STUDIO_PASSWORD) via HTTP Basic auth."""
+        if not PASSWORD:
+            return True
+        header = self.headers.get("Authorization") or ""
+        if header.startswith("Basic "):
+            try:
+                _user, _, pw = base64.b64decode(header[6:]).decode("utf-8", "replace").partition(":")
+                if hmac.compare_digest(pw.encode(), PASSWORD.encode()):
+                    return True
+            except Exception:
+                pass
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="Font Studio", charset="UTF-8"')
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return False
+
     def do_GET(self):
         path = self.path.split("?", 1)[0]
-        if path == "/":
-            path = "/index.html"
         if path == "/healthz":
             return self._send(200, b"ok", "text/plain")
+        if not self._authorized():
+            return
+        if path == "/":
+            path = "/index.html"
         name = path.lstrip("/")
         if not re.fullmatch(r"[\w\-]+\.(html|js|css|svg)", name):
             return self._error(404, "not found")
@@ -240,6 +263,8 @@ Original copyright: {lic['copyright']}
         self._send(200, json.dumps(obj, ensure_ascii=False).encode(), "application/json; charset=utf-8")
 
     def do_POST(self):
+        if not self._authorized():
+            return
         u = urlsplit(self.path)
         if u.path.startswith("/api/edit/"):
             return self._edit(u.path)
