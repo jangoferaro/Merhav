@@ -31,7 +31,7 @@ export function designPage(ctx, opts) {
   <h2>עקרונות</h2>
   <ol class="principles">
     <li><div><b>הדף לבן, הצבע בפוסטר</b><span>הממשק עצמו שחור-לבן. צבע מופיע רק בפוסטרים, בחותמות ובבלוקים גדולים, ותמיד שטוח, בלי גרדיאנטים.</span></div></li>
-    <li><div><b>שני גופנים, שני תפקידים</b><span>Heebo לכותרות (900, צפוף וענק) ולמספרים גדולים (300). IBM Plex Sans Hebrew פשוט וגנרי לכל טקסט התוכן.</span></div></li>
+    <li><div><b>שני גופנים, שני תפקידים</b><span>Heebo לכותרות (900, צפוף וענק) ולמספרים גדולים (300). Assistant פשוט וגנרי לכל טקסט התוכן.</span></div></li>
     <li><div><b>פינות ישרות, עיגול אחד</b><span>כל קופסה, כפתור, שדה ותמונה בפינות של 0. העיגול שמור למה שהכי חשוב: הסכום שמרוויחים, נקודת סטטוס, אווטאר.</span></div></li>
     <li><div><b>קווי שיער במקום קופסאות</b><span>היררכיה בעזרת קו מבני שחור וקו שיער אפור, לא צללים ולא רקעים. רשימות הן שורות על קווים.</span></div></li>
     <li><div><b>הגרפיקה מגיעה מעולם הפוסטר</b><span>אות ענקית מוטה, אלפבית צבעוני על שחור, קרני שמש, קשת, פיקסל-ארט, פסים עם מדבקת כוכב, שחמט, ומילה ענקית עם קווי בנייה. בהשראת העבודות של Under ושל הדר לוזון.</span></div></li>
@@ -48,14 +48,14 @@ export function designPage(ctx, opts) {
 </section>
 
 <section class="ds-section">
-  <h2>טיפוגרפיה <span>Heebo לכותרות ומספרים · IBM Plex Sans Hebrew לטקסט</span></h2>
+  <h2>טיפוגרפיה <span>Heebo לכותרות ומספרים · Assistant לטקסט</span></h2>
   <div class="typescale">
     <p class="display"><small>display · 900 · ‎-0.045em</small>הופעה הלילה</p>
     <h1><small>h1 · 800</small>שיתוף והרווחה</h1>
     <h2><small>h2 · 700</small>הזמנות פתוחות</h2>
-    <p class="lead"><small>lead · IBM Plex Sans Hebrew 400</small>בוחרים הופעה, משתפים, ומקבלים על כל כרטיס.</p>
-    <p><small>body · IBM Plex Sans Hebrew 400</small>הכסף ממתין לאישור עד שלושה ימים אחרי ההופעה, ואז עובר לזמין.</p>
-    <p class="meta"><small>meta · IBM Plex Sans Hebrew 400</small>יום ה׳, 3 בדצמבר · הבארבי, תל אביב</p>
+    <p class="lead"><small>lead · Assistant 400</small>בוחרים הופעה, משתפים, ומקבלים על כל כרטיס.</p>
+    <p><small>body · Assistant 400</small>הכסף ממתין לאישור עד שלושה ימים אחרי ההופעה, ואז עובר לזמין.</p>
+    <p class="meta"><small>meta · Assistant 400</small>יום ה׳, 3 בדצמבר · הבארבי, תל אביב</p>
   </div>
 </section>
 

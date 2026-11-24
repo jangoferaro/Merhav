@@ -99,7 +99,7 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
 <meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;700;800;900&family=IBM+Plex+Sans+Hebrew:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;700;800;900&family=Assistant:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/app.js" defer></script>
 </head>
