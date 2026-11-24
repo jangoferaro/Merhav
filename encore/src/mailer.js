@@ -1,0 +1,23 @@
+// שליחת קוד כניסה. בפיתוח: מודפס ליומן ומוצג על המסך.
+// בייצור: דרך Resend (או כל ספק אחר — מחליפים רק את הפונקציה הזו).
+import { config } from "./util.js";
+
+export async function sendLoginCode(email, code) {
+  if (process.env.RESEND_API_KEY) {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        from: process.env.MAIL_FROM || "ENCORE <login@encore.example>",
+        to: email,
+        subject: `הקוד שלך ל-ENCORE: ${code}`,
+        text: `הקוד שלך: ${code}\nהוא בתוקף ל-10 דקות. אם לא ביקשת אותו, אפשר להתעלם מההודעה.`,
+      }),
+    });
+    if (!res.ok) throw new Error(`mail send failed: ${res.status}`);
+    return { sent: true };
+  }
+  if (config.isProd) throw new Error("RESEND_API_KEY חסר — אי אפשר לשלוח קודי כניסה");
+  console.log(`[dev] login code for ${email}: ${code}`);
+  return { sent: false, devCode: code };
+}

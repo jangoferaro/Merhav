@@ -1,0 +1,246 @@
+// אזור האמן: מסך בית ממוקד תוצאות, פתיחת קמפיין בשלושה צעדים, וניהול קמפיין.
+import { config, isoToIsraelLocal } from "../util.js";
+import { split, STATUS_LABEL, TRANSITIONS } from "../domain/campaigns.js";
+import { csrfField, empty, html, layout, money, postButton, poster, showDate, stat, statusBadge } from "./kit.js";
+
+export function artistHome(ctx, { list, totals }, opts) {
+  return layout(
+    ctx,
+    "ההופעות שלי",
+    html`
+<div class="row-head"><h1>ההופעות שלי</h1><a class="btn" href="/artist/new">+ הופעה חדשה</a></div>
+${list.length
+  ? html`
+<div class="stats">
+  ${stat(totals.tickets, "כרטיסים דרך מקדמים")}
+  ${stat(totals.promoters, "אנשים מקדמים אותך")}
+  ${stat(money(totals.revenue), "הכנסות שנוצרו")}
+  ${stat(totals.first_time, "קנו ממך לראשונה דרכנו", "", )}
+</div>
+<p class="note">"קנו לראשונה" = רוכשים שזו הרכישה הראשונה שלהם ממך דרך ENCORE. ייתכן שהם כבר הכירו אותך מקודם.</p>
+<ul class="list cards">
+  ${list.map(
+    (c) => html`<li>
+      <a href="/artist/c/${c.id}" class="row-link">
+        ${poster(c, "thumb")}
+        <div class="grow"><b>${c.title}</b> ${statusBadge(c.status)}
+          <div class="meta">${showDate(c.starts_at)} · ${c.venue}</div>
+          <div class="meta">${c.results.tickets} כרטיסים · ${c.results.promoters} מקדמים · ${money(c.reward_agorot)} לכרטיס</div>
+        </div>
+        <span class="chev" aria-hidden="true">‹</span>
+      </a>
+    </li>`
+  )}
+</ul>`
+  : empty("עוד אין הופעות", "מפרסמים הופעה אחת ורואים איך הקהל מתחיל להפיץ אותה.", html`<a class="btn big" href="/artist/new">פרסום הופעה ראשונה</a>`)}`,
+    opts
+  );
+}
+
+// ---------- פתיחת קמפיין ----------
+
+const steps = (n) => html`<ol class="steps-bar" aria-label="שלב ${n} מתוך 3">${["לינק", "פרטים ותגמול", "אישור"].map(
+  (s, i) => html`<li class="${i + 1 === n ? "on" : i + 1 < n ? "done" : ""}">${s}</li>`
+)}</ol>`;
+
+export function newStep1(ctx, opts) {
+  return layout(
+    ctx,
+    "הופעה חדשה",
+    html`
+<section class="narrow">
+  ${steps(1)}
+  <h1>הדביקו לינק להופעה</h1>
+  <p class="muted">לינק לעמוד ההופעה באתר הכרטוס או באתר שלכם. ננסה למלא את הפרטים לבד.</p>
+  <form method="post" action="/artist/new/extract" class="stack" data-busy="מחפשים את הפרטים…">
+    ${csrfField(ctx)}
+    <input type="url" name="url" required placeholder="https://…" dir="ltr" inputmode="url" autofocus>
+    <button class="btn big block">המשך</button>
+  </form>
+  <p class="center"><a href="/artist/new/details">אין לינק? ממלאים ידנית</a></p>
+</section>`,
+    opts
+  );
+}
+
+export function newForm(ctx, { v, found = [], error = "" }, opts) {
+  const reward = v.reward ?? "";
+  const field = (name, label, attrs = "", extra = "") =>
+    html`<label class="field${found.includes(name) ? " found" : ""}">${label}${found.includes(name) ? html` <small>✓ מולא אוטומטית</small>` : ""}
+      <input name="${name}" value="${v[name] ?? ""}" ${html([attrs])}>${extra}</label>`;
+  return layout(
+    ctx,
+    "פרטי ההופעה",
+    html`
+<section class="narrow">
+  ${steps(2)}
+  ${found.length ? html`<p class="flash good">מצאנו ${found.length} פרטים. בדקו שהכל נכון והשלימו את מה שחסר.</p>` : ""}
+  ${error ? html`<p class="flash bad">${error}</p>` : ""}
+  <form method="post" action="/artist/new/preview" class="stack">
+    ${csrfField(ctx)}
+    <input type="hidden" name="source_url" value="${v.source_url ?? ""}">
+    ${field("artist_name", "שם האמן / הלהקה", "required maxlength=120")}
+    ${field("title", "שם ההופעה", "required maxlength=120")}
+    ${field("starts_at", "מתי", "type=datetime-local required")}
+    <div class="row2">
+      ${field("venue", "איפה (מקום)", "required maxlength=120")}
+      ${field("city", "עיר", "maxlength=40")}
+    </div>
+    ${field("price", "מחיר כרטיס (₪)", "type=number min=1 step=0.01 required inputmode=decimal data-price")}
+
+    <div class="reward-box">
+      <label class="field big-field">כמה תתנו על כל כרטיס שנמכר? (₪)
+        <input name="reward" value="${reward}" type="number" min="1" step="1" required inputmode="numeric" data-reward>
+      </label>
+      <p class="hint" data-suggest>טיפ: תגמול של כ-20% מהמחיר מושך יותר מקדמים.</p>
+      <div class="split" data-split data-fee-bps="${config.feeBps}" aria-live="polite">
+        <div><span>מקדם</span><b data-s="reward">—</b></div>
+        <div><span>ENCORE (${config.feeBps / 100}%)</span><b data-s="fee">—</b></div>
+        <div class="you"><span>נשאר לכם</span><b data-s="artist">—</b></div>
+      </div>
+      <p class="note">משלמים רק על כרטיסים שנמכרו דרך מקדמים. על מכירות אחרות אין עמלה.</p>
+    </div>
+
+    <details>
+      <summary>עוד אפשרויות (לא חובה)</summary>
+      <div class="stack">
+        ${field("image_url", "תמונה (לינק https)", "type=url maxlength=500 dir=ltr")}
+        ${field("genre", "סגנון", "maxlength=40 list=genres", html`<datalist id="genres"><option>פופ</option><option>רוק</option><option>אינדי</option><option>ג'אז</option><option>היפ הופ</option><option>אלקטרוני</option><option>ים תיכוני</option><option>סטנדאפ</option></datalist>`)}
+        <label class="field">תיאור<textarea name="description" rows="3" maxlength="2000">${v.description ?? ""}</textarea></label>
+        ${field("promo_limit", "מקסימום כרטיסים למכירה דרך מקדמים", "type=number min=1 inputmode=numeric")}
+        <label class="field">משפט פתיחה להודעת השיתוף<textarea name="share_text" rows="2" maxlength="600" placeholder="למשל: ההופעה הכי מרגשת שלנו השנה 🔥">${v.share_text ?? ""}</textarea></label>
+      </div>
+    </details>
+    <button class="btn big block">לתצוגה מקדימה</button>
+  </form>
+</section>`,
+    opts
+  );
+}
+
+export function previewPage(ctx, { c, form }, opts) {
+  const s = split(c.price_agorot, c.reward_agorot);
+  return layout(
+    ctx,
+    "תצוגה מקדימה",
+    html`
+<section class="narrow">
+  ${steps(3)}
+  <h1>ככה זה ייראה למקדמים</h1>
+  <article class="show preview">
+    ${poster(c)}
+    <div class="show-body">
+      <p class="eyebrow">${c.artist_name}</p>
+      <h3>${c.title}</h3>
+      <p class="meta">${showDate(c.starts_at)} · ${c.city || c.venue}</p>
+      <div class="earn"><span>הרווח שלך</span><b>${money(c.reward_agorot)}</b><small>לכל כרטיס · מחיר ${money(c.price_agorot)}</small></div>
+    </div>
+  </article>
+  <div class="split static">
+    <div><span>מקדם</span><b>${money(s.reward)}</b></div>
+    <div><span>ENCORE</span><b>${money(s.fee)}</b></div>
+    <div class="you"><span>נשאר לכם מכל כרטיס</span><b>${money(s.artist)}</b></div>
+  </div>
+  ${c.promo_limit ? html`<p class="muted center">עד ${c.promo_limit} כרטיסים דרך מקדמים.</p>` : ""}
+  <form method="post" action="/artist/new" class="stack">
+    ${csrfField(ctx)}
+    ${Object.entries(form).filter(([k]) => k !== "_csrf").map(([k, val]) => html`<input type="hidden" name="${k}" value="${val}">`)}
+    <button class="btn big block" name="publish" value="1">פרסום</button>
+    <button class="btn ghost block" name="publish" value="0">שמירה כטיוטה</button>
+  </form>
+  <form method="post" action="/artist/new/details" class="center">
+    ${csrfField(ctx)}
+    ${Object.entries(form).filter(([k]) => k !== "_csrf").map(([k, val]) => html`<input type="hidden" name="${k}" value="${val}">`)}
+    <button class="linklike">חזרה לעריכה</button>
+  </form>
+</section>`,
+    opts
+  );
+}
+
+// ---------- ניהול קמפיין ----------
+
+const ACTION_LABEL = { active: "הפעלה", paused: "השהיה", ended: "סיום הקמפיין", cancelled: "ההופעה בוטלה" };
+const ACTION_CONFIRM = {
+  ended: "לסיים את הקמפיין? מכירות חדשות לא יזכו מקדמים בתגמול. מה שכבר נצבר נשמר.",
+  cancelled: "לסמן שההופעה בוטלה? כל התגמולים של המקדמים יבוטלו. אי אפשר לחזור מזה.",
+};
+
+export function manageCampaign(ctx, { c, r, top, publicUrl }, opts) {
+  const s = split(c.price_agorot, c.reward_agorot);
+  const actions = TRANSITIONS[c.status].filter((t) => t !== "sold_out");
+  return layout(
+    ctx,
+    c.title,
+    html`
+<p><a href="/artist">→ כל ההופעות</a></p>
+<div class="row-head">
+  <div><p class="eyebrow">${c.artist_name}</p><h1>${c.title} ${statusBadge(c.status)}</h1>
+  <p class="meta">${showDate(c.starts_at)} · ${c.venue}${c.city ? `, ${c.city}` : ""}</p></div>
+</div>
+
+<div class="stats">
+  ${stat(r.tickets, "כרטיסים דרך מקדמים")}
+  ${stat(r.promoters, "מקדמים")}
+  ${stat(money(r.revenue), "הכנסה שנוצרה")}
+  ${stat(r.first_time, "קנו ממך לראשונה דרכנו")}
+  ${stat(money(r.rewards), "תגמולים למקדמים")}
+  ${stat(r.clicks, "כניסות ללינקים")}
+</div>
+
+${c.status === "draft" || c.status === "active"
+  ? html`<div class="linkbox"><code dir="ltr">${publicUrl}</code><button type="button" class="btn small" data-copy="${publicUrl}">העתקה</button></div>
+         <p class="note">שתפו את דף ההופעה עם הקהל שלכם. מי שירצה יוכל להפוך למקדם בלחיצה.</p>`
+  : ""}
+
+<section class="card">
+  <h2>מקדמים מובילים</h2>
+  ${top.length
+    ? html`<ol class="leaders">${top.map((p, i) => html`<li><span>${i === 0 && p.tickets ? "🏆" : i + 1}</span><b>${(p.name || "מקדם/ת").split(" ")[0]}</b><span class="muted">${p.clicks} כניסות</span><b>${p.tickets} כרטיסים</b></li>`)}</ol>`
+    : html`<p class="muted">עוד אין מקדמים. ${c.status === "active" ? "ההופעה כבר מופיעה במרקטפלייס." : ""}</p>`}
+</section>
+
+${["ended", "cancelled"].includes(c.status)
+  ? ""
+  : html`
+<section class="card">
+  <h2>תגמול לכרטיס</h2>
+  <div class="split static"><div><span>מקדם</span><b>${money(s.reward)}</b></div><div><span>עמלת ENCORE</span><b>${money(s.fee)}</b></div><div class="you"><span>נשאר לכם</span><b>${money(s.artist)}</b></div></div>
+  <form method="post" action="/artist/c/${c.id}/reward" class="inline">
+    ${csrfField(ctx)}
+    <input name="reward" type="number" min="1" step="1" value="${c.reward_agorot / 100}" inputmode="numeric" aria-label="תגמול חדש בשקלים">
+    <button class="btn ghost">עדכון</button>
+  </form>
+  <p class="note">השינוי חל רק על מכירות מעכשיו. מה שמקדמים כבר הרוויחו לא משתנה.</p>
+</section>
+
+<details class="card">
+  <summary>חומרי שיווק והגבלות</summary>
+  <form method="post" action="/artist/c/${c.id}/details" class="stack">
+    ${csrfField(ctx)}
+    <label class="field">תמונה (https)<input name="image_url" type="url" value="${c.image_url}" dir="ltr"></label>
+    <label class="field">תיאור<textarea name="description" rows="3" maxlength="2000">${c.description}</textarea></label>
+    <label class="field">משפט פתיחה להודעת השיתוף<textarea name="share_text" rows="2" maxlength="600">${c.share_text}</textarea></label>
+    <label class="field">מקסימום כרטיסים דרך מקדמים<input name="promo_limit" type="number" min="1" value="${c.promo_limit ?? ""}" placeholder="ללא הגבלה"></label>
+    <button class="btn ghost">שמירה</button>
+  </form>
+</details>`}
+
+${actions.length
+  ? html`<section class="actions">${actions.map((a) =>
+      postButton(ctx, `/artist/c/${c.id}/status`, ACTION_LABEL[a], {
+        cls: a === "cancelled" ? "btn danger" : a === "active" ? "btn" : "btn ghost",
+        confirm: ACTION_CONFIRM[a] ?? "",
+        fields: { to: a },
+      })
+    )}</section>`
+  : ""}
+<p class="note">מצב נוכחי: ${STATUS_LABEL[c.status]} · תנאים בגרסה ${c.terms_version}</p>`,
+    opts
+  );
+}
+
+export const formFromCampaign = (c) => ({
+  artist_name: c.artist_name, title: c.title, starts_at: isoToIsraelLocal(c.starts_at), venue: c.venue, city: c.city,
+  price: c.price_agorot / 100, reward: c.reward_agorot / 100,
+});

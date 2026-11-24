@@ -1,13 +1,14 @@
 {
-  "name": "kahal",
+  "name": "encore",
   "private": true,
-  "version": "0.1.0",
-  "description": "מכירת כרטיסים לאומנים דרך שגרירים מהקהל",
+  "version": "0.2.0",
+  "description": "ENCORE — מנוע להגדלת קהל: הציבור מקדם הופעות ומרוויח מכל כרטיס",
   "type": "module",
   "engines": { "node": ">=22.13" },
   "scripts": {
     "start": "node --no-warnings=ExperimentalWarning src/server.js",
     "dev": "node --no-warnings=ExperimentalWarning --watch src/server.js",
+    "seed": "node --no-warnings=ExperimentalWarning src/seed.js",
     "test": "node --no-warnings=ExperimentalWarning --test test/*.test.js"
   }
 }
