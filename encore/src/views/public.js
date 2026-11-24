@@ -12,15 +12,20 @@ export function landing(ctx, shows, opts) {
   <h1>הקהל מקדם את ההופעה.<br><em>וכולם מרוויחים.</em></h1>
   <p class="lead">אמנים מפרסמים הופעה. כל אחד יכול לשתף אותה ולהרוויח כסף מכל כרטיס שנמכר בזכותו.</p>
   <div class="choices">
-    <a class="choice artist" href="/artist/new">
-      <span class="emoji" aria-hidden="true">🎤</span>
+    <a class="choice artist" href="/grow">
+      <span class="choice-tag">לאמנים</span>
       <b>אני רוצה להגדיל את הקהל שלי</b>
-      <small>מדביקים לינק להופעה, קובעים כמה לתת על כל כרטיס, וזהו.</small>
+      <small>למלא הופעה, להזמין תוכן, או להגיע לקהלים חדשים. משלמים על תוצאות.</small>
     </a>
     <a class="choice promoter" href="/shows">
-      <span class="emoji" aria-hidden="true">💸</span>
+      <span class="choice-tag">לקהל</span>
       <b>אני רוצה להרוויח מקידום הופעות</b>
       <small>בוחרים הופעה, משתפים בוואטסאפ, ומקבלים על כל כרטיס.</small>
+    </a>
+    <a class="choice creator-choice" href="/creator">
+      <span class="choice-tag">ליוצרים</span>
+      <b>אני רוצה להרוויח מיצירת תוכן</b>
+      <small>ריל, המלצה, צילום או פרסום בערוץ שלך. לא צריך אלפי עוקבים.</small>
     </a>
   </div>
 </section>
@@ -72,7 +77,7 @@ export function terms(ctx, opts) {
     html`
 <section class="prose">
   <h1>תנאים ופרטיות, בקצרה</h1>
-  <p class="note">⚠️ טיוטה לפיילוט. הנוסח המחייב ייכתב עם יועץ משפטי לפני השקה מסחרית.</p>
+  <p class="note">טיוטה לפיילוט. הנוסח המחייב ייכתב עם יועץ משפטי לפני השקה מסחרית.</p>
   <h2>מה אנחנו שומרים</h2>
   <ul>
     <li>מקדמים: מייל, שם, ופרטים לתשלום. פרטי התשלום נשמרים מוצפנים.</li>
@@ -137,7 +142,7 @@ export function showPage(ctx, { c, referrer, link, stats, buyable }, opts) {
     <h1>${c.title}</h1>
     <p class="meta big">${showDate(c.starts_at)}<br>${c.venue}${c.city ? `, ${c.city}` : ""}</p>
     ${referrer
-      ? html`<p class="ref">💛 <b>${referrer}</b> המליץ/ה לך על ההופעה. <small>(מקבל/ת עמלה קטנה אם תקנו דרך הקישור, בלי עלות נוספת לכם)</small></p>`
+      ? html`<p class="ref"><b>${referrer}</b> המליץ/ה לך על ההופעה. <small>(מקבל/ת עמלה קטנה אם תקנו דרך הקישור, בלי עלות נוספת לכם)</small></p>`
       : ""}
     ${c.description ? html`<p class="desc">${c.description}</p>` : ""}
 
@@ -262,12 +267,12 @@ export function thanksPage(ctx, { c, more, followed }, opts) {
     "תודה!",
     html`
 <section class="narrow center">
-  <h1>נתראה בהופעה 🎉</h1>
+  <h1>נתראה בהופעה</h1>
   <p class="lead">הכרטיסים נשלחו אליך ממערכת הכרטוס.</p>
 </section>
 <section class="narrow card">
   ${followed
-    ? html`<p>✓ נעדכן אותך כש${c.artist_name} מעלים הופעה חדשה.</p>`
+    ? html`<p>נעדכן אותך כש${c.artist_name} מעלים הופעה חדשה.</p>`
     : html`
   <h2>רוצה לשמוע על ההופעה הבאה של ${c.artist_name}?</h2>
   <form method="post" action="/s/${c.id}/follow" class="stack">

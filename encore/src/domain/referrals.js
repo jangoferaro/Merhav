@@ -52,12 +52,12 @@ export function linkStats(db, linkId) {
 /** טקסט מוכן לשיתוף. גילוי נאות על העמלה כלול כברירת מחדל (PRD §9.3). */
 export function shareText(campaign, url) {
   const custom = (campaign.share_text || "").trim();
-  const intro = custom || `בואו איתי ל${campaign.artist_name} – ${campaign.title} 🎶`;
+  const intro = custom || `בואו איתי ל${campaign.artist_name} – ${campaign.title}`;
   return [
     intro,
-    `📅 ${showDate(campaign.starts_at)}`,
-    `📍 ${campaign.venue}${campaign.city ? `, ${campaign.city}` : ""}`,
-    `🎟️ ${url}`,
+    `${showDate(campaign.starts_at)}`,
+    `${campaign.venue}${campaign.city ? `, ${campaign.city}` : ""}`,
+    `כרטיסים: ${url}`,
     "",
     "(גילוי נאות: אני מקבל/ת עמלה על כרטיסים שנקנים דרך הקישור)",
   ].join("\n");

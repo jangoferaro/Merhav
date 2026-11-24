@@ -143,11 +143,12 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE INDEX IF NOT EXISTS orders_campaign ON orders(campaign_id);
 
 -- ---------- תגמולים ויומן כספי ----------
--- kind: sale (אחד להזמנה) | clawback (קיזוז אחרי תשלום) | adjustment (התאמה ידנית מתועדת)
+-- kind: sale (אחד להזמנה) | clawback (קיזוז אחרי תשלום) | adjustment (התאמה ידנית מתועדת) | service (עבודת תוכן שהושלמה)
 CREATE TABLE IF NOT EXISTS commissions (
   id             INTEGER PRIMARY KEY,
-  kind           TEXT NOT NULL CHECK (kind IN ('sale','clawback','adjustment')),
+  kind           TEXT NOT NULL CHECK (kind IN ('sale','clawback','adjustment','service')),
   order_id       INTEGER REFERENCES orders(id),
+  service_order_id INTEGER REFERENCES service_orders(id),
   campaign_id    INTEGER REFERENCES campaigns(id),
   promoter_id    INTEGER NOT NULL REFERENCES users(id),
   amount_agorot  INTEGER NOT NULL,
@@ -160,6 +161,7 @@ CREATE TABLE IF NOT EXISTS commissions (
   paid_at        TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS one_sale_commission_per_order ON commissions(order_id) WHERE kind = 'sale';
+CREATE UNIQUE INDEX IF NOT EXISTS one_earning_per_service_order ON commissions(service_order_id) WHERE kind = 'service';
 CREATE INDEX IF NOT EXISTS commissions_promoter ON commissions(promoter_id, status);
 
 -- יומן בלתי ניתן לשינוי: כל שינוי בסכום תגמול נרשם כאן. sum(ledger) לכל תגמול == amount_agorot שלו.
@@ -212,6 +214,7 @@ CREATE TABLE IF NOT EXISTS disputes (
   id           INTEGER PRIMARY KEY,
   user_id      INTEGER NOT NULL REFERENCES users(id),
   campaign_id  INTEGER REFERENCES campaigns(id),
+  service_order_id INTEGER REFERENCES service_orders(id),
   message      TEXT NOT NULL,
   status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','resolved','rejected')),
   resolution   TEXT NOT NULL DEFAULT '',
@@ -241,6 +244,127 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_log BEGIN SELECT RAISE(ABORT, 'audit log is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABORT, 'audit log is append-only'); END;
+
+-- ---------- מודול תוכן: יוצרים, שירותים והזמנות ----------
+CREATE TABLE IF NOT EXISTS creator_profiles (
+  user_id       INTEGER PRIMARY KEY REFERENCES users(id),
+  display_name  TEXT NOT NULL,
+  bio           TEXT NOT NULL DEFAULT '',
+  city          TEXT NOT NULL DEFAULT '',
+  genres        TEXT NOT NULL DEFAULT '',
+  kinds         TEXT NOT NULL DEFAULT '',
+  image_url     TEXT NOT NULL DEFAULT '',
+  status        TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','hidden')),
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS creator_portfolio (
+  id          INTEGER PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  url         TEXT NOT NULL,
+  title       TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL
+);
+
+-- ערוצים אישיים. מספר העוקבים מדווח ע"י היוצר ומוצג כ"לא מאומת"
+CREATE TABLE IF NOT EXISTS social_channels (
+  id          INTEGER PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  platform    TEXT NOT NULL,
+  url         TEXT NOT NULL,
+  followers   INTEGER,
+  created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS creator_services (
+  id                    INTEGER PRIMARY KEY,
+  user_id               INTEGER NOT NULL REFERENCES users(id),
+  template              TEXT NOT NULL,
+  title                 TEXT NOT NULL,
+  deliverable           TEXT NOT NULL,
+  description           TEXT NOT NULL DEFAULT '',
+  price_agorot          INTEGER NOT NULL CHECK (price_agorot >= 1000),
+  delivery_days         INTEGER NOT NULL CHECK (delivery_days BETWEEN 1 AND 60),
+  revisions             INTEGER NOT NULL CHECK (revisions BETWEEN 0 AND 3),
+  license               TEXT NOT NULL,
+  includes_publication  INTEGER NOT NULL DEFAULT 0,
+  active                INTEGER NOT NULL DEFAULT 1,
+  created_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL
+);
+
+-- הזמנה: התנאים נשמרים כתמונת מצב (terms_json) — שינוי מחיר בשירות לא משנה הזמנה קיימת
+CREATE TABLE IF NOT EXISTS service_orders (
+  id                     INTEGER PRIMARY KEY,
+  service_id             INTEGER NOT NULL REFERENCES creator_services(id),
+  creator_id             INTEGER NOT NULL REFERENCES users(id),
+  artist_id              INTEGER NOT NULL REFERENCES artists(id),
+  artist_user_id         INTEGER NOT NULL REFERENCES users(id),
+  campaign_id            INTEGER REFERENCES campaigns(id),
+  link_id                INTEGER REFERENCES referral_links(id),
+  status                 TEXT NOT NULL CHECK (status IN ('requested','accepted','submitted','revision_requested','approved','published','completed','cancelled','disputed')),
+  title                  TEXT NOT NULL,
+  terms_json             TEXT NOT NULL,
+  price_agorot           INTEGER NOT NULL,
+  fee_agorot             INTEGER NOT NULL,
+  creator_amount_agorot  INTEGER NOT NULL,
+  includes_publication   INTEGER NOT NULL,
+  brief                  TEXT NOT NULL,
+  revisions_left         INTEGER NOT NULL,
+  due_at                 TEXT NOT NULL,
+  disputed_from          TEXT,
+  created_at             TEXT NOT NULL,
+  updated_at             TEXT NOT NULL,
+  accepted_at            TEXT,
+  submitted_at           TEXT,
+  approved_at            TEXT,
+  published_at           TEXT,
+  completed_at           TEXT,
+  cancelled_at           TEXT
+);
+CREATE INDEX IF NOT EXISTS service_orders_creator ON service_orders(creator_id, status);
+CREATE INDEX IF NOT EXISTS service_orders_artist ON service_orders(artist_user_id, status);
+
+CREATE TABLE IF NOT EXISTS deliverables (
+  id          INTEGER PRIMARY KEY,
+  order_id    INTEGER NOT NULL REFERENCES service_orders(id),
+  version     INTEGER NOT NULL,
+  url         TEXT NOT NULL,
+  note        TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL,
+  UNIQUE (order_id, version)
+);
+
+CREATE TABLE IF NOT EXISTS revision_requests (
+  id          INTEGER PRIMARY KEY,
+  order_id    INTEGER NOT NULL REFERENCES service_orders(id),
+  message     TEXT NOT NULL,
+  created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS publications (
+  id           INTEGER PRIMARY KEY,
+  order_id     INTEGER NOT NULL UNIQUE REFERENCES service_orders(id),
+  url          TEXT NOT NULL,
+  submitted_at TEXT NOT NULL,
+  verified_at  TEXT,
+  verified_by  INTEGER REFERENCES users(id),
+  method       TEXT
+);
+
+-- הכסף של האמן מוחזק אצל ספק התשלומים (הרשאה), לא אצל הפלטפורמה
+CREATE TABLE IF NOT EXISTS service_payments (
+  id               INTEGER PRIMARY KEY,
+  order_id         INTEGER NOT NULL UNIQUE REFERENCES service_orders(id),
+  provider         TEXT NOT NULL,
+  external_id      TEXT NOT NULL,
+  amount_agorot    INTEGER NOT NULL,
+  captured_agorot  INTEGER NOT NULL DEFAULT 0,
+  status           TEXT NOT NULL CHECK (status IN ('authorized','captured','voided')),
+  created_at       TEXT NOT NULL,
+  updated_at       TEXT NOT NULL
+);
 
 -- ---------- ספק כרטוס מדומה (Sandbox) — מחליף מערכת כרטוס אמיתית בפיתוח ובדמו ----------
 CREATE TABLE IF NOT EXISTS sim_events (

@@ -7,6 +7,7 @@ import * as R from "./domain/referrals.js";
 import * as I from "./domain/ingest.js";
 import * as M from "./domain/money.js";
 import { setSimDeliver, simBuy } from "./providers/sim.js";
+import * as K from "./domain/content.js";
 
 const file = process.env.ENCORE_DB ?? "data/encore.db";
 for (const f of [file, `${file}-wal`, `${file}-shm`]) fs.rmSync(f, { force: true });
@@ -57,8 +58,34 @@ sell(dani, past, { clicks: 5, orders: [2, 2] });
 db.prepare("UPDATE events SET starts_at = ? WHERE id = (SELECT event_id FROM campaigns WHERE id = ?)").run(addDays(new Date().toISOString(), -5), past);
 M.settle(db);
 
+// ---------- יוצרי תוכן והזמנות ----------
+const lior = user("lior@encore.local", "ליאור שמש");
+const shira = user("shira@encore.local", "שירה אלון");
+const yoni = user("yoni@encore.local", "יוני גל");
+K.saveProfile(db, lior, { display_name: "ליאור שמש", city: "תל אביב", genres: "אינדי, פופ", kinds: ["content"], bio: "מצלמת ועורכת רילסים להופעות. אוהבת במיוחד אינדי ישראלי ורגעים אמיתיים מהקהל." });
+K.addPortfolio(db, lior, { url: "https://example.com/lior/reel-1", title: "ריל להשקת סינגל" });
+K.saveService(db, lior, { template: "reel", price: "200", delivery_days: "4" });
+K.saveService(db, lior, { template: "live_shoot", price: "350" });
+K.saveProfile(db, shira, { display_name: "שירה אלון", city: "ירושלים", genres: "אינדי, רוק", kinds: ["exposure", "content"], bio: "ממליצה על מוזיקה ישראלית חדשה לקהילה של כ-3,000 אנשים שבאמת מקשיבים." });
+K.addChannel(db, shira, { platform: "Instagram", url: "https://instagram.com/example", followers: "3200" });
+K.addChannel(db, shira, { platform: "Telegram", url: "https://t.me/example", followers: "900" });
+K.saveService(db, shira, { template: "story_post", price: "120" });
+K.saveService(db, shira, { template: "song_review", price: "150" });
+K.saveProfile(db, yoni, { display_name: "יוני גל", city: "חיפה", genres: "ג'אז, אלקטרוני", kinds: ["content"], bio: "מעצב פוסטרים להופעות ולסינגלים." });
+K.saveService(db, yoni, { template: "graphic", price: "180" });
+
+const o1 = K.placeOrder(db, noa, K.servicesOf(db, lior.id)[0].id, { artist_name: "נועה ברק", goal: "show", campaign_id: String(ids[0]), rights: "on", notes: "רגע השיא: השיר האחרון" });
+K.acceptOrder(db, lior, o1);
+K.submitDeliverable(db, lior, o1, { url: "https://example.com/lior/noa-reel-v1", note: "גרסה ראשונה, 38 שניות" });
+const o2 = K.placeOrder(db, noa, K.servicesOf(db, shira.id).find((s) => s.template === "song_review").id, { artist_name: "נועה ברק", goal: "music", music_url: "https://example.com/noa/single", rights: "on" });
+K.acceptOrder(db, shira, o2);
+K.submitDeliverable(db, shira, o2, { url: "https://example.com/shira/review" });
+K.approveOrder(db, noa, o2);
+K.placeOrder(db, band, K.servicesOf(db, yoni.id)[0].id, { artist_name: "הקרוואן", goal: "content", rights: "on" });
+
 console.log(`נוצר ${file}`);
 console.log("משתמשים לדוגמה (הקוד מוצג על המסך במצב פיתוח):");
 console.log("  ops@encore.local   — צוות תפעול (ניהול)");
 console.log("  noa@encore.local   — אמנית");
 console.log("  dani@encore.local  — מקדם עם מכירות וכסף זמין");
+console.log("  lior@encore.local  — יוצרת תוכן עם הזמנה שמחכה לאישור האמנית");

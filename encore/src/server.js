@@ -18,6 +18,8 @@ import * as P from "./views/public.js";
 import * as ME from "./views/me.js";
 import * as A from "./views/artist.js";
 import * as AD from "./views/admin.js";
+import * as K from "./domain/content.js";
+import * as CV from "./views/content.js";
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml" };
@@ -30,7 +32,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
   const r = new Router();
   const origin = (ctx) => (baseUrl || `http://${ctx.req.headers.host}`).replace(/\/$/, "");
   const opts = (ctx) =>
-    ctx.user ? { unread: ID.unreadCount(db, ctx.user.id), isArtist: ID.artistsOf(db, ctx.user.id).length > 0 } : {};
+    ctx.user ? { unread: ID.unreadCount(db, ctx.user.id), isArtist: ID.artistsOf(db, ctx.user.id).length > 0, isCreator: !!K.getProfile(db, ctx.user.id) } : {};
 
   const requireUser = (ctx) => {
     if (ctx.user) return true;
@@ -264,7 +266,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
 
   r.get("/artist", (ctx) => {
     if (!requireUser(ctx)) return;
-    ctx.send(A.artistHome(ctx, C.artistOverview(db, ctx.user.id), opts(ctx)));
+    ctx.send(A.artistHome(ctx, { ...C.artistOverview(db, ctx.user.id), contentOrders: K.ordersForArtist(db, ctx.user.id) }, opts(ctx)));
   });
 
   r.get("/artist/new", (ctx) => {
@@ -316,7 +318,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
     rateLimit(`create:${ctx.user.id}`, 20, 3600_000);
     const f = await ctx.form();
     const id = C.createCampaign(db, ctx.user, f, { publish: f.publish === "1" });
-    ctx.redirect(`/artist/c/${id}`, f.publish === "1" ? "ההופעה פורסמה 🎉 היא כבר מופיעה למקדמים." : "נשמר כטיוטה");
+    ctx.redirect(`/artist/c/${id}`, f.publish === "1" ? "ההופעה פורסמה. היא כבר מופיעה למקדמים." : "נשמר כטיוטה");
   });
 
   r.get("/artist/c/:id", (ctx) => {
@@ -352,6 +354,114 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
     const c = managed(ctx, ctx.params.id);
     C.updateCampaignDetails(db, ctx.user, c.id, await ctx.form());
     ctx.redirect(`/artist/c/${c.id}`, "נשמר");
+  });
+
+  // ---------- מודול התוכן ----------
+
+  r.get("/grow", (ctx) => ctx.send(CV.growPage(ctx, opts(ctx))));
+
+  r.get("/creators", (ctx) => {
+    const kind = ["content", "exposure"].includes(ctx.query.kind) ? ctx.query.kind : "";
+    const goal = K.GOALS[ctx.query.goal] ? ctx.query.goal : "";
+    ctx.send(CV.creatorsPage(ctx, { creators: K.discoverCreators(db, { viewerId: ctx.user?.id, kind }), kind, goal }, opts(ctx)));
+  });
+
+  r.get("/creators/:id", (ctx) => {
+    const c = K.creatorPublic(db, Number(ctx.params.id));
+    if (!c || (c.status !== "active" && !ctx.user?.is_admin && ctx.user?.id !== c.user_id)) throw new UserError("הפרופיל לא נמצא", 404);
+    ctx.send(CV.creatorProfilePage(ctx, { c, goal: K.GOALS[ctx.query.goal] ? ctx.query.goal : "" }, opts(ctx)));
+  });
+
+  r.get("/services/:id/order", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const s = K.getService(db, ctx.params.id);
+    if (!s || !s.active) throw new UserError("השירות לא זמין", 404);
+    const artists = ID.artistsOf(db, ctx.user.id);
+    const campaigns = C.campaignsOfUser(db, ctx.user.id).filter((c) => ["active", "paused", "draft"].includes(c.status));
+    ctx.send(CV.orderNewPage(ctx, { s, creator: K.getProfile(db, s.user_id), artistName: artists[0]?.name ?? ctx.user.name ?? "", campaigns, goal: ctx.query.goal ?? "" }, opts(ctx)));
+  });
+
+  r.post("/services/:id/order", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    rateLimit(`order:${ctx.user.id}`, 20, 3600_000);
+    const id = K.placeOrder(db, ctx.user, ctx.params.id, await ctx.form());
+    ctx.redirect(`/orders/${id}`, "ההזמנה נשלחה. נעדכן כשהיוצר יאשר.");
+  });
+
+  r.get("/orders/:id", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const o = K.getOrder(db, ctx.params.id);
+    const role = K.roleIn(o, ctx.user);
+    if (!role) throw new UserError("ההזמנה לא נמצאה", 404);
+    let linkInfo = null;
+    if (o.link_id) {
+      const c = C.getCampaign(db, o.campaign_id);
+      linkInfo = { reward: c.reward_agorot, tickets: R.linkStats(db, o.link_id).tickets };
+    }
+    ctx.send(CV.orderPage(ctx, {
+      o, role, linkInfo,
+      deliverables: K.deliverablesOf(db, o.id), revisions: K.revisionsOf(db, o.id), publication: K.publicationOf(db, o.id),
+      disputes: db.prepare("SELECT * FROM disputes WHERE service_order_id = ? ORDER BY id").all(o.id),
+    }, opts(ctx)));
+  });
+
+  const orderAction = (name, fn, msg) =>
+    r.post(`/orders/:id/${name}`, async (ctx) => {
+      if (!requireUser(ctx)) return;
+      await fn(ctx, await ctx.form());
+      ctx.redirect(`/orders/${ctx.params.id}`, msg);
+    });
+  orderAction("accept", (ctx) => K.acceptOrder(db, ctx.user, ctx.params.id), "יצאנו לדרך. בהצלחה!");
+  orderAction("decline", (ctx, f) => K.declineOrder(db, ctx.user, ctx.params.id, f.reason), "ההזמנה נדחתה והאמן עודכן");
+  orderAction("deliver", (ctx, f) => K.submitDeliverable(db, ctx.user, ctx.params.id, f), "נשלח לאמן");
+  orderAction("publish", (ctx, f) => K.submitPublication(db, ctx.user, ctx.params.id, f), "תודה! האמן יאמת את הפרסום");
+  orderAction("approve", (ctx) => K.approveOrder(db, ctx.user, ctx.params.id), "אושר");
+  orderAction("revise", (ctx, f) => K.requestRevision(db, ctx.user, ctx.params.id, f.message), "בקשת התיקון נשלחה");
+  orderAction("verify", (ctx) => K.verifyPublication(db, ctx.user, ctx.params.id), "הושלם");
+  orderAction("cancel", (ctx) => K.cancelOrder(db, ctx.user, ctx.params.id), "ההזמנה בוטלה ולא חויבת");
+  orderAction("dispute", (ctx, f) => K.openOrderDispute(db, ctx.user, ctx.params.id, f.message), "הפנייה הועברה לצוות");
+
+  r.get("/creator", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const uid = ctx.user.id;
+    ctx.send(CV.creatorHome(ctx, {
+      profile: K.getProfile(db, uid), services: K.servicesOf(db, uid), orders: K.ordersForCreator(db, uid),
+      portfolio: K.portfolio(db, uid), channels: K.channels(db, uid),
+    }, opts(ctx)));
+  });
+
+  const creatorPost = (path, fn, msg, to = "/creator") =>
+    r.post(path, async (ctx) => {
+      if (!requireUser(ctx)) return;
+      const dest = await fn(ctx, await ctx.form());
+      ctx.redirect(typeof dest === "string" ? dest : to, msg);
+    });
+  creatorPost("/creator/profile", (ctx, f) => {
+    const isNew = !K.getProfile(db, ctx.user.id);
+    K.saveProfile(db, ctx.user, f);
+    return isNew ? "/creator/services/new" : "/creator";
+  }, "נשמר");
+  creatorPost("/creator/services/new", (ctx, f) => void K.saveService(db, ctx.user, f), "השירות פורסם. אמנים יכולים להזמין אותו.");
+  creatorPost("/creator/services/:id/edit", (ctx, f) => void K.saveService(db, ctx.user, f, ctx.params.id), "נשמר. הזמנות קיימות נשארות בתנאים המקוריים.");
+  creatorPost("/creator/services/:id/toggle", (ctx) => {
+    const s = K.getService(db, ctx.params.id);
+    if (s?.user_id === ctx.user.id) K.setServiceActive(db, ctx.user, s.id, !s.active);
+  }, "עודכן");
+  creatorPost("/creator/portfolio", (ctx, f) => K.addPortfolio(db, ctx.user, f), "נוסף");
+  creatorPost("/creator/portfolio/:id/delete", (ctx) => K.removeOwned(db, ctx.user, "creator_portfolio", ctx.params.id), "הוסר");
+  creatorPost("/creator/channels", (ctx, f) => K.addChannel(db, ctx.user, f), "נוסף");
+  creatorPost("/creator/channels/:id/delete", (ctx) => K.removeOwned(db, ctx.user, "social_channels", ctx.params.id), "הוסר");
+
+  r.get("/creator/services/new", (ctx) => {
+    if (!requireUser(ctx)) return;
+    if (!K.getProfile(db, ctx.user.id)) return ctx.redirect("/creator");
+    ctx.send(CV.serviceForm(ctx, { template: K.TEMPLATES[ctx.query.template] ? ctx.query.template : null }, opts(ctx)));
+  });
+  r.get("/creator/services/:id/edit", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const s = K.getService(db, ctx.params.id);
+    if (!s || s.user_id !== ctx.user.id) throw new UserError("לא נמצא", 404);
+    ctx.send(CV.serviceForm(ctx, { s }, opts(ctx)));
   });
 
   // ---------- Webhooks ממערכות כרטוס ----------
@@ -426,6 +536,12 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
         return ctx.send(AD.adminUsers(ctx, { rows: q(`SELECT * FROM users ORDER BY id DESC LIMIT 500`) }, o));
       case "audit":
         return ctx.send(AD.adminAudit(ctx, { rows: q(`SELECT a.*, u.email AS actor FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id ORDER BY a.id DESC LIMIT 300`) }, o));
+      case "content":
+        return ctx.send(AD.adminContentTab(ctx, {
+          orders: K.allOrders(db),
+          creators: q(`SELECT p.*, u.email, (SELECT COUNT(*) FROM creator_services s WHERE s.user_id = p.user_id AND s.active = 1) AS services
+                         FROM creator_profiles p JOIN users u ON u.id = p.user_id ORDER BY p.created_at DESC LIMIT 300`),
+        }, o));
       case "sim":
         return ctx.send(AD.adminSim(ctx, { orders: Sim.simOrders(db, 100), events: q(`SELECT * FROM sim_events ORDER BY rowid DESC LIMIT 100`) }, o));
       default: {
@@ -453,7 +569,15 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
 
   adminPost("/admin/settle", (ctx) => {
     const res = M.settle(db);
-    ctx.redirect("/admin", `${res.ended} קמפיינים הסתיימו, ${res.released} תגמולים שוחררו`);
+    ctx.redirect("/admin", `${res.ended} קמפיינים הסתיימו, ${res.released} תגמולים שוחררו, ${res.content} הזמנות תוכן עודכנו`);
+  });
+  adminPost("/admin/orders/:id/resolve", (ctx, f) => {
+    K.resolveOrderDispute(db, ctx.user, ctx.params.id, f);
+    ctx.redirect(`/orders/${ctx.params.id}`, "ההחלטה נשמרה ושני הצדדים עודכנו");
+  });
+  adminPost("/admin/creators/:id/status", (ctx, f) => {
+    K.setProfileStatus(db, ctx.user, Number(ctx.params.id), f.status);
+    ctx.redirect("/admin?tab=content", "עודכן");
   });
   adminPost("/admin/payouts/:id", (ctx, f) => {
     M.decidePayout(db, ctx.user, ctx.params.id, f.outcome === "paid" ? "paid" : "failed", f.reference);
@@ -536,7 +660,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const tick = () => {
     try {
       const r = M.settle(db);
-      if (r.ended || r.released) console.log(`[settle] ended=${r.ended} released=${r.released}`);
+      if (r.ended || r.released || r.content) console.log(`[settle] ended=${r.ended} released=${r.released} content=${r.content}`);
     } catch (e) {
       console.error("[settle]", e);
     }

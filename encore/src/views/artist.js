@@ -2,13 +2,28 @@
 import { config, isoToIsraelLocal } from "../util.js";
 import { split, STATUS_LABEL, TRANSITIONS } from "../domain/campaigns.js";
 import { csrfField, empty, html, layout, money, postButton, poster, showDate, stat, statusBadge } from "./kit.js";
+import { orderBadge } from "./content.js";
 
-export function artistHome(ctx, { list, totals }, opts) {
+function contentOrdersBlock(orders) {
+  return html`
+<section>
+  <div class="row-head"><h2>תוכן וחשיפה</h2><a class="btn small ghost" href="/creators">הזמנת תוכן</a></div>
+  ${orders.length
+    ? html`<ul class="list">${orders.map(
+        (o) => html`<li class="${["submitted", "published"].includes(o.status) ? "unread" : ""}"><a class="row-link" href="/orders/${o.id}">
+          <div class="grow"><b>${o.title}</b> <span class="muted">· ${o.creator_name}</span><div class="meta">${orderBadge(o.status)}</div></div>
+          <b>${money(o.price_agorot)}</b></a></li>`
+      )}</ul>`
+    : html`<p class="muted">גם בלי הופעה קרובה אפשר להמשיך לגדול: ריל, סקירת שיר או פרסום אצל יוצרים שמתחברים למוזיקה שלך.</p>`}
+</section>`;
+}
+
+export function artistHome(ctx, { list, totals, contentOrders = [] }, opts) {
   return layout(
     ctx,
     "ההופעות שלי",
     html`
-<div class="row-head"><h1>ההופעות שלי</h1><a class="btn" href="/artist/new">+ הופעה חדשה</a></div>
+<div class="row-head"><h1>האזור שלי כאמן</h1><a class="btn" href="/grow">+ מטרה חדשה</a></div>
 ${list.length
   ? html`
 <div class="stats">
@@ -32,7 +47,8 @@ ${list.length
     </li>`
   )}
 </ul>`
-  : empty("עוד אין הופעות", "מפרסמים הופעה אחת ורואים איך הקהל מתחיל להפיץ אותה.", html`<a class="btn big" href="/artist/new">פרסום הופעה ראשונה</a>`)}`,
+  : empty("עוד אין הופעות", "מפרסמים הופעה אחת ורואים איך הקהל מתחיל להפיץ אותה.", html`<a class="btn big" href="/artist/new">פרסום הופעה ראשונה</a>`)}
+${contentOrdersBlock(contentOrders)}`,
     opts
   );
 }
@@ -66,7 +82,7 @@ export function newStep1(ctx, opts) {
 export function newForm(ctx, { v, found = [], error = "" }, opts) {
   const reward = v.reward ?? "";
   const field = (name, label, attrs = "", extra = "") =>
-    html`<label class="field${found.includes(name) ? " found" : ""}">${label}${found.includes(name) ? html` <small>✓ מולא אוטומטית</small>` : ""}
+    html`<label class="field${found.includes(name) ? " found" : ""}">${label}${found.includes(name) ? html` <small>מולא אוטומטית</small>` : ""}
       <input name="${name}" value="${v[name] ?? ""}" ${html([attrs])}>${extra}</label>`;
   return layout(
     ctx,
@@ -108,7 +124,7 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
         ${field("genre", "סגנון", "maxlength=40 list=genres", html`<datalist id="genres"><option>פופ</option><option>רוק</option><option>אינדי</option><option>ג'אז</option><option>היפ הופ</option><option>אלקטרוני</option><option>ים תיכוני</option><option>סטנדאפ</option></datalist>`)}
         <label class="field">תיאור<textarea name="description" rows="3" maxlength="2000">${v.description ?? ""}</textarea></label>
         ${field("promo_limit", "מקסימום כרטיסים למכירה דרך מקדמים", "type=number min=1 inputmode=numeric")}
-        <label class="field">משפט פתיחה להודעת השיתוף<textarea name="share_text" rows="2" maxlength="600" placeholder="למשל: ההופעה הכי מרגשת שלנו השנה 🔥">${v.share_text ?? ""}</textarea></label>
+        <label class="field">משפט פתיחה להודעת השיתוף<textarea name="share_text" rows="2" maxlength="600" placeholder="למשל: ההופעה הכי מרגשת שלנו השנה">${v.share_text ?? ""}</textarea></label>
       </div>
     </details>
     <button class="btn big block">לתצוגה מקדימה</button>
@@ -196,7 +212,7 @@ ${c.status === "draft" || c.status === "active"
 <section class="card">
   <h2>מקדמים מובילים</h2>
   ${top.length
-    ? html`<ol class="leaders">${top.map((p, i) => html`<li><span>${i === 0 && p.tickets ? "🏆" : i + 1}</span><b>${(p.name || "מקדם/ת").split(" ")[0]}</b><span class="muted">${p.clicks} כניסות</span><b>${p.tickets} כרטיסים</b></li>`)}</ol>`
+    ? html`<ol class="leaders">${top.map((p, i) => html`<li><span>${i + 1}</span><b>${(p.name || "מקדם/ת").split(" ")[0]}</b><span class="muted">${p.clicks} כניסות</span><b>${p.tickets} כרטיסים</b></li>`)}</ol>`
     : html`<p class="muted">עוד אין מקדמים. ${c.status === "active" ? "ההופעה כבר מופיעה במרקטפלייס." : ""}</p>`}
 </section>
 

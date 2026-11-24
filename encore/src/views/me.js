@@ -9,7 +9,7 @@ const COMMISSION_LABEL = {
 
 const tabs = (ctx) => html`
 <nav class="tabs" aria-label="האזור שלי">
-  ${[["/me/sales", "המכירות שלי"], ["/me/money", "הכסף שלי"], ["/me/notifications", "התראות"]].map(
+  ${[["/me/sales", "המכירות שלי"], ["/me/money", "הכסף שלי"], ["/creator", "יצירת תוכן"], ["/me/notifications", "התראות"]].map(
     ([h, l]) => html`<a href="${h}"${ctx.url.pathname === h ? html` aria-current="page"` : ""}>${l}</a>`
   )}
 </nav>`;
@@ -94,7 +94,7 @@ ${commissions.length
   <ul class="list compact">
     ${commissions.map(
       (m) => html`<li>
-        <div class="grow"><b>${m.kind === "sale" ? m.title : m.kind === "clawback" ? `קיזוז · ${m.title ?? ""}` : `התאמה`}</b>
+        <div class="grow"><b>${m.kind === "sale" ? m.title : m.kind === "service" ? `עבודת תוכן · ${m.title}` : m.kind === "clawback" ? `קיזוז · ${m.title ?? ""}` : `התאמה`}</b>
           <div class="meta">${shortDate(m.created_at)}${m.kind === "sale" ? ` · ${m.rewarded_qty} כרטיסים${m.refunded_qty ? ` (${m.refunded_qty} הוחזרו)` : ""}` : m.note ? ` · ${m.note}` : ""}
           ${m.status === "pending" && m.starts_at ? ` · יתפנה ב-${shortDate(availableFrom(m.starts_at))}` : ""}</div></div>
         <div class="end"><b class="${m.amount_agorot < 0 ? "neg" : "money"}">${money(m.amount_agorot)}</b>
@@ -110,7 +110,7 @@ ${payouts.length
   <h2>העברות</h2>
   <ul class="list compact">${payouts.map(
     (p) => html`<li><div class="grow">${shortDate(p.created_at)}${p.reference && p.status === "paid" ? html` <span class="muted">· אסמכתא ${p.reference}</span>` : ""}</div>
-      <div class="end"><b>${money(p.amount_agorot)}</b><small>${{ requested: "בטיפול", paid: "הועבר ✓", failed: "נכשל" }[p.status]}</small></div></li>`
+      <div class="end"><b>${money(p.amount_agorot)}</b><small>${{ requested: "בטיפול", paid: "הועבר", failed: "נכשל" }[p.status]}</small></div></li>`
   )}</ul>
 </section>`
   : ""}`,

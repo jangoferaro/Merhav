@@ -2,12 +2,13 @@
 import { shortDate } from "../util.js";
 import { ATTRIBUTION_LABEL } from "../domain/ingest.js";
 import { csrfField, html, layout, money, postButton, statusBadge } from "./kit.js";
+import { adminContent } from "./content.js";
 
 const COMMISSION_HE = { pending: "ממתין", payable: "זמין", paid: "שולם", reversed: "בוטל", disputed: "מוקפא" };
 
 const TABS = [
   ["", "סקירה"], ["payouts", "תשלומים"], ["disputes", "פניות"], ["orders", "עסקאות"],
-  ["campaigns", "קמפיינים"], ["users", "משתמשים"], ["audit", "יומן פעולות"], ["sim", "ספק מדומה"],
+  ["content", "תוכן"], ["campaigns", "קמפיינים"], ["users", "משתמשים"], ["audit", "יומן פעולות"], ["sim", "ספק מדומה"],
 ];
 
 function shell(ctx, tab, body, opts) {
@@ -26,6 +27,8 @@ ${body}`,
 
 const table = (head, rows) => html`<div class="table-wrap"><table><thead><tr>${head.map((h) => html`<th>${h}</th>`)}</tr></thead><tbody>${rows}</tbody></table></div>`;
 
+export const adminContentTab = (ctx, data, opts) => shell(ctx, "content", adminContent(ctx, data), opts);
+
 export function adminOverview(ctx, { counts, issues, webhooks }, opts) {
   return shell(
     ctx,
@@ -36,7 +39,7 @@ export function adminOverview(ctx, { counts, issues, webhooks }, opts) {
 </div>
 <section class="card">
   <h2>בדיקת התאמה כספית</h2>
-  ${issues.length ? html`<ul class="bad-list">${issues.map((i) => html`<li>${i}</li>`)}</ul>` : html`<p class="ok">✓ היומן, היתרות והתשלומים תואמים.</p>`}
+  ${issues.length ? html`<ul class="bad-list">${issues.map((i) => html`<li>${i}</li>`)}</ul>` : html`<p class="ok">תקין: היומן, היתרות והתשלומים תואמים.</p>`}
   ${postButton(ctx, "/admin/settle", "הרצת שחרור תגמולים עכשיו", { cls: "btn ghost" })}
 </section>
 <section class="card">
@@ -167,7 +170,7 @@ ${table(
   ["זמן", "הזמנה", "קונה", "כמות", "ref", ""],
   orders.map(
     (o) => html`<tr><td>${shortDate(o.created_at)}</td><td><code>${o.id}</code></td><td>${o.buyer_name}</td><td>${o.qty}${o.refunded_qty ? ` (הוחזרו ${o.refunded_qty})` : ""}</td>
-    <td><small>${o.ref ? "✓" : "—"}</small></td>
+    <td><small>${o.ref ? "יש" : "—"}</small></td>
     <td>${o.refunded_qty < o.qty
       ? html`${postButton(ctx, `/admin/sim/refund`, "החזר כרטיס", { cls: "btn small ghost", fields: { order: o.id, qty: 1 } })}${postButton(ctx, `/admin/sim/replay`, "שליחה כפולה", { cls: "btn small ghost", fields: { order: o.id } })}`
       : ""}</td></tr>`
@@ -194,14 +197,14 @@ ${error ? html`<p class="flash bad">${error}</p>` : ""}
   <label class="field">כמות<select name="qty">${[1, 2, 3, 4, 5, 6].map((n) => html`<option>${n}</option>`)}</select></label>
   <button class="btn big block">תשלום</button>
 </form>
-<p class="note">⚠️ קופת Sandbox: לא מחויב כסף אמיתי.</p>`
+<p class="note">קופת Sandbox: לא מחויב כסף אמיתי.</p>`
   );
 }
 
 export function simReceipt(ctx, { o, backUrl }) {
   return simShell(
     html`
-<h1>התשלום התקבל ✓</h1>
+<h1>התשלום התקבל</h1>
 <p>${o.buyer_name}, הנה הכרטיסים שלך:</p>
 <ul class="codes">${o.codes.split(",").map((c) => html`<li><code>${c}</code></li>`)}</ul>
 <a class="btn block" href="${backUrl}">חזרה</a>`
@@ -211,5 +214,5 @@ export function simReceipt(ctx, { o, backUrl }) {
 function simShell(body) {
   return html`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>קופת כרטיסים (Sandbox)</title><link rel="stylesheet" href="/static/style.css"></head>
-<body class="sim"><div class="sim-bar">🎟️ TicketBox · Sandbox</div><main class="narrow">${body}</main></body></html>`.s;
+<body class="sim"><div class="sim-bar">TicketBox · Sandbox</div><main class="narrow">${body}</main></body></html>`.s;
 }

@@ -2,6 +2,7 @@
 import { insert, tx } from "../db.js";
 import { addDays, clock, config, decrypt, encrypt, money, shekelsToAgorot, text, UserError } from "../util.js";
 import { audit, notify } from "./identity.js";
+import { contentReconciliationIssues, settleContent } from "./content.js";
 
 /**
  * שלושה מצבים ברורים למקדם (PRD §9.7):
@@ -45,8 +46,9 @@ export function salesByShow(db, userId) {
 export function commissionsOf(db, userId, limit = 100) {
   return db
     .prepare(
-      `SELECT m.*, e.title, e.starts_at, o.qty, o.refunded_qty, o.rewarded_qty
+      `SELECT m.*, COALESCE(e.title, so.title) AS title, e.starts_at, o.qty, o.refunded_qty, o.rewarded_qty
          FROM commissions m
+         LEFT JOIN service_orders so ON so.id = m.service_order_id
          LEFT JOIN orders o ON o.id = m.order_id
          LEFT JOIN campaigns c ON c.id = m.campaign_id
          LEFT JOIN events e ON e.id = c.event_id
@@ -117,7 +119,7 @@ export function decidePayout(db, admin, payoutId, outcome, reference = "") {
       const ref = text(reference, "אסמכתא להעברה", { max: 100 });
       db.prepare("UPDATE payouts SET status = 'paid', reference = ?, decided_at = ?, decided_by = ? WHERE id = ?").run(ref, now, admin.id, p.id);
       db.prepare("UPDATE commissions SET status = 'paid', paid_at = ?, updated_at = ? WHERE payout_id = ?").run(now, now, p.id);
-      notify(db, p.user_id, `העברנו לך ${money(p.amount_agorot)} 🎉`, "/me/money");
+      notify(db, p.user_id, `העברנו לך ${money(p.amount_agorot)}`, "/me/money");
     } else {
       db.prepare("UPDATE payouts SET status = 'failed', reference = ?, decided_at = ?, decided_by = ? WHERE id = ?").run(String(reference).slice(0, 200), now, admin.id, p.id);
       db.prepare("UPDATE commissions SET payout_id = NULL, updated_at = ? WHERE payout_id = ?").run(now, p.id);
@@ -163,7 +165,7 @@ export function settle(db) {
     for (const [uid, amount] of perUser) {
       if (amount > 0) notify(db, uid, `${money(amount)} עברו למצב "זמין לתשלום".`, "/me/money");
     }
-    return { ended: ending.length, released: ready.length };
+    return { ended: ending.length, released: ready.length, content: settleContent(db) };
   });
 }
 
@@ -245,5 +247,5 @@ export function reconciliationIssues(db) {
     )
     .all()
     .map((r) => `תשלום #${r.id}: ${r.amount_agorot} אבל התגמולים בו ${r.sum}`);
-  return [...ledger, ...payouts];
+  return [...ledger, ...payouts, ...contentReconciliationIssues(db)];
 }

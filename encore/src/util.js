@@ -19,6 +19,16 @@ export const config = {
   attributionDays: 30,
   /** כמה ימים אחרי ההופעה התגמול הופך לזמין (חלון ביטולים/החזרים) */
   holdDaysAfterShow: 3,
+  /** עמלת הפלטפורמה על עבודת תוכן, מנוכה מהכנסת היוצר (1000 = 10%) */
+  get contentFeeBps() {
+    return Number(process.env.CONTENT_FEE_BPS ?? 1000);
+  },
+  /** יוצר לא הגיב להזמנה תוך X ימים → ההזמנה מתבטלת והכסף משתחרר לאמן */
+  acceptWindowDays: 3,
+  /** אמן לא הגיב לתוצר תוך X ימים → התוצר מאושר אוטומטית (הגנה על היוצר) */
+  autoApproveDays: 5,
+  /** אמן לא אימת פרסום תוך X ימים → הפרסום נחשב מאומת לפי הקישור */
+  publicationVerifyDays: 3,
   /** סכום מינימלי לבקשת תשלום (אגורות) */
   minPayoutAgorot: 5000,
   get adminEmails() {

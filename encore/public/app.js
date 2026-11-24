@@ -16,7 +16,7 @@
       const text = copy.dataset.copy ?? $("#" + copy.dataset.copyFrom)?.value ?? "";
       try {
         await navigator.clipboard.writeText(text);
-        flashButton(copy, copy.dataset.copied || "הועתק ✓");
+        flashButton(copy, copy.dataset.copied || "הועתק");
       } catch {
         prompt("העתיקו:", text);
       }
@@ -91,4 +91,20 @@
       $$("[data-method]", r.form).forEach((el) => (el.hidden = el.dataset.method !== r.value));
     })
   );
+})();
+
+// מחיר שירות: כמה נשאר ליוצר אחרי העמלה
+(() => {
+  const input = document.querySelector("[data-service-price]");
+  const out = document.querySelector("[data-service-net]");
+  if (!input || !out) return;
+  const bps = Number(input.dataset.feeBps);
+  const calc = () => {
+    const p = Math.round(Number(input.value) * 100) || 0;
+    if (!p) return;
+    const net = p - Math.floor((p * bps) / 10000);
+    out.textContent = `תקבלו ₪${(net / 100).toLocaleString("he-IL")} על כל עבודה שהושלמה (אחרי ${bps / 100}% עמלה).`;
+  };
+  input.addEventListener("input", calc);
+  calc();
 })();

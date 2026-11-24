@@ -73,12 +73,15 @@ export function showCard(ctx, c) {
 
 // ---------- מסגרת הדף ----------
 
-export function layout(ctx, title, body, { unread = 0, isArtist = false, wide = false, description = "" } = {}) {
+const BELL = raw(`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`);
+
+export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreator = false, wide = false, description = "" } = {}) {
   const u = ctx.user;
   const nav = [
     ["/shows", "הופעות"],
-    u && ["/me/money", "הכסף שלי"],
-    u && isArtist && ["/artist", "לאמנים"],
+    ["/creators", "יוצרים"],
+    u && isCreator && ["/creator", "יצירה"],
+    u && isArtist && ["/artist", "האמן"],
     u?.is_admin && ["/admin", "ניהול"],
   ].filter(Boolean);
   const path = ctx.url.pathname;
@@ -103,11 +106,11 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, wide = 
   <div class="top-in">
     <a href="/" class="logo" aria-label="ENCORE, דף הבית">ENCORE<i>.</i></a>
     <nav aria-label="ראשי">
-      ${nav.map(([href, label]) => html`<a href="${href}"${path.startsWith(href) ? raw(' aria-current="page"') : ""}>${label}</a>`)}
+      ${nav.map(([href, label]) => html`<a href="${href}"${(path === href || path.startsWith(href + "/")) ? raw(' aria-current="page"') : ""}>${label}</a>`)}
     </nav>
     <div class="top-end">
       ${u
-        ? html`<a href="/me/notifications" class="bell" aria-label="התראות${unread ? ` (${unread} חדשות)` : ""}">🔔${unread ? html`<i>${unread}</i>` : ""}</a>
+        ? html`<a href="/me/notifications" class="bell" aria-label="התראות${unread ? ` (${unread} חדשות)` : ""}">${BELL}${unread ? html`<i>${unread}</i>` : ""}</a>
                <a href="/me/sales" class="me" title="${u.email}">${(u.name || u.email)[0]}</a>`
         : html`<a href="/login?next=${encodeURIComponent(path)}" class="btn small ghost">כניסה</a>`}
     </div>

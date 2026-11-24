@@ -194,3 +194,60 @@ test("טיוטה לא מופיעה לציבור; קמפיין מושהה לא מ
   assert.equal((await new Browser().req(`/s/${cid}`)).status, 404);
   assert.doesNotMatch((await new Browser().get("/shows")).text, /טיוטה/);
 });
+
+test("מסע תוכן: יוצר פותח פרופיל ושירות → אמן בוחר מטרה ומזמין → תוצר → אישור → הכסף ליוצר", async () => {
+  resetRateLimits();
+  clock.set("2026-12-01T10:00:00.000Z");
+  const creator = new Browser();
+  await creator.login("lior@encore.test", "ליאור");
+  await creator.get("/creator");
+  assert.match(creator.last, /לא צריך אלפי עוקבים/);
+  let r = await creator.post("/creator/profile", { display_name: "ליאור", genres: "אינדי", kinds: "content", bio: "מצלמת הופעות" });
+  assert.match(r.text, /איזה שירות\?/); // אחרי פרופיל: ישר לבחירת תבנית
+  await creator.get("/creator/services/new?template=reel");
+  r = await creator.post("/creator/services/new", { template: "reel", price: "200", title: "ריל לקידום", deliverable: "ריל 30 שניות", delivery_days: "5", revisions: "1", license: "organic" });
+  assert.match(r.text, /השירות פורסם/);
+
+  const artist = new Browser();
+  await artist.login("band@encore.test", "להקה");
+  r = await artist.get("/grow");
+  assert.match(r.text, /מה תרצה שיקרה\?/);
+  r = await artist.get("/creators?kind=content&goal=content");
+  assert.match(r.text, /ליאור/);
+  assert.match(r.text, /₪200/);
+  const sid = r.text.match(/\/creators\/(\d+)/)[1];
+  r = await artist.get(`/creators/${sid}`);
+  const orderHref = r.text.match(/\/services\/\d+\/order[^"]*/)[0].replace(/&amp;/g, "&");
+  r = await artist.get(orderHref);
+  assert.match(r.text, /שימוש בערוצים שלך/);
+  assert.match(r.text, /היוצר מקבל ₪180/);
+  r = await artist.post(orderHref.split("?")[0], { artist_name: "הלהקה", goal: "content", rights: "on", notes: "קצב מהיר" });
+  assert.match(r.text, /ההזמנה נשלחה/);
+  const oid = db.prepare("SELECT id FROM service_orders ORDER BY id DESC").get().id;
+
+  // זר לא רואה את ההזמנה
+  const stranger = new Browser();
+  await stranger.login("z@encore.test", "Z");
+  assert.equal((await stranger.req(`/orders/${oid}`)).status, 404);
+
+  r = await creator.get(`/orders/${oid}`);
+  assert.match(r.text, /הזמנה חדשה בשבילך/);
+  assert.match(r.text, /הערות האמן: קצב מהיר/);
+  await creator.post(`/orders/${oid}/accept`);
+  r = await creator.post(`/orders/${oid}/deliver`, { url: "https://drive.example/reel-v1", note: "גרסה ראשונה" });
+  assert.match(r.text, /נשלח לאמן/);
+
+  r = await artist.get(`/orders/${oid}`);
+  assert.match(r.text, /התוצר מוכן/);
+  r = await artist.post(`/orders/${oid}/approve`);
+  assert.match(r.text, /חויבתם ₪200/);
+
+  r = await creator.get("/me/money");
+  assert.match(r.text, /זמין לתשלום<\/span><b>₪180/);
+  assert.match(r.text, /עבודת תוכן · ריל לקידום/);
+});
+
+test("אין אימוג'ים בממשק", async () => {
+  const page = (await new Browser().get("/")).text + (await new Browser().get("/creators")).text + (await new Browser().get("/grow")).text;
+  assert.doesNotMatch(page, /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
+});

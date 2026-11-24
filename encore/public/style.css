@@ -293,3 +293,51 @@ body.sim { background: #eef2f7; color: #111; color-scheme: light; --surface: #ff
 .codes code { font-size: 1.2rem; letter-spacing: .12em; padding: 8px 12px; border: 2px dashed #2563eb; border-radius: 10px; display: inline-block; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- מודול התוכן ---------- */
+.choice-tag { font-size: .78rem; font-weight: 700; letter-spacing: .04em; color: var(--brand); text-transform: uppercase; }
+.choice.promoter .choice-tag { color: #ff8fab; }
+@media (min-width: 900px) { .choices { grid-template-columns: repeat(3, 1fr); } }
+.choice.creator-choice { background: var(--violet); color: #fff; border-color: var(--violet); }
+.choice.creator-choice small { color: rgb(255 255 255 / 75%); }
+.choice.creator-choice .choice-tag { color: #d9ccff; }
+@media (prefers-color-scheme: dark) { .choice.creator-choice { background: #2a2050; border-color: #2a2050; } }
+
+.goal-list { display: grid; gap: 10px; margin: 16px 0 24px; }
+.goal { display: grid; gap: 4px; padding: 18px 20px; background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius); text-decoration: none; color: var(--ink); transition: border-color .12s ease, transform .12s ease; }
+.goal:hover { border-color: var(--brand); transform: translateX(-2px); }
+.goal b { font-size: 1.1rem; }
+.goal span { color: var(--muted); font-size: .93rem; }
+
+.avatar { width: 48px; height: 48px; border-radius: 50%; flex: none; display: inline-grid; place-items: center; overflow: hidden; background: var(--violet); color: var(--bg); font-weight: 800; font-size: 1.2rem; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar.big { width: 84px; height: 84px; font-size: 2rem; }
+.creator { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 10px; align-content: start; box-shadow: var(--shadow); }
+.creator-head { display: flex; gap: 12px; align-items: center; color: var(--ink); text-decoration: none; }
+.creator-head > div { display: grid; }
+.match { margin: 0; font-size: .88rem; color: var(--money); font-weight: 500; }
+.bio { color: var(--muted); margin: 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.profile-head + .bio { -webkit-line-clamp: unset; color: var(--ink); margin: 12px 0; }
+.svc-mini { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--bg); border-radius: 12px; padding: 10px 12px; }
+.svc-mini > div { display: grid; }
+.price-tag { font-size: 1.25rem; font-weight: 800; white-space: nowrap; }
+.profile-head { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; }
+.profile-head h1 { margin: 0; }
+.links { padding-inline-start: 1.2em; }
+.links li { margin: .3em 0; overflow-wrap: anywhere; }
+.svc { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin: 12px 0; display: grid; gap: 8px; }
+.svc h3 { margin: 0; }
+.facts { margin: 0; padding-inline-start: 1.2em; color: var(--ink); }
+.facts li { margin: .2em 0; }
+.terms-box { background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 8px; }
+.terms-box h2, .terms-box h3 { margin: 4px 0 0; }
+.total { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
+.total b { font-size: 1.6rem; font-weight: 800; }
+.next { border: 2px solid var(--brand); display: grid; gap: 12px; }
+.next h2 { margin: 0; }
+pre.brief { white-space: pre-wrap; font: inherit; margin: 0; line-height: 1.7; }
+.os-requested, .os-submitted, .os-published { background: #fff1d6; color: var(--warn); }
+.os-accepted, .os-revision_requested, .os-approved { background: var(--brand-soft); color: var(--brand); }
+.os-completed { background: var(--money-soft); color: var(--money); }
+.os-cancelled, .os-disputed { background: #fde8e8; color: var(--bad); }
+.seg legend { margin-bottom: 6px; width: 100%; }

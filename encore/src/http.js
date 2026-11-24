@@ -93,7 +93,13 @@ export function makeCtx(req, res) {
     setCookie: (c) => setCookies.push(c),
     _form: null,
     async form() {
-      if (!this._form) this._form = Object.fromEntries(new URLSearchParams(await readBody(req)));
+      if (!this._form) {
+        const out = {};
+        for (const [k, v] of new URLSearchParams(await readBody(req))) {
+          out[k] = k in out ? [].concat(out[k], v) : v;
+        }
+        this._form = out;
+      }
       return this._form;
     },
     checkCsrf(form) {
