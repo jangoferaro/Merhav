@@ -401,6 +401,68 @@ CREATE TABLE IF NOT EXISTS sim_orders (
   codes         TEXT NOT NULL,
   created_at    TEXT NOT NULL
 );
+
+-- ---------- כרטוס של Jocares: הקופה שלנו ----------
+CREATE TABLE IF NOT EXISTS ticket_orders (
+  id                INTEGER PRIMARY KEY,
+  campaign_id       INTEGER NOT NULL REFERENCES campaigns(id),
+  token             TEXT NOT NULL UNIQUE,           -- הקישור הפרטי של הקונה לכרטיסים
+  buyer_name        TEXT NOT NULL,
+  buyer_email       TEXT NOT NULL,
+  buyer_phone       TEXT NOT NULL DEFAULT '',
+  qty               INTEGER NOT NULL CHECK (qty > 0),
+  refunded_qty      INTEGER NOT NULL DEFAULT 0,
+  unit_price_agorot INTEGER NOT NULL,
+  fee_agorot        INTEGER NOT NULL DEFAULT 0,      -- דמי שירות לכרטיס
+  total_agorot      INTEGER NOT NULL,
+  status            TEXT NOT NULL,                   -- pending | paid | expired | failed | rejected
+  click_token       TEXT,
+  marketing_consent INTEGER NOT NULL DEFAULT 0,
+  gateway           TEXT NOT NULL,
+  payment_ref       TEXT,
+  created_at        TEXT NOT NULL,
+  expires_at        TEXT NOT NULL,
+  paid_at           TEXT
+);
+CREATE INDEX IF NOT EXISTS ticket_orders_campaign ON ticket_orders(campaign_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS ticket_orders_payment ON ticket_orders(gateway, payment_ref) WHERE payment_ref IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS tickets (
+  id          INTEGER PRIMARY KEY,
+  order_id    INTEGER NOT NULL REFERENCES ticket_orders(id),
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id),
+  code        TEXT NOT NULL UNIQUE,
+  seq         INTEGER NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'valid',        -- valid | used | refunded
+  used_at     TEXT
+);
+
+-- החזרים: נרשמים מיד (הכרטיס נפסל, התגמול מתעדכן), והכסף עצמו מוחזר דרך ספק התשלום ברקע
+CREATE TABLE IF NOT EXISTS ticket_refunds (
+  id            INTEGER PRIMARY KEY,
+  order_id      INTEGER NOT NULL REFERENCES ticket_orders(id),
+  qty           INTEGER NOT NULL,
+  amount_agorot INTEGER NOT NULL,
+  reason        TEXT NOT NULL DEFAULT '',
+  status        TEXT NOT NULL DEFAULT 'pending',    -- pending | done | failed
+  error         TEXT,
+  actor_id      INTEGER,
+  created_at    TEXT NOT NULL,
+  done_at       TEXT
+);
+
+-- ספק תשלום מדומה (Sandbox): עמוד תשלום מתארח, כמו אצל ספקי סליקה אמיתיים
+CREATE TABLE IF NOT EXISTS pay_sandbox (
+  ref           TEXT PRIMARY KEY,
+  amount_agorot INTEGER NOT NULL,
+  refunded_agorot INTEGER NOT NULL DEFAULT 0,
+  description   TEXT NOT NULL,
+  return_url    TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending',    -- pending | paid | failed
+  card_last4    TEXT,
+  created_at    TEXT NOT NULL,
+  paid_at       TEXT
+);
 `;
 
 export function openDb(file = process.env.ENCORE_DB ?? "data/encore.db") {
@@ -424,6 +486,9 @@ function migrate(db) {
   add("referral_links", "coupon_code", "TEXT");
   add("referral_links", "coupon_registered_at", "TEXT");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS referral_links_coupon ON referral_links(coupon_code) WHERE coupon_code IS NOT NULL");
+  // כרטוס של Jocares: קיבולת המקום וקישור סודי לסריקה בכניסה
+  add("events", "capacity", "INTEGER");
+  add("campaigns", "door_token", "TEXT");
   const missing = db.prepare("SELECT id FROM referral_links WHERE coupon_code IS NULL").all();
   for (const { id } of missing) db.prepare("UPDATE referral_links SET coupon_code = ? WHERE id = ?").run(newCouponCode(db), id);
 }

@@ -43,6 +43,14 @@ export const config = {
   publicationVerifyDays: 3,
   /** סכום מינימלי לבקשת תשלום (אגורות) */
   minPayoutAgorot: 5000,
+  /** דמי שירות לכרטיס שהקונה משלם מעל מחיר הכרטיס (באגורות). ברירת מחדל 0: הקונה משלם בדיוק את המחיר */
+  get ticketFeeAgorot() {
+    const v = Math.round(Number(process.env.TICKET_SERVICE_FEE ?? 0) * 100);
+    return Number.isInteger(v) && v >= 0 ? v : 0;
+  },
+  /** כמה זמן כרטיסים שמורים לקונה בזמן שהוא משלם */
+  holdMinutes: 15,
+  maxTicketsPerOrder: 10,
   get adminEmails() {
     return (process.env.ADMIN_EMAILS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   },

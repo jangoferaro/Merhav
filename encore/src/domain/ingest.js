@@ -21,7 +21,12 @@ export class RetryLater extends UserError {
  */
 export function ingestWebhook(db, providerName, raw, headers) {
   const p = provider(providerName);
-  const evt = p.verifyWebhook(raw, headers);
+  return ingestEvent(db, p.name, p.verifyWebhook(raw, headers));
+}
+
+/** אירוע שכבר אומת (או שנוצר בתוך המערכת, בקופה של Jocares). אותם כללי אידמפוטנטיות. */
+export function ingestEvent(db, providerName, evt) {
+  const p = provider(providerName);
   return tx(db, () => {
     const fresh = db
       .prepare("INSERT OR IGNORE INTO webhook_events (provider, event_id, type, received_at) VALUES (?, ?, ?, ?)")

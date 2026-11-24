@@ -158,3 +158,72 @@ document.addEventListener("click", async (e) => {
   try { await navigator.clipboard.writeText(a.dataset.copyThenGo); } catch {}
   window.location.href = a.href;
 });
+
+// פתיחת הופעה: מראים רק את השדות של אופן המכירה שנבחר
+(() => {
+  const box = document.querySelector("[data-ticketing]");
+  if (!box) return;
+  const sync = () => {
+    const v = box.querySelector("input:checked")?.value;
+    document.querySelectorAll(".ticketing-opt").forEach((el) => {
+      const on = el.dataset.when === v;
+      el.hidden = !on;
+      el.querySelectorAll("input").forEach((i) => (i.required = on));
+    });
+  };
+  box.addEventListener("change", sync);
+  sync();
+})();
+
+// קופה: הסכום מתעדכן לפי מספר הכרטיסים
+(() => {
+  const sel = document.querySelector("[data-qty]");
+  const out = document.querySelector("[data-total]");
+  if (!sel || !out) return;
+  const unit = Number(sel.dataset.unit);
+  sel.addEventListener("change", () => {
+    out.textContent = "₪" + ((unit * Number(sel.value)) / 100).toLocaleString("he-IL", { maximumFractionDigits: 2 });
+  });
+})();
+
+// כניסה: סריקת QR במצלמה (בדפדפנים שתומכים), אחרת הקלדה או סורק חיצוני
+(() => {
+  const form = document.querySelector("[data-door-form]");
+  if (!form) return;
+  const input = form.querySelector("[data-door-code]");
+  const btn = form.querySelector("[data-scan]");
+  const box = document.querySelector("[data-scanner]");
+  if (!("BarcodeDetector" in window) || !navigator.mediaDevices?.getUserMedia) return;
+  btn.hidden = false;
+  const start = async () => {
+    try {
+      const detector = new BarcodeDetector({ formats: ["qr_code"] });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const video = box.querySelector("video");
+      video.srcObject = stream;
+      box.hidden = false;
+      btn.hidden = true;
+      await video.play();
+      const tick = async () => {
+        const [code] = await detector.detect(video).catch(() => []);
+        if (code?.rawValue) {
+          stream.getTracks().forEach((t) => t.stop());
+          try { sessionStorage.setItem("door-camera", "1"); } catch {}
+          input.value = code.rawValue;
+          form.submit();
+          return;
+        }
+        requestAnimationFrame(tick);
+      };
+      tick();
+    } catch {
+      box.hidden = true;
+      btn.hidden = false;
+    }
+  };
+  btn.addEventListener("click", start);
+  // אחרי סריקה, המצלמה נפתחת שוב אוטומטית לכרטיס הבא
+  let again = false;
+  try { again = sessionStorage.getItem("door-camera") === "1"; } catch {}
+  if (again) setTimeout(start, 900);
+})();

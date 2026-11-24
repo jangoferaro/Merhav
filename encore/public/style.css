@@ -540,3 +540,60 @@ main:has(.lp-hero) { max-width: var(--max-wide); }
 .map-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin-bottom: 12px; }
 tr.unread td:first-child { box-shadow: inset -3px 0 0 var(--jo-red); }
 .code-big { font: 500 clamp(2rem, 9vw, 3rem)/1 var(--font-mono); letter-spacing: .06em; background: var(--jo-acid); color: #151515; padding: 14px 18px; display: inline-block; direction: ltr; }
+
+/* ==========================================================================
+   הקופה של Jocares: קנייה, כרטיס, כניסה, מכירות
+   ========================================================================== */
+.ticketing-opt { margin-top: -6px; }
+.checkout-show { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 20px; }
+.checkout-show h1 { margin: 2px 0 6px; font-size: clamp(1.6rem, 6vw, 2.2rem); }
+.poster.mini { width: 112px; flex: none; aspect-ratio: 4 / 5; }
+.poster.mini .band, .poster.mini .initials { display: none; }
+.qty-row { display: flex; gap: 16px; align-items: flex-end; justify-content: space-between; }
+.qty-row select { min-width: 96px; font-size: 1.1rem; }
+.qty-row .total { text-align: end; }
+.qty-row .total b { display: block; font: 600 1.8rem/1.1 var(--font-mono); }
+
+.paybox .card { border: 1px solid var(--ink); }
+.paybox h1 { font-family: var(--font-mono); margin: 4px 0; }
+.sandbox-note { background: var(--jo-acid); color: #151515; padding: 10px 14px; font-weight: 600; border: 1px solid #151515; }
+
+.actions-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.ticket-list { display: grid; gap: 18px; margin: 20px 0; }
+.ticket { background: #fff; border: 1px solid var(--ink); padding: 0 0 18px; text-align: center; position: relative; }
+.ticket::before, .ticket::after { content: ""; position: absolute; top: 44px; width: 18px; height: 18px; border-radius: 50%; background: var(--paper); border: 1px solid var(--ink); }
+.ticket::before { inset-inline-start: -10px; }
+.ticket::after { inset-inline-end: -10px; }
+.ticket-head { display: flex; justify-content: space-between; padding: 10px 16px; background: var(--ink); color: var(--jo-paper); font: 500 .85rem/1.4 var(--font-mono); }
+.ticket.st-valid .ticket-head span:last-child { color: var(--jo-acid); }
+.ticket .qr { margin: 26px auto 8px; width: min(240px, 70vw); }
+.ticket .qr svg { width: 100%; height: auto; display: block; }
+.ticket .qr.void { aspect-ratio: 1; background: repeating-linear-gradient(45deg, var(--wash) 0 10px, transparent 10px 20px); }
+.ticket.st-used .qr, .ticket.st-refunded .qr { opacity: .35; }
+.ticket-code { font: 600 1.4rem/1.2 var(--font-mono); letter-spacing: .12em; margin: 6px 0 2px; }
+.ticket-name { color: var(--ink-2); margin: 0; }
+.tickets-page + .promo-box .stamp { float: inline-end; }
+
+.door h1 { margin-top: 0; }
+.door-result { display: grid; gap: 4px; padding: 22px 18px; margin: 0 0 18px; border: 2px solid var(--ink); text-align: center; }
+.door-result b { font: 700 2rem/1.1 var(--font-display); }
+.door-result.good { background: var(--jo-acid); color: #151515; }
+.door-result.bad { background: var(--jo-red); color: #151515; }
+.door-result small { font-family: var(--font-mono); }
+.scanner { border: 1px solid var(--ink); margin-bottom: 14px; background: #000; }
+.scanner video { width: 100%; display: block; max-height: 60vh; object-fit: cover; }
+.door input[name="code"] { font: 600 1.4rem/1.2 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; }
+
+.meter { display: flex; height: 10px; border: 1px solid var(--ink); background: var(--surface); margin: 6px 0 0; }
+.meter span { display: block; height: 100%; width: var(--p); background: var(--jo-acid); border-inline-end: 1px solid var(--ink); }
+.sales .stats { grid-template-columns: repeat(3, 1fr); }
+.table-wrap { overflow-x: auto; margin: 10px -4px 0; }
+table.orders { width: 100%; border-collapse: collapse; font-size: .95rem; }
+table.orders th, table.orders td { text-align: start; padding: 8px 6px; border-bottom: 1px solid var(--hair); vertical-align: middle; white-space: nowrap; }
+table.orders th { font-weight: 600; border-bottom-color: var(--ink); }
+table.orders form.refund { display: flex; gap: 6px; margin: 0; }
+table.orders select { padding: 4px 6px; min-height: 0; }
+@media (max-width: 560px) {
+  .sales .stats { grid-template-columns: 1fr 1fr; }
+  .poster.mini { width: 84px; }
+}

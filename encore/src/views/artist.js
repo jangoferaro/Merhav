@@ -1,4 +1,5 @@
 // אזור האמן: מסך בית ממוקד תוצאות, פתיחת קמפיין בשלושה צעדים, וניהול קמפיין.
+import { artistSales } from "./tickets.js";
 import { config, isoToIsraelLocal } from "../util.js";
 import { split, STATUS_LABEL, TRANSITIONS } from "../domain/campaigns.js";
 import { csrfField, empty, html, imageInput, layout, money, postButton, poster, showDate, stat, statusBadge } from "./kit.js";
@@ -94,13 +95,20 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
   ${error ? html`<p class="flash bad">${error}</p>` : ""}
   <form method="post" action="/artist/new/preview" class="stack" enctype="multipart/form-data" data-busy="מעלים…">
     ${csrfField(ctx)}
-    <fieldset class="seg ticketing"><legend class="field">איפה מוכרים את הכרטיסים?</legend>
-      <label><input type="radio" name="ticketing" value="coupon" ${v.ticketing !== "sim" ? html`checked` : ""}> באתר הכרטוס שלי</label>
-      <label><input type="radio" name="ticketing" value="sim" ${v.ticketing === "sim" ? html`checked` : ""}> קופה לדוגמה (בדיקה)</label>
+    <fieldset class="seg ticketing" data-ticketing><legend class="field">איך מוכרים את הכרטיסים?</legend>
+      <label><input type="radio" name="ticketing" value="jocares" ${!["coupon", "sim"].includes(v.ticketing) ? html`checked` : ""}> Jocares מוכרת (מומלץ)</label>
+      <label><input type="radio" name="ticketing" value="coupon" ${v.ticketing === "coupon" ? html`checked` : ""}> יש לי כבר קופה</label>
     </fieldset>
-    <label class="field">לינק לעמוד הכרטיסים שלך
-      <input name="source_url" type="url" dir="ltr" value="${v.source_url ?? ""}" placeholder="https://">
-      <small class="hint">כל ג׳וקר מקבל קוד אישי. אנחנו מגדירים את הקודים במערכת הכרטוס שלך ומעדכנים את המכירות. את/ה לא צריך/ה לעשות כלום.</small></label>
+    <div class="ticketing-opt" data-when="jocares">
+      <label class="field">כמה כרטיסים יש למכירה?
+        <input name="capacity" type="number" min="1" max="20000" inputmode="numeric" value="${v.capacity ?? ""}" placeholder="למשל 150">
+        <small class="hint">קופה מלאה בלי הגדרות: קונים אצלנו, מקבלים כרטיס עם קוד לסריקה, ואת/ה מקבל/ת קישור לסריקה בכניסה. ג׳וקרים מקבלים תגמול אוטומטית.</small></label>
+    </div>
+    <div class="ticketing-opt" data-when="coupon">
+      <label class="field">לינק לעמוד הכרטיסים שלך
+        <input name="source_url" type="url" dir="ltr" value="${v.source_url ?? ""}" placeholder="https://">
+        <small class="hint">כשהמקום או מערכת אחרת מוכרים. כל ג׳וקר מקבל קוד אישי, ואנחנו מעדכנים את המכירות. את/ה לא צריך/ה לעשות כלום.</small></label>
+    </div>
     ${field("artist_name", "שם האמן / הלהקה", "required maxlength=120")}
     ${field("title", "שם ההופעה", "required maxlength=120")}
     <div class="field${found.includes("image_url") ? " found" : ""}">תמונה של ההופעה${found.includes("image_url") ? html` <small>נמצאה בעמוד ההופעה</small>` : ""}
@@ -189,7 +197,7 @@ const ACTION_CONFIRM = {
   cancelled: "לסמן שההופעה בוטלה? כל התגמולים של המקדמים יבוטלו. אי אפשר לחזור מזה.",
 };
 
-export function manageCampaign(ctx, { c, r, top, publicUrl, lastImport = null }, opts) {
+export function manageCampaign(ctx, { c, r, top, publicUrl, lastImport = null, sales = null }, opts) {
   const s = split(c.price_agorot, c.reward_agorot);
   const actions = TRANSITIONS[c.status].filter((t) => t !== "sold_out");
   return layout(
@@ -219,6 +227,7 @@ ${c.status === "draft" || c.status === "active"
 ${c.provider === "coupon"
   ? html`<p class="note">הכרטיסים נמכרים באתר הכרטוס שלך, וכל ג׳וקר מקבל קוד אישי. אנחנו מגדירים את הקודים ומעדכנים את המכירות כאן. עדכון אחרון: ${lastImport ? showDate(lastImport) : "עוד לא"}.</p>`
   : ""}
+${sales ? artistSales(ctx, { c, ...sales }) : ""}
 <section class="card">
   <h2>הג׳וקרים המובילים</h2>
   ${top.length

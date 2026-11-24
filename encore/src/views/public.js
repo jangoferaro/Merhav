@@ -131,7 +131,7 @@ ${shows.length
 
 // ---------- דף הופעה: לרוכש ולמקדם ----------
 
-export function showPage(ctx, { c, referrer, link, stats, buyable }, opts) {
+export function showPage(ctx, { c, referrer, link, stats, buyable, left = null }, opts) {
   return layout(
     ctx,
     `${c.artist_name} · ${c.title}`,
@@ -149,8 +149,10 @@ export function showPage(ctx, { c, referrer, link, stats, buyable }, opts) {
 
     <div class="buy-box">
       <div><span class="muted">כרטיס</span> <b class="price">${money(c.price_agorot)}</b></div>
-      ${buyable
-        ? html`<a class="btn big block" href="/s/${c.id}/buy">לרכישת כרטיסים</a>`
+      ${buyable && left === 0
+        ? html`<p class="muted">הכרטיסים אזלו.</p>`
+        : buyable
+        ? html`<a class="btn big block" href="/s/${c.id}/buy">לרכישת כרטיסים</a>${left !== null && left <= 20 ? html`<p class="note">נשארו ${left} כרטיסים.</p>` : ""}`
         : html`<p class="muted">${c.status === "cancelled" ? "ההופעה בוטלה." : "המכירה דרך Jocares סגורה כרגע."}</p>
                ${c.source_url ? html`<a class="btn ghost block" href="${c.source_url}" rel="noopener nofollow">לאתר ההופעה</a>` : ""}`}
     </div>

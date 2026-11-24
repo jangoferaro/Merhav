@@ -103,7 +103,7 @@ export function showCard(ctx, c) {
 
 const BELL = raw(`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`);
 
-export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreator = false, wide = false, description = "", og = {} } = {}) {
+export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreator = false, wide = false, description = "", og = {}, noindex = false } = {}) {
   const abs = (u) => (/^https?:\/\//.test(u) ? u : `${ctx.origin ?? ""}${u}`);
   const desc = description || "אמנות צריכה קהל. בוחרים הופעה, משתפים, ומרוויחים מכל כרטיס שנמכר בזכותכם.";
   const ogTitle = og.title || (title ? `${title} · jocares.` : "jocares. · אמנות צריכה קהל");
@@ -123,7 +123,8 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${title ? `${title} · jocares.` : "jocares. · אמנות צריכה קהל"}</title>
-<meta name="description" content="${desc}">
+<meta name="description" content="${desc}">${noindex ? html`
+<meta name="robots" content="noindex, nofollow">` : ""}
 <meta property="og:site_name" content="jocares.">
 <meta property="og:type" content="${og.type || "website"}">
 <meta property="og:locale" content="he_IL">

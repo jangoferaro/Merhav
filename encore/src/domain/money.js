@@ -3,6 +3,7 @@ import { insert, tx } from "../db.js";
 import { addDays, clock, config, decrypt, encrypt, money, shekelsToAgorot, text, UserError } from "../util.js";
 import { audit, notify } from "./identity.js";
 import { contentReconciliationIssues, settleContent } from "./content.js";
+import { expireHolds, ticketIssues } from "./tickets.js";
 
 /**
  * שלושה מצבים ברורים למקדם (PRD §9.7):
@@ -165,7 +166,7 @@ export function settle(db) {
     for (const [uid, amount] of perUser) {
       if (amount > 0) notify(db, uid, `${money(amount)} עברו למצב "זמין לתשלום".`, "/me/money");
     }
-    return { ended: ending.length, released: ready.length, content: settleContent(db) };
+    return { ended: ending.length, released: ready.length, content: settleContent(db), expired: expireHolds(db) };
   });
 }
 
@@ -247,5 +248,5 @@ export function reconciliationIssues(db) {
     )
     .all()
     .map((r) => `תשלום #${r.id}: ${r.amount_agorot} אבל התגמולים בו ${r.sum}`);
-  return [...ledger, ...payouts, ...contentReconciliationIssues(db)];
+  return [...ledger, ...payouts, ...contentReconciliationIssues(db), ...ticketIssues(db)];
 }

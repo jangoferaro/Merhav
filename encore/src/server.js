@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { openDb } from "./db.js";
 import { clock, config, hmac, isEmail, normalizeEmail, safeEqual, UserError } from "./util.js";
 import { cookie, isCrawler, makeCtx, rateLimit, readBody, Router, safeNext } from "./http.js";
-import { sendLoginCode } from "./mailer.js";
 import * as ID from "./domain/identity.js";
 import * as C from "./domain/campaigns.js";
 import * as R from "./domain/referrals.js";
@@ -24,6 +23,11 @@ import { designPage } from "./views/design.js";
 import { imageFromForm, serveMedia } from "./media.js";
 import { finishGoogleLogin, googleEnabled, startGoogleLogin } from "./auth-google.js";
 import * as CP from "./domain/coupons.js";
+import * as T from "./domain/tickets.js";
+import * as TV from "./views/tickets.js";
+import { gateway } from "./payments/index.js";
+import { sandboxPay, sandboxPayment } from "./payments/sandbox.js";
+import { sendLoginCode, sendTickets } from "./mailer.js";
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png" };
@@ -120,6 +124,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
           c, link, stats: link ? R.linkStats(db, link.id) : null,
           referrer: ref && ref.promoter_id !== ctx.user?.id ? ID.publicName({ name: ref.name }) : null,
           buyable: ["active", "paused", "sold_out"].includes(c.status) && c.starts_at > clock.iso(),
+          left: c.provider === "jocares" ? T.inventory(db, c).available : null,
         },
         opts(ctx)
       )
@@ -320,6 +325,127 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     ctx.redirect("/");
   });
 
+  // ---------- הקופה של Jocares ----------
+
+  const checkoutData = (ctx, c) => {
+    const ref = refFor(ctx, c.id);
+    return { c, inv: T.inventory(db, c), referrer: ref && ref.promoter_id !== ctx.user?.id ? ID.publicName({ name: ref.name }) : null };
+  };
+  const jocaresCampaign = (id) => {
+    const c = campaignOr404(id);
+    if (c.provider !== "jocares") throw new UserError("ההופעה לא נמכרת דרך Jocares", 404);
+    return c;
+  };
+  const ticketsUrl = (ctx, order) => `${origin(ctx)}/tickets/${order.token}`;
+  const goExternal = (ctx, url) => {
+    if (url.startsWith("/")) return ctx.redirect(url);
+    ctx.res.writeHead(303, { location: url });
+    ctx.res.end();
+  };
+  /** אחרי תשלום: הכרטיסים למייל. כישלון בשליחה לא מפיל את ההזמנה (הם גם על המסך). */
+  const deliverTickets = (ctx, order) => {
+    const c = C.getCampaign(db, order.campaign_id);
+    sendTickets(order.buyer_email, { name: order.buyer_name, show: `${c.artist_name} · ${c.title}`, url: ticketsUrl(ctx, order), qty: order.qty }).catch((e) =>
+      console.error("[tickets mail]", e.message)
+    );
+  };
+
+  r.get("/checkout/:id", (ctx) => {
+    const c = jocaresCampaign(ctx.params.id);
+    if (!T.salesOpen(c)) return ctx.redirect(`/s/${c.id}`, { ok: false, m: "המכירה להופעה הזו סגורה" });
+    ctx.send(TV.checkoutPage(ctx, { ...checkoutData(ctx, c), v: { email: ctx.user?.email ?? "", name: ctx.user?.name ?? "" } }, opts(ctx)));
+  });
+
+  r.post("/checkout/:id", async (ctx) => {
+    const c = jocaresCampaign(ctx.params.id);
+    rateLimit(`checkout:${ctx.ip}`, 20, 600_000);
+    const f = await ctx.form();
+    let order;
+    try {
+      order = T.createOrder(db, c.id, f, { clickToken: refFor(ctx, c.id)?.token ?? null });
+    } catch (e) {
+      if (!(e instanceof UserError)) throw e;
+      return ctx.send(TV.checkoutPage(ctx, { ...checkoutData(ctx, c), v: f, error: e.message }, opts(ctx)), 400);
+    }
+    goExternal(ctx, T.startPayment(db, order, { origin: origin(ctx) }));
+  });
+
+  r.get("/checkout/return/:token", (ctx) => {
+    const before = T.orderByToken(db, ctx.params.token);
+    if (!before) throw new UserError("ההזמנה לא נמצאה", 404);
+    const order = T.returnFromPayment(db, before);
+    if (order.status === "paid" || order.status === "rejected") {
+      if (before.status !== "paid" && order.status === "paid") deliverTickets(ctx, order);
+      return ctx.redirect(`/tickets/${order.token}${before.status !== "paid" ? "?new=1" : ""}`);
+    }
+    ctx.send(TV.paymentPendingPage(ctx, { order }));
+  });
+
+  // התראת שרת-לשרת מספק התשלום (ספק אמיתי). אומתה בחתימה של הספק.
+  r.post("/webhooks/pay/:gateway", async (ctx) => {
+    const g = gateway(ctx.params.gateway);
+    const raw = await readBody(ctx.req, 64 * 1024, { raw: true });
+    const n = g.verifyNotification(raw, ctx.req.headers);
+    const before = db.prepare("SELECT * FROM ticket_orders WHERE gateway = ? AND payment_ref = ?").get(g.name, n.ref);
+    if (n.status === "paid") {
+      const { order, fresh } = T.confirmPayment(db, g.name, n.ref);
+      if (fresh && before?.status !== "paid") deliverTickets(ctx, order);
+    } else if (n.status === "failed") T.failPayment(db, g.name, n.ref);
+    ctx.json({ ok: true });
+  }, { noCsrf: true });
+
+  r.get("/tickets/:token", (ctx) => {
+    const order = T.orderByToken(db, ctx.params.token);
+    if (!order || !["paid", "rejected"].includes(order.status)) throw new UserError("הכרטיסים לא נמצאו", 404);
+    const c = C.getCampaign(db, order.campaign_id);
+    const tickets = T.ticketsOf(db, order.id).map((t) => ({ ...t, qr: T.qrSvg(t.code) }));
+    ctx.send(TV.ticketsPage(ctx, { c, order, tickets, fresh: ctx.query.new === "1", url: ticketsUrl(ctx, order) }, opts(ctx)));
+  });
+
+  r.get("/tickets/:token/calendar.ics", (ctx) => {
+    const order = T.orderByToken(db, ctx.params.token);
+    if (!order || order.status !== "paid") throw new UserError("הכרטיסים לא נמצאו", 404);
+    const c = C.getCampaign(db, order.campaign_id);
+    ctx.res.writeHead(200, { "content-type": "text/calendar; charset=utf-8", "content-disposition": `attachment; filename="jocares-${c.id}.ics"` });
+    ctx.res.end(T.ics(c, order, ticketsUrl(ctx, order)));
+  });
+
+  // עמוד התשלום של ספק הניסיון (מחליף עמוד תשלום מתארח של חברת סליקה)
+  r.get("/pay/sandbox/:ref", (ctx) => {
+    const p = sandboxPayment(db, ctx.params.ref);
+    if (!p) throw new UserError("העסקה לא נמצאה", 404);
+    if (p.status !== "pending") return ctx.redirect(new URL(p.return_url).pathname);
+    ctx.send(TV.sandboxPayPage(ctx, { p }));
+  });
+
+  r.post("/pay/sandbox/:ref", async (ctx) => {
+    const p = sandboxPayment(db, ctx.params.ref);
+    if (!p) throw new UserError("העסקה לא נמצאה", 404);
+    const status = sandboxPay(db, p.ref, (await ctx.form()).card);
+    if (status === "failed") return ctx.send(TV.sandboxPayPage(ctx, { p: sandboxPayment(db, p.ref), error: "הכרטיס נדחה" }), 402);
+    ctx.redirect(new URL(p.return_url).pathname);
+  });
+
+  // ---------- כניסה להופעה ----------
+
+  const doorCampaign = (token) => {
+    const c = T.campaignByDoor(db, token);
+    if (!c) throw new UserError("הקישור לכניסה לא בתוקף", 404);
+    return c;
+  };
+
+  r.get("/door/:token", (ctx) => {
+    const c = doorCampaign(ctx.params.token);
+    ctx.send(TV.doorPage(ctx, { c, token: ctx.params.token, stats: T.doorStats(db, c.id) }));
+  });
+
+  r.post("/door/:token", async (ctx) => {
+    const c = doorCampaign(ctx.params.token);
+    rateLimit(`door:${ctx.ip}`, 600, 600_000);
+    const last = T.checkIn(db, c, (await ctx.form()).code);
+    ctx.send(TV.doorPage(ctx, { c, token: ctx.params.token, stats: T.doorStats(db, c.id), last }), last.result === "ok" ? 200 : 409);
+  });
+
   // ---------- אמן ----------
 
   r.get("/artist", (ctx) => {
@@ -388,10 +514,49 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     ctx.send(
       A.manageCampaign(
         ctx,
-        { c, r: C.campaignResults(db, c.id), top: C.topPromoters(db, c.id), publicUrl: `${origin(ctx)}/s/${c.id}`, lastImport: c.provider === "coupon" ? CP.lastImportAt(db, c.id) : null },
+        {
+          c, r: C.campaignResults(db, c.id), top: C.topPromoters(db, c.id), publicUrl: `${origin(ctx)}/s/${c.id}`,
+          lastImport: c.provider === "coupon" ? CP.lastImportAt(db, c.id) : null,
+          sales: c.provider === "jocares"
+            ? { s: T.salesSummary(db, c), orders: T.ordersOfCampaign(db, c.id), doorUrl: `${origin(ctx)}/door/${T.doorToken(db, c.id)}`, open: T.salesOpen(c) }
+            : null,
+        },
         opts(ctx)
       )
     );
+  });
+
+  r.post("/artist/c/:id/capacity", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = managed(ctx, ctx.params.id);
+    T.setCapacity(db, ctx.user, c, (await ctx.form()).capacity);
+    ctx.redirect(`/artist/c/${c.id}`, "מספר הכרטיסים עודכן");
+  });
+
+  r.post("/artist/c/:id/refund", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = managed(ctx, ctx.params.id);
+    const f = await ctx.form();
+    const o = T.ticketOrder(db, f.order);
+    if (!o || o.campaign_id !== c.id) throw new UserError("ההזמנה לא נמצאה");
+    T.refundTickets(db, ctx.user, o.id, f.qty, "החזר מהאמן");
+    await T.processRefunds(db);
+    ctx.redirect(`/artist/c/${c.id}`, "הוחזר. הכרטיסים כבר לא בתוקף, והכסף חוזר לקונה.");
+  });
+
+  r.get("/artist/c/:id/buyers.csv", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = managed(ctx, ctx.params.id);
+    ID.audit(db, ctx.user.id, "tickets.export", "campaign", c.id, {});
+    ctx.res.writeHead(200, { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="jocares-buyers-${c.id}.csv"`, "cache-control": "no-store" });
+    ctx.res.end(T.buyersCsv(db, c.id));
+  });
+
+  r.post("/artist/c/:id/door/rotate", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = managed(ctx, ctx.params.id);
+    T.rotateDoorToken(db, ctx.user, c.id);
+    ctx.redirect(`/artist/c/${c.id}`, "נוצר קישור חדש לכניסה");
   });
 
   r.post("/artist/c/:id/status", async (ctx) => {
@@ -400,6 +565,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const f = await ctx.form();
     if (f.to === "sold_out") throw new UserError("המצב הזה נקבע אוטומטית");
     C.setStatus(db, ctx.user, c.id, String(f.to));
+    if (f.to === "cancelled") await T.processRefunds(db);
     ctx.redirect(ctx.user.is_admin && !ID.artistsOf(db, ctx.user.id).some((a) => a.id === c.artist_id) ? "/admin?tab=campaigns" : `/artist/c/${c.id}`, "עודכן");
   });
 
@@ -750,7 +916,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   // בוטים של תצוגה מקדימה עוברים לדפי הופעה ולתמונות, כדי שאפשר יהיה לבדוק שיתוף בוואטסאפ.
   const pilotPass = () => process.env.STAGING_PASSWORD;
   const pilotToken = () => hmac(pilotPass(), "pilot-access");
-  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health)$|^\/(static|media|webhooks)\//;
+  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health)$|^\/(static|media|webhooks|tickets|door)\//;
 
   function stagingGate(req, res, ctx) {
     if (!pilotPass()) return false;
@@ -837,7 +1003,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const tick = () => {
     try {
       const r = M.settle(db);
-      if (r.ended || r.released || r.content) console.log(`[settle] ended=${r.ended} released=${r.released} content=${r.content}`);
+      if (r.ended || r.released || r.content || r.expired) console.log(`[settle] ended=${r.ended} released=${r.released} content=${r.content} expired=${r.expired}`);
+      T.processRefunds(db).then((n) => n && console.log(`[refunds] ${n}`), (e) => console.error("[refunds]", e));
     } catch (e) {
       console.error("[settle]", e);
     }

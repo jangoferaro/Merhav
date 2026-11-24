@@ -21,3 +21,20 @@ export async function sendLoginCode(email, code) {
   console.log(`[dev] login code for ${email}: ${code}`);
   return { sent: false, devCode: code };
 }
+
+/** הכרטיסים לקונה. בלי ספק דואר: נרשם ביומן (הקונה רואה את הכרטיסים גם על המסך מיד אחרי התשלום). */
+export async function sendTickets(email, { name, show, url, qty }) {
+  const subject = `הכרטיסים שלך: ${show}`;
+  const body = `היי ${name},\n\n${qty > 1 ? `${qty} הכרטיסים שלך` : "הכרטיס שלך"} ל${show} מחכים כאן:\n${url}\n\nבכניסה מציגים את הקוד מהטלפון. אין צורך להדפיס.\n\nJocares`;
+  if (process.env.RESEND_API_KEY) {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({ from: process.env.MAIL_FROM || "Jocares <tickets@jocares.example>", to: email, subject, text: body }),
+    });
+    if (!res.ok) throw new Error(`mail send failed: ${res.status}`);
+    return { sent: true };
+  }
+  if (!config.isProd || config.isStaging) console.log(`[dev] tickets for ${email}: ${url}`);
+  return { sent: false };
+}

@@ -80,13 +80,22 @@ export function parseCampaignInput(input) {
     reward_agorot: reward,
     promo_limit: parseLimit(input.promo_limit),
     share_text: text(input.share_text, "טקסט לשיתוף", { max: 600, required: false }),
-    // "coupon" = האמן מוכר במערכת הכרטוס שלו (ברירת מחדל כשיש לינק להופעה); "sim" = קופה לדוגמה
+    // "jocares" = הקופה שלנו (מומלץ). "coupon" = האמן מוכר באתר אחר וכל ג׳וקר מקבל קוד.
+    // "sim" = ספק חיצוני מדומה לבדיקות. בלי בחירה מפורשת: coupon אם יש לינק, אחרת sim (תאימות לאחור).
     ticketing: (() => {
+      if (input.ticketing === "jocares") return "jocares";
       if (input.ticketing === "sim") return "sim";
       if (input.ticketing === "coupon" && !source) throw new UserError("צריך לינק לעמוד הכרטיסים שלך, כדי שנדע לאן לשלוח את הקונים");
       return source ? "coupon" : "sim";
     })(),
+    capacity: input.ticketing === "jocares" ? parseCapacity(input.capacity) : null,
   };
+}
+
+export function parseCapacity(v) {
+  const n = Number(String(v ?? "").trim());
+  if (!Number.isInteger(n) || n < 1 || n > 20000) throw new UserError("כמה כרטיסים יש למכירה? מספר בין 1 ל-20,000");
+  return n;
 }
 
 export function createCampaign(db, user, input, { publish = true } = {}) {
@@ -104,7 +113,7 @@ export function createCampaign(db, user, input, { publish = true } = {}) {
     }
     const eventId = insert(db, "events", {
       artist_id: artist.id, title: c.title, description: c.description, venue: c.venue, city: c.city,
-      genre: c.genre, starts_at: c.starts_at, image_url: c.image_url, source_url: c.source_url, created_at: now,
+      genre: c.genre, starts_at: c.starts_at, image_url: c.image_url, source_url: c.source_url, capacity: c.capacity, created_at: now,
     });
     const p = provider(c.ticketing);
     const externalId = p.registerEvent(db, { title: c.title, price_agorot: c.price_agorot });
@@ -126,7 +135,7 @@ export function createCampaign(db, user, input, { publish = true } = {}) {
 // ---------- שאילתות ----------
 
 const CAMPAIGN_SELECT = `
-  SELECT c.*, e.title, e.description, e.venue, e.city, e.genre, e.starts_at, e.image_url, e.source_url,
+  SELECT c.*, e.title, e.description, e.venue, e.city, e.genre, e.starts_at, e.image_url, e.source_url, e.capacity,
          a.name AS artist_name,
          t.id AS terms_id, t.version AS terms_version, t.reward_agorot, t.fee_bps
     FROM campaigns c
@@ -186,8 +195,9 @@ export function setStatus(db, user, campaignId, to, { reason = "" } = {}) {
 }
 
 // מוגדר ב-ingest.js; מוזרק כאן כדי למנוע תלות מעגלית
-let cancelCampaignOrders = () => {};
-export const _setCancelHandler = (fn) => (cancelCampaignOrders = fn);
+const cancelHandlers = [];
+const cancelCampaignOrders = (db, c, actorId) => cancelHandlers.forEach((fn) => fn(db, c, actorId));
+export const _setCancelHandler = (fn) => cancelHandlers.push(fn);
 
 /** שינוי תגמול: יוצר גרסת תנאים חדשה שחלה רק על מכירות עתידיות */
 export function changeReward(db, user, campaignId, rewardInput) {

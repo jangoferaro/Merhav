@@ -4,9 +4,9 @@ import { openDb, insert } from "./db.js";
 import { clock, emailHash, isoToIsraelLocal, addDays } from "./util.js";
 import * as C from "./domain/campaigns.js";
 import * as R from "./domain/referrals.js";
-import * as I from "./domain/ingest.js";
 import * as M from "./domain/money.js";
-import { setSimDeliver, simBuy } from "./providers/sim.js";
+import * as T from "./domain/tickets.js";
+import { sandboxPay } from "./payments/sandbox.js";
 import * as K from "./domain/content.js";
 import { saveImage, mediaDir } from "./media.js";
 import { demoImage } from "./demo-images.js";
@@ -19,7 +19,6 @@ const file = process.env.ENCORE_DB ?? "data/encore.db";
 for (const f of [file, `${file}-wal`, `${file}-shm`]) fs.rmSync(f, { force: true });
 fs.rmSync(mediaDir(), { recursive: true, force: true });
 const db = openDb(file);
-setSimDeliver((raw, h) => I.ingestWebhook(db, "sim", raw, h));
 
 const user = (email, name, isAdmin = 0) => {
   const id = insert(db, "users", { email, email_hash: emailHash(email), name, is_admin: isAdmin, created_at: clock.iso() });
@@ -35,36 +34,45 @@ const maya = user("maya@encore.local", "מאיה פרץ");
 const tom = user("tom@encore.local", "תום אדלר");
 
 const shows = [
-  [noa, { artist_name: "נועה ברק", title: "ערב אקוסטי באינטימי", venue: "הבארבי", city: "תל אביב", genre: "אינדי", starts_at: inDays(9), price: "89", reward: "20", description: "שירים מהאלבום החדש, גיטרה, פסנתר וכמה הפתעות." , image_url: img("blur") }],
-  [band, { artist_name: "הקרוואן", title: "השקת אלבום", venue: "זאפה", city: "ירושלים", genre: "רוק", starts_at: inDays(16), price: "120", reward: "25", promo_limit: "100" , image_url: img("rays") }],
-  [noa, { artist_name: "נועה ברק", title: "הופעה בצפון", venue: "האנגר 11", city: "חיפה", genre: "אינדי", starts_at: inDays(30), price: "75", reward: "15" , image_url: img("rings") }],
-  [band, { artist_name: "שקד וחברים", title: "ג'אם ג'אז של חמישי", venue: "בית העם", city: "תל אביב", genre: "ג'אז", starts_at: inDays(4), price: "60", reward: "10" , image_url: img("stripes") }],
-  [band, { artist_name: "DJ Lila", title: "Lila All Night", venue: "הבלוק", city: "תל אביב", genre: "אלקטרוני", starts_at: inDays(22), price: "110", reward: "30" , image_url: img("pixels") }],
+  [noa, { artist_name: "נועה ברק", title: "ערב אקוסטי באינטימי", venue: "הבארבי", city: "תל אביב", genre: "אינדי", starts_at: inDays(9), price: "89", reward: "20", description: "שירים מהאלבום החדש, גיטרה, פסנתר וכמה הפתעות.", image_url: img("blur"), ticketing: "jocares", capacity: "120" }],
+  [band, { artist_name: "הקרוואן", title: "השקת אלבום", venue: "זאפה", city: "ירושלים", genre: "רוק", starts_at: inDays(16), price: "120", reward: "25", promo_limit: "100", image_url: img("rays"), ticketing: "jocares", capacity: "300" }],
+  [noa, { artist_name: "נועה ברק", title: "הופעה בצפון", venue: "האנגר 11", city: "חיפה", genre: "אינדי", starts_at: inDays(30), price: "75", reward: "15", image_url: img("rings"), ticketing: "jocares", capacity: "250" }],
+  [band, { artist_name: "שקד וחברים", title: "ג'אם ג'אז של חמישי", venue: "בית העם", city: "תל אביב", genre: "ג'אז", starts_at: inDays(4), price: "60", reward: "10", image_url: img("stripes"), ticketing: "jocares", capacity: "80" }],
+  [band, { artist_name: "DJ Lila", title: "Lila All Night", venue: "הבלוק", city: "תל אביב", genre: "אלקטרוני", starts_at: inDays(22), price: "110", reward: "30", image_url: img("pixels"), ticketing: "jocares", capacity: "400" }],
 ];
 const ids = shows.map(([u, s]) => C.createCampaign(db, u, s));
 
 let n = 0;
+/** קנייה אמיתית בקופה: הזמנה → עמוד התשלום של ספק הניסיון → אישור → כרטיסים */
+const purchase = (cid, qty, clickToken = null, email = `buyer${n++}@example.com`) => {
+  const o = T.createOrder(db, cid, { name: "קונה לדוגמה", email, qty, consent: n % 2 ? "on" : "" }, { clickToken });
+  T.startPayment(db, o, { origin: "" });
+  sandboxPay(db, T.ticketOrder(db, o.id).payment_ref, "4242424242424242");
+  return T.returnFromPayment(db, T.ticketOrder(db, o.id));
+};
 const sell = (promoter, cid, buys) => {
-  const c = C.getCampaign(db, cid);
   const link = R.getOrCreateLink(db, promoter, cid);
   for (let i = 0; i < buys.clicks; i++) R.recordClick(db, link, `seed-${n++}`);
-  for (const qty of buys.orders) {
-    const click = R.recordClick(db, link, `seed-${n++}`);
-    simBuy(db, c.external_event_id, { name: "קונה לדוגמה", email: `buyer${n++}@example.com`, qty, ref: click.token });
-  }
+  for (const qty of buys.orders) purchase(cid, qty, R.recordClick(db, link, `seed-${n++}`).token);
 };
 sell(dani, ids[0], { clicks: 14, orders: [2, 1, 3] });
 sell(maya, ids[0], { clicks: 6, orders: [2] });
 sell(dani, ids[1], { clicks: 9, orders: [1, 2] });
 sell(tom, ids[3], { clicks: 3, orders: [1] });
-simBuy(db, C.getCampaign(db, ids[0]).external_event_id, { name: "ישיר", email: "direct@example.com", qty: 2 });
+purchase(ids[0], 2, null, "direct@example.com");
+// מישהו כבר נכנס בדלת, והאמן החזיר כרטיס אחד
+const first = db.prepare("SELECT * FROM ticket_orders WHERE campaign_id = ? AND status = 'paid' ORDER BY id LIMIT 1").get(ids[0]);
+T.checkIn(db, C.getCampaign(db, ids[0]), T.ticketsOf(db, first.id)[0].code);
+const refundable = db.prepare("SELECT * FROM ticket_orders WHERE campaign_id = ? AND qty = 3").get(ids[0]);
+T.refundTickets(db, noa, refundable.id, 1, "בקשת הקונה");
+await T.processRefunds(db);
 
 // מסלול הקופונים: הופעה שנמכרת באתר הכרטוס של האמן. לצוות יש קודים להגדיר ומכירות להעלות.
 const cpn = C.createCampaign(db, band, { artist_name: "הקרוואן", title: "ערב קופונים בלבונטין", venue: "לבונטין 7", city: "תל אביב", genre: "רוק", starts_at: inDays(12), price: "90", reward: "20", image_url: img("rays"), source_url: "https://tickets.example.com/caravan", ticketing: "coupon" });
 for (const u of [dani, maya, tom]) R.getOrCreateLink(db, u, cpn);
 
 // הופעה שכבר עברה: התגמולים של דני שם כבר זמינים לתשלום
-const past = C.createCampaign(db, noa, { artist_name: "נועה ברק", title: "הופעת חנוכה", venue: "צוללת צהובה", city: "ירושלים", starts_at: inDays(1), price: "70", reward: "15", image_url: img("blur") });
+const past = C.createCampaign(db, noa, { artist_name: "נועה ברק", title: "הופעת חנוכה", venue: "צוללת צהובה", city: "ירושלים", starts_at: inDays(1), price: "70", reward: "15", image_url: img("blur"), ticketing: "jocares", capacity: "60" });
 sell(dani, past, { clicks: 5, orders: [2, 2] });
 db.prepare("UPDATE events SET starts_at = ? WHERE id = (SELECT event_id FROM campaigns WHERE id = ?)").run(addDays(new Date().toISOString(), -5), past);
 M.settle(db);
@@ -99,4 +107,5 @@ console.log("משתמשים לדוגמה (הקוד מוצג על המסך במצ
 console.log("  ops@encore.local   — צוות תפעול (ניהול)");
 console.log("  noa@encore.local   — אמנית");
 console.log("  dani@encore.local  — מקדם עם מכירות וכסף זמין");
+console.log("קנייה לדוגמה: כל הופעה → לרכישת כרטיסים → כרטיס 4242 4242 4242 4242");
 console.log("  lior@encore.local  — יוצרת תוכן עם הזמנה שמחכה לאישור האמנית");
