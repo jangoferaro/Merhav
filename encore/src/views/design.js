@@ -9,14 +9,10 @@ let demo;
 const demoSrc = (i) => (demo ??= DEMO_STYLES.map((st, k) => `data:image/png;base64,${demoImage(101 + k, st, 480, 360).toString("base64")}`))[i % DEMO_STYLES.length];
 
 const SWATCHES = [
-  ["--paper", "נייר", "#ffffff", "#111"],
-  ["--ink", "דיו", "#111111", "#fff"],
-  ["--c0", "כתום", "#ff4d00", "#111"],
-  ["--c1", "ורוד", "#ffb3d1", "#111"],
-  ["--c2", "ירוק", "#007a37", "#fff"],
-  ["--c3", "סגול", "#6e4cff", "#fff"],
-  ["--c4", "כחול", "#0034d1", "#fff"],
-  ["--c5", "צהוב", "#ffc400", "#111"],
+  ["--jo-ink", "Ink Black", "#151515", "#EDECE4"],
+  ["--jo-paper", "Paper White", "#EDECE4", "#151515"],
+  ["--jo-acid", "Joker Acid", "#DFFF45", "#151515"],
+  ["--jo-red", "Rebel Red", "#FF493D", "#151515"],
 ];
 
 const sample = (artist_name, title, i = 0) => ({ artist_name, title, image_url: demoSrc(i) });
@@ -27,36 +23,49 @@ export function designPage(ctx, opts) {
     "שפה עיצובית",
     html`
 <section class="hero">
-  <p class="eyebrow">שפה עיצובית · גרסה 1</p>
-  <h1 class="display">דף שקט.<br>צבע רועש.</h1>
-  <p class="lead">הקהל, האמנים והיוצרים מביאים את הצבע. הממשק נשאר לבן, ישר ונקי, כדי שהם יבלטו.</p>
+  <p class="eyebrow">jocares. · שפה עיצובית · גרסה 2</p>
+  <h1 class="display" dir="ltr" lang="en" style="text-align:right">Be Jo.</h1>
+  <p class="lead">מותג תרבות עצמאי, אנושי, נועז ומינימליסטי. הממשק נקי ושקט, הצילום בשחור לבן, והחומצה מסמנת את מה שחשוב.</p>
+  <p class="meta" dir="ltr" lang="en" style="text-align:right">Who cares? Jo cares. Because art deserves an audience.</p>
 </section>
 
 <section class="ds-section">
   <h2>עקרונות</h2>
   <ol class="principles">
-    <li><div><b>הדף לבן, הצבע בפוסטר</b><span>הממשק עצמו שחור-לבן. צבע מופיע רק בפוסטרים, בחותמות ובבלוקים גדולים, ותמיד שטוח, בלי גרדיאנטים.</span></div></li>
-    <li><div><b>שני גופנים, שני תפקידים</b><span>Heebo לכותרות (900, צפוף וענק) ולמספרים גדולים (300). Assistant פשוט וגנרי לכל טקסט התוכן.</span></div></li>
+    <li><div><b>נייר, דיו, חומצה</b><span>הממשק על נייר חם בדיו שחורה. Joker Acid מסמן את מה שהכי חשוב, Rebel Red הוא מבטא. בלי גרדיאנטים ובלי צללים מטושטשים.</span></div></li>
+    <li><div><b>שלושה קולות</b><span>כותרות חזקות וצפופות (Space Grotesk ללטינית, Heebo לעברית), טקסט פשוט ב-Assistant, ומספרים ב-IBM Plex Mono, כמו על כרטיס.</span></div></li>
     <li><div><b>פינות ישרות, עיגול אחד</b><span>כל קופסה, כפתור, שדה ותמונה בפינות של 0. העיגול שמור למה שהכי חשוב: הסכום שמרוויחים, נקודת סטטוס, אווטאר.</span></div></li>
     <li><div><b>קווי שיער במקום קופסאות</b><span>היררכיה בעזרת קו מבני שחור וקו שיער אפור, לא צללים ולא רקעים. רשימות הן שורות על קווים.</span></div></li>
-    <li><div><b>תמיד יש תמונה</b><span>התמונה של האמן היא הגיבור. העיצוב עוטף אותה בקווי בנייה, במסגרת צבע או בפס עם השם, בהשראת העבודות של Under ושל הדר לוזון.</span></div></li>
+    <li><div><b>תמיד יש תמונה, בשחור לבן</b><span>צילום אמנים וקהל בשחור לבן. הצבע מגיע רק מהטיפול: קווי בנייה, מסגרת חומצה או אדום, או פס עם שם האמן.</span></div></li>
     <li><div><b>בלי אימוג'ים</b><span>אייקונים בקו דק אחד (1.25px) בצבע הטקסט, או מילה במקומם.</span></div></li>
   </ol>
 </section>
 
 <section class="ds-section">
-  <h2>צבע <span>6 צבעי פלטה + נייר ודיו</span></h2>
+  <h2>צבע <span>ארבעה צבעים, זהו</span></h2>
   <div class="swatches">
-    ${SWATCHES.map(([v, name, hex, on]) => html`<div class="swatch" style="background:var(${v});color:${on}${v === "--paper" ? ";box-shadow:inset 0 0 0 1px #111" : ""}"><b>${name}</b><code dir="ltr">${v}</code><code dir="ltr">${hex}</code></div>`)}
+    ${SWATCHES.map(([v, name, hex, on]) => html`<div class="swatch" style="background:var(${v});color:${on}${v === "--jo-paper" ? ";box-shadow:inset 0 0 0 1px #151515" : ""}"><b>${name}</b><code dir="ltr">${v}</code><code dir="ltr">${hex}</code></div>`)}
   </div>
-  <p class="note">טקסט על צבע רק בזוגות שנבדקו (AA): דיו על כתום, ורוד וצהוב; נייר על ירוק, סגול וכחול. כסף בירוק, שגיאה באדום. כתום לא משמש לטקסט קטן.</p>
+  <p class="note">דיו על נייר לכל הטקסט. חומצה היא הדגשה: חותמת הסכום, סימון כסף, פעולה ראשית לקהל. אדום הוא מבטא (סמל הג׳וקר, התראות, מסגרות) ולא טקסט קטן; לטקסט שגיאה יש אדום כהה (‎--bad). דיו על חומצה 16:1, דיו על אדום 5.3:1.</p>
 </section>
 
 <section class="ds-section">
-  <h2>טיפוגרפיה <span>Heebo לכותרות ומספרים · Assistant לטקסט</span></h2>
+  <h2>סמל ופוסטרים <span>מערכת המותג</span></h2>
+  <p class="muted">הג׳וקר הוא הקלף החסר: האדם שעוזר לאמן להגיע לקהל. אין קשר להימורים, ואין צורך במטאפורות קלפים בכל מסך.
+  הפוסטרים משמשים לקמפיינים מחוץ למוצר (רשתות, הדפסה). בתוך המוצר השפה שקטה.</p>
+  <div class="ds-row" style="align-items:flex-end;gap:24px">
+    <img src="/static/joker.svg" alt="סמל הג׳וקר" width="96" height="96" class="ds-mark">
+    ${["poster-be-jo", "poster-manifesto", "poster-missing-card"].map((f) => html`<img src="/static/${f}.svg" alt="" width="216" height="270" class="ds-poster">`)}
+  </div>
+</section>
+
+<section class="ds-section">
+  <h2>טיפוגרפיה <span>Space Grotesk + Heebo לכותרות · Assistant לטקסט · IBM Plex Mono למספרים</span></h2>
   <div class="typescale">
-    <p class="display"><small>display · 900 · ‎-0.045em</small>הופעה הלילה</p>
-    <h1><small>h1 · 800</small>שיתוף והרווחה</h1>
+    <p class="display" dir="ltr" style="text-align:right"><small>display · Space Grotesk 700</small>Art deserves an audience.</p>
+    <p class="display"><small>display · Heebo 900</small>אמנות צריכה קהל.</p>
+    <h1><small>h1 · Heebo 800</small>שתף והרוויח</h1>
+    <p class="price"><small>מספרים · IBM Plex Mono</small>₪1,240 · 24 כרטיסים</p>
     <h2><small>h2 · 700</small>הזמנות פתוחות</h2>
     <p class="lead"><small>lead · Assistant 400</small>בוחרים הופעה, משתפים, ומקבלים על כל כרטיס.</p>
     <p><small>body · Assistant 400</small>הכסף ממתין לאישור עד שלושה ימים אחרי ההופעה, ואז עובר לזמין.</p>
@@ -78,7 +87,7 @@ export function designPage(ctx, opts) {
 
 <section class="ds-section">
   <h2>חותמת <span>העיגול היחיד במערכת</span></h2>
-  <div class="ds-row">${stamp("₪20", "לכל כרטיס")} ${stamp("₪180", "בשבילך")} <span class="stamp" style="background:var(--c0)"><b>וכולם</b><small>מרוויחים</small></span></div>
+  <div class="ds-row">${stamp("₪20", "לכל כרטיס")} ${stamp("₪180", "בשבילך")} <span class="stamp hero-stamp" style="position:static" lang="en" dir="ltr"><b>Be Jo.</b></span></div>
 </section>
 
 <section class="ds-section">

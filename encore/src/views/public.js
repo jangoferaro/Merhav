@@ -9,9 +9,9 @@ export function landing(ctx, shows, opts) {
     "",
     html`
 <section class="hero">
-  <h1 class="display">הקהל מקדם<br>את ההופעה.</h1>
-  <span class="stamp hero-stamp"><b>וכולם</b><small>מרוויחים</small></span>
-  <p class="lead">אמנים מפרסמים הופעה. כל אחד יכול לשתף אותה ולהרוויח כסף מכל כרטיס שנמכר בזכותו.</p>
+  <h1 class="display">אמנות<br>צריכה קהל.</h1>
+  <span class="stamp hero-stamp" lang="en" dir="ltr"><b>Be Jo.</b></span>
+  <p class="lead">אמנים מפרסמים הופעה. כל אחד יכול לעזור לה להגיע לקהל, ולהרוויח מכל כרטיס שנמכר בזכותו.</p>
   <div class="choices">
     <a class="choice artist" href="/grow">
       <span class="choice-tag">לאמנים</span>
@@ -19,7 +19,7 @@ export function landing(ctx, shows, opts) {
       <small>למלא הופעה, להזמין תוכן, או להגיע לקהלים חדשים. משלמים על תוצאות.</small>
     </a>
     <a class="choice promoter" href="/shows">
-      <span class="choice-tag">לקהל</span>
+      <span class="choice-tag" lang="en" dir="ltr">Be Jo.</span>
       <b>אני רוצה להרוויח מקידום הופעות</b>
       <small>בוחרים הופעה, משתפים בוואטסאפ, ומקבלים על כל כרטיס.</small>
     </a>
@@ -50,7 +50,7 @@ export function how(ctx, opts) {
   <h1>איך זה עובד</h1>
   <h2>למקדמים</h2>
   <ol>
-    <li>בוחרים הופעה ולוחצים על <b>שיתוף והרווחה</b>. מקבלים לינק אישי.</li>
+    <li>בוחרים הופעה ולוחצים על <b>שתף והרוויח</b>. מקבלים לינק אישי.</li>
     <li>משתפים עם מי שרוצים. הודעה מוכנה כבר מחכה, ואפשר לערוך אותה.</li>
     <li>כשמישהו קונה דרך הלינק, מקבלים את הסכום שמופיע על ההופעה, על כל כרטיס.</li>
   </ol>
@@ -112,7 +112,7 @@ export function marketplace(ctx, { shows, cities, city, when }, opts) {
     html`
 <section class="page-head">
   <h1>בוחרים הופעה. משתפים. מרוויחים.</h1>
-  <p class="lead">הסכום הירוק הוא מה שתקבלו על כל כרטיס שנמכר דרך הלינק שלכם.</p>
+  <p class="lead">הסכום המסומן הוא מה שתקבלו על כל כרטיס שנמכר דרך הלינק שלכם.</p>
 </section>
 <nav class="chips" aria-label="סינון">
   ${chip(q("", when), "בכל הארץ", !city)}
@@ -151,7 +151,7 @@ export function showPage(ctx, { c, referrer, link, stats, buyable }, opts) {
       <div><span class="muted">כרטיס</span> <b class="price">${money(c.price_agorot)}</b></div>
       ${buyable
         ? html`<a class="btn big block" href="/s/${c.id}/buy">לרכישת כרטיסים</a>`
-        : html`<p class="muted">${c.status === "cancelled" ? "ההופעה בוטלה." : "המכירה דרך ENCORE סגורה כרגע."}</p>
+        : html`<p class="muted">${c.status === "cancelled" ? "ההופעה בוטלה." : "המכירה דרך Jocares סגורה כרגע."}</p>
                ${c.source_url ? html`<a class="btn ghost block" href="${c.source_url}" rel="noopener nofollow">לאתר ההופעה</a>` : ""}`}
     </div>
 
@@ -162,7 +162,7 @@ export function showPage(ctx, { c, referrer, link, stats, buyable }, opts) {
       <p>על כל כרטיס שנמכר דרך הלינק שלכם תקבלו <b class="money">${money(c.reward_agorot)}</b>.</p>
       ${link
         ? html`<a class="btn ghost block" href="/s/${c.id}/share">הלינק שלי · ${stats.tickets} כרטיסים עד עכשיו</a>`
-        : html`<form method="post" action="/s/${c.id}/promote">${csrfField(ctx)}<button class="btn block">שיתוף והרווחה</button></form>`}
+        : html`<form method="post" action="/s/${c.id}/promote">${csrfField(ctx)}<button class="btn block">שתף והרוויח</button></form>`}
     </div>`
       : ""}
   </div>

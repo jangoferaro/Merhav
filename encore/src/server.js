@@ -669,7 +669,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const db = openDb();
   const port = Number(process.env.PORT ?? 3000);
-  http.createServer(createApp(db)).listen(port, () => console.log(`ENCORE רץ על http://localhost:${port}`));
+  http.createServer(createApp(db)).listen(port, () => console.log(`Jocares רץ על http://localhost:${port}`));
   const tick = () => {
     try {
       const r = M.settle(db);

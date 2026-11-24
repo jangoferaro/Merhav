@@ -5,60 +5,67 @@
    ========================================================================== */
 
 :root {
-  /* בסיס */
-  --paper: #ffffff;
-  --ink: #111111;
-  --ink-2: #5f5f5f;          /* טקסט משני: ניגודיות 6.4:1 על לבן */
-  --hair: #e4e4e4;           /* קו שיער */
-  --rule: #111111;           /* קו מבני */
-  --wash: #f6f6f4;           /* משטח שקט */
-
-  /* ששת צבעי הפלטה: לפוסטרים, חותמות ובלוקים. טקסט עליהם רק בזוגות שנבדקו */
-  --c0: #ff4d00;  /* כתום   · ink 6.1:1 */
-  --c1: #ffb3d1;  /* ורוד   · ink 11:1 */
-  --c2: #007a37;  /* ירוק   · paper 5.3:1 */
-  --c3: #6e4cff;  /* סגול   · paper 5.2:1 */
-  --c4: #0034d1;  /* כחול   · paper 9.1:1 */
-  --c5: #ffc400;  /* צהוב   · ink 12:1 */
+  /* מותג Jocares. (brand/BRAND_KIT.md) */
+  --jo-ink: #151515;
+  --jo-paper: #EDECE4;
+  --jo-acid: #DFFF45;
+  --jo-red: #FF493D;
 
   /* תפקידים */
-  --money: #007a37;
-  --bad: #c8102e;
-  --warn: #8a5a00;
-  --focus: #ff4d00;
-  --on-c0: #111; --on-c1: #111; --on-c2: #fff; --on-c3: #fff; --on-c4: #fff; --on-c5: #111;
+  --paper: var(--jo-paper);
+  --surface: #f6f5f0;        /* כרטיסים ושדות על הנייר */
+  --ink: var(--jo-ink);
+  --ink-2: #555550;          /* טקסט משני: 6.4:1 על הנייר */
+  --hair: #d3d1c6;
+  --rule: var(--jo-ink);
+  --wash: #e2e0d6;
+
+  /* צבעי הטיפולים (מסגרת/פס): רק צבעי המותג; טקסט רק בזוגות שנבדקו */
+  --c0: var(--jo-acid);  /* ink 16:1 */
+  --c1: var(--jo-red);   /* ink 5.3:1 */
+  --c2: var(--jo-ink);   /* paper 15:1 */
+  --c3: var(--jo-acid);
+  --c4: var(--jo-red);
+  --c5: var(--jo-ink);
+  --on-c0: #151515; --on-c1: #151515; --on-c2: #EDECE4; --on-c3: #151515; --on-c4: #151515; --on-c5: #EDECE4;
+
+  --money: var(--jo-ink);    /* כסף: דיו על הדגשת חומצה */
+  --bad: #c42a1f;            /* אדום כהה לטקסט שגיאה (5.3:1); האדום של המותג למילויים */
+  --warn: #555550;
+  --focus: var(--jo-red);
 
   /* טיפוגרפיה */
-  --font-display: "Heebo", "Helvetica Neue", Helvetica, Arial, sans-serif;   /* כותרות ומספרים גדולים */
-  --font: "Assistant", "Noto Sans Hebrew", Arial, system-ui, sans-serif; /* טקסט רץ */
+  --font-display: "Space Grotesk", "Heebo", Arial, sans-serif; /* לטינית ב-Space Grotesk, עברית ב-Heebo */
+  --font: "Assistant", "Heebo", Arial, system-ui, sans-serif;   /* טקסט רץ */
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace; /* מספרים */
   --t-display: clamp(2.6rem, 10vw, 6.2rem);
   --t-1: clamp(2rem, 6.5vw, 3.4rem);
   --t-2: 1.35rem;
-  --t-body: 1.0625rem;   /* 17px: Assistant קטן יחסית בגודל נומינלי */
+  --t-body: 1.0625rem;
   --t-small: .9rem;
   --t-micro: .74rem;
 
-  /* מרווחים */
   --gap: 16px;
   --gutter: 16px;
   --max: 760px;
   --max-wide: 1180px;
-
+  --joker: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill-rule='evenodd' d='M50 0 61 39 100 50 61 61 50 100 39 61 0 50 39 39Z M50 39a11 11 0 1 0 0 22 11 11 0 1 0 0-22Z'/%3E%3C/svg%3E");
   color-scheme: light;
 }
 
-/* מצב כהה: המסגרת הכהה של עמודי תיק עבודות, הפלטה נשארת */
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #111111;
-    --ink: #ededed;
-    --ink-2: #a3a3a3;
-    --hair: #2b2b2b;
-    --rule: #ededed;
-    --wash: #1a1a1a;
-    --money: #3ccf7e;
-    --bad: #ff6b6b;
-    --warn: #f0b84a;
+    --paper: var(--jo-ink);
+    --surface: #1d1d1d;
+    --ink: var(--jo-paper);
+    --ink-2: #a8a79f;
+    --hair: #2e2e2c;
+    --rule: var(--jo-paper);
+    --wash: #222220;
+    --c2: var(--jo-paper); --c5: var(--jo-paper); --on-c2: #151515; --on-c5: #151515;
+    --money: var(--jo-paper);
+    --bad: #ff7468;
+    --warn: #a8a79f;
     color-scheme: dark;
   }
 }
@@ -73,9 +80,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
-a:hover { text-decoration-color: var(--c0); }
+a:hover { text-decoration-color: var(--jo-red); }
 img { max-width: 100%; display: block; }
-h1, h2, h3, .display, .logo, .foot-big, .stat b, .bucket b, .price, .price-tag, .total b, .split b, .stamp b,
+.stat b, .bucket b, .price, .price-tag, .total b, .split b, .stamp b, .earn b { font-family: var(--font-mono); letter-spacing: -.04em; }
+h1, h2, h3, .display,
 .empty h3, .choice b, .goal b, .creator-head b, .svc h3, .principles li::before, .leaders li > span:first-child,
 .big-field input, .code-input, .band { font-family: var(--font-display); }
 h1, h2, h3 { margin: 0 0 .4em; font-weight: 800; letter-spacing: -.02em; line-height: 1.02; }
@@ -84,21 +92,21 @@ h2 { font-size: var(--t-2); font-weight: 700; letter-spacing: -.01em; line-heigh
 h3 { font-size: 1.1rem; font-weight: 700; letter-spacing: 0; line-height: 1.3; }
 p { margin: 0 0 .9em; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-::selection { background: var(--c5); color: #111; }
+::selection { background: var(--jo-acid); color: #151515; }
 .skip { position: absolute; inset-inline-start: -999px; }
 .skip:focus { inset-inline-start: var(--gutter); top: 8px; background: var(--paper); padding: 8px 12px; z-index: 20; }
 
 /* ---------- מסגרת ---------- */
 .top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--paper) 92%, transparent); backdrop-filter: blur(8px); }
 .top-in { max-width: var(--max-wide); margin: 0 auto; padding: 14px var(--gutter); display: flex; align-items: center; gap: 20px; }
-.logo { font-weight: 900; font-size: 1.6rem; letter-spacing: -.05em; text-decoration: none; direction: ltr; line-height: 1; display: inline-flex; align-items: flex-start; gap: 3px; }
-.logo i { width: 9px; height: 9px; border-radius: 50%; background: var(--c0); margin-top: 2px; }
+.logo { font: 700 1.7rem/1 "Space Grotesk", Arial, sans-serif; letter-spacing: -.06em; text-decoration: none; direction: ltr; display: inline-flex; align-items: baseline; }
+.logo i { font-style: normal; color: var(--jo-red); }
 .top nav { display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; flex: 1; }
 .top nav a { text-decoration: none; font-weight: 400; font-size: 1rem; white-space: nowrap; padding: 4px 0; border-bottom: 1px solid transparent; }
 .top nav a[aria-current="page"] { font-weight: 600; border-color: var(--ink); }
 .top-end { display: flex; gap: 12px; align-items: center; }
 .bell { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; text-decoration: none; }
-.bell i { position: absolute; top: 0; inset-inline-end: -2px; background: var(--c0); color: #111; font-style: normal; font-size: .68rem; font-weight: 700; min-width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center; padding: 0 3px; }
+.bell i { position: absolute; top: 0; inset-inline-end: -2px; background: var(--jo-red); color: #151515; font-style: normal; font-size: .68rem; font-weight: 700; min-width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center; padding: 0 3px; }
 .me { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; text-decoration: none; font-weight: 600; text-transform: uppercase; }
 @media (max-width: 430px) { .top-in { gap: 12px; } .top nav { gap: 12px; } .top nav a { font-size: .92rem; } .logo { font-size: 1.35rem; } }
 
@@ -107,21 +115,22 @@ main.wide { max-width: var(--max-wide); }
 
 .foot { border-top: 1px solid var(--rule); max-width: var(--max-wide); margin: 0 auto; padding: 28px var(--gutter) 48px; display: grid; gap: 6px; font-weight: 400; }
 .foot p { margin: 0; }
-.foot-big { font-weight: 900; font-size: clamp(3.2rem, 16vw, 9rem); letter-spacing: -.06em; line-height: .85; direction: ltr; text-align: right; }
+.foot-big { font: 700 clamp(3.4rem, 17vw, 10rem)/.85 "Space Grotesk", Arial, sans-serif; letter-spacing: -.07em; text-align: right; }
+.foot-tag { font: 500 1rem/1.4 "Space Grotesk", Arial, sans-serif; text-align: right; }
 .foot nav { display: flex; gap: 18px; flex-wrap: wrap; font-size: var(--t-small); }
 
 /* ---------- טיפוגרפיה ---------- */
 .display { font-size: var(--t-display); font-weight: 900; letter-spacing: -.045em; line-height: .9; }
 .lead { font-size: 1.22rem; font-weight: 400; line-height: 1.5; max-width: 34ch; }
 .eyebrow { font-size: var(--t-small); font-weight: 400; margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
-.eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c0); flex: none; }
+.eyebrow::before { content: ""; width: 11px; height: 11px; flex: none; background: var(--jo-red); -webkit-mask: var(--joker) center / contain no-repeat; mask: var(--joker) center / contain no-repeat; }
 .meta { color: var(--ink-2); font-size: .97rem; font-weight: 400; margin: 0; }
 .meta.big { font-size: 1.12rem; color: var(--ink); }
 .muted { color: var(--ink-2); }
 .note { color: var(--ink-2); font-size: var(--t-small); font-weight: 400; }
 .hint { color: var(--ink-2); font-size: .9rem; margin: 0; }
 .center { text-align: center; }
-.money { color: var(--money); }
+.money { color: var(--money); background: linear-gradient(transparent 58%, var(--jo-acid) 58%, var(--jo-acid) 92%, transparent 92%); padding: 0 .1em; }
 .neg { color: var(--bad); }
 .ok { color: var(--money); font-weight: 600; }
 .prose { max-width: 62ch; }
@@ -141,7 +150,7 @@ section > .row-head:has(h2) { border-top: 1px solid var(--rule); padding-top: 12
   background: var(--ink); color: var(--paper); padding: 0 22px; min-height: 50px;
   transition: background-color .15s ease, color .15s ease, border-color .15s ease;
 }
-.btn:hover { background: var(--c0); border-color: var(--c0); color: #111; }
+.btn:hover { background: var(--jo-acid); border-color: var(--jo-ink); color: #151515; }
 .btn[disabled] { opacity: .35; cursor: not-allowed; background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .btn.ghost { background: transparent; color: var(--ink); }
 .btn.ghost:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
@@ -159,7 +168,7 @@ section > .row-head:has(h2) { border-top: 1px solid var(--rule); padding-top: 12
 .field small { color: var(--money); font-weight: 400; }
 .field.found input { border-color: var(--money); box-shadow: inset 4px 0 0 var(--money); }
 input, select, textarea {
-  font: 400 1rem/1.4 var(--font); color: var(--ink); background: var(--paper);
+  font: 400 1rem/1.4 var(--font); color: var(--ink); background: var(--surface);
   border: 1px solid var(--ink); border-radius: 0; padding: 12px 14px; min-height: 50px; width: 100%; min-width: 0;
 }
 textarea { min-height: auto; resize: vertical; }
@@ -186,20 +195,20 @@ details[open] > summary::after { content: "–"; }
 details[open] > summary { margin-bottom: 14px; }
 
 /* ---------- משטחים ---------- */
-.card { border: 1px solid var(--ink); padding: 22px; margin: 20px 0; background: var(--paper); }
+.card { border: 1px solid var(--ink); padding: 22px; margin: 20px 0; background: var(--surface); }
 .narrow { max-width: 480px; margin-inline: auto; }
 .flash { padding: 14px 18px; margin: 0 0 20px; font-weight: 400; border-inline-start: 4px solid; }
 .flash.good { background: var(--wash); border-color: var(--money); }
 .flash.bad { background: var(--wash); border-color: var(--bad); }
-.flash.dev { background: var(--c5); color: #111; border-color: #111; font-family: ui-monospace, Menlo, monospace; font-size: .9rem; }
+.flash.dev { background: var(--jo-acid); color: #151515; border-color: #151515; font-family: ui-monospace, Menlo, monospace; font-size: .9rem; }
 
 /* תג: נקודה עגולה + מילה */
 .badge { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-micro); font-weight: 600; letter-spacing: .01em; vertical-align: middle; white-space: nowrap; color: var(--ink); }
 .badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-2); }
-.st-active::before, .os-completed::before { background: var(--c2); }
-.st-paused::before, .st-draft::before, .os-requested::before, .os-submitted::before, .os-published::before { background: var(--c5); }
-.st-cancelled::before, .os-cancelled::before, .os-disputed::before { background: var(--bad); }
-.os-accepted::before, .os-revision_requested::before, .os-approved::before { background: var(--c3); }
+.st-active::before, .os-completed::before { background: var(--jo-acid); box-shadow: inset 0 0 0 1px var(--ink); }
+.st-paused::before, .st-draft::before, .os-requested::before, .os-submitted::before, .os-published::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink); }
+.st-cancelled::before, .os-cancelled::before, .os-disputed::before { background: var(--jo-red); }
+.os-accepted::before, .os-revision_requested::before, .os-approved::before { background: var(--ink); }
 .st-sold_out::before, .st-ended::before { background: var(--ink); }
 
 /* מספרים: קל, ענק, מופרד בקווי שיער */
@@ -223,7 +232,7 @@ details[open] > summary { margin-bottom: 14px; }
 .list { list-style: none; padding: 0; margin: 12px 0; border-top: 1px solid var(--rule); }
 .list li { display: flex; gap: 14px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--hair); }
 .list.compact li { padding: 12px 0; }
-.list li.unread { box-shadow: inset -3px 0 0 var(--c0); padding-inline-start: 12px; }
+.list li.unread { box-shadow: inset -3px 0 0 var(--jo-red); padding-inline-start: 12px; }
 .list .grow { flex: 1; min-width: 0; }
 .list .end { text-align: end; display: grid; }
 .list .end small { color: var(--ink-2); font-size: var(--t-micro); }
@@ -251,6 +260,8 @@ details[open] > summary { margin-bottom: 14px; }
 .pc-0 { --pc: var(--c0); --pc-on: var(--on-c0); } .pc-1 { --pc: var(--c1); --pc-on: var(--on-c1); }
 .pc-2 { --pc: var(--c2); --pc-on: var(--on-c2); } .pc-3 { --pc: var(--c3); --pc-on: var(--on-c3); }
 .pc-4 { --pc: var(--c4); --pc-on: var(--on-c4); } .pc-5 { --pc: var(--c5); --pc-on: var(--on-c5); }
+/* צילום בשחור לבן (מהמותג): הצבע מגיע רק מהטיפול */
+.poster img, .avatar img, .upload-preview img { filter: grayscale(1) contrast(1.08); }
 .poster img { transition: transform .6s cubic-bezier(.2, .7, .2, 1); }
 .show:hover .poster img, .show-media:hover .poster img { transform: scale(1.03); }
 /* lines: קווי בנייה מעל התמונה */
@@ -279,7 +290,7 @@ details[open] > summary { margin-bottom: 14px; }
 /* ---------- חותמת עגולה ---------- */
 .stamp {
   width: 104px; aspect-ratio: 1; border-radius: 50%; display: grid; place-content: center; text-align: center;
-  background: var(--c1); color: #111; line-height: 1.05; flex: none;
+  background: var(--jo-acid); color: #151515; line-height: 1.05; flex: none;
 }
 .stamp b { font-size: 1.7rem; font-weight: 300; letter-spacing: -.03em; display: block; }
 .stamp small { font-size: .72rem; font-weight: 400; display: block; margin-top: 2px; }
@@ -291,8 +302,8 @@ details[open] > summary { margin-bottom: 14px; }
 /* ---------- דף הבית ---------- */
 .hero { position: relative; padding: 24px 0 12px; }
 .hero .lead { margin-top: 20px; }
-.hero-stamp { position: absolute; top: clamp(8px, 3vw, 30px); inset-inline-end: 0; width: clamp(110px, 24vw, 170px); background: var(--c0); transform: rotate(-12deg); }
-.hero-stamp b { font-size: clamp(1.5rem, 4.4vw, 2.3rem); font-weight: 600; }
+.hero-stamp { position: absolute; top: clamp(8px, 3vw, 30px); left: 0; right: auto; width: clamp(110px, 24vw, 170px); background: var(--jo-acid); transform: rotate(-12deg); }
+.hero-stamp b { font: 700 clamp(1.6rem, 5vw, 2.6rem)/1 "Space Grotesk", Arial, sans-serif; letter-spacing: -.05em; }
 .hero-stamp small { font-size: clamp(.9rem, 2.6vw, 1.15rem); font-weight: 300; }
 .choices { display: grid; gap: 0; margin: 36px 0 44px; }
 @media (min-width: 900px) { main:has(.choices) { max-width: var(--max-wide); } .choices { grid-template-columns: repeat(3, 1fr); } }
@@ -305,10 +316,11 @@ details[open] > summary { margin-bottom: 14px; }
 .choice::after { content: "←"; position: absolute; bottom: 18px; inset-inline-end: 22px; font-size: 1.8rem; font-weight: 300; transition: transform .2s ease; }
 .choice:hover::after { transform: translateX(-6px); }
 .choice-tag { font-size: var(--t-micro); font-weight: 600; letter-spacing: .08em; }
-.choice.artist { background: var(--c0); color: var(--on-c0); }
-.choice.promoter { background: var(--ink); color: var(--paper); }
-.choice.creator-choice { background: var(--c4); color: var(--on-c4); }
-@media (prefers-color-scheme: dark) { .choice.promoter { background: var(--c5); color: #111; } }
+.choice.artist { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.choice.promoter { background: var(--jo-acid); color: #151515; }
+.choice.promoter .choice-tag { font: 700 1.3rem/1 "Space Grotesk", Arial, sans-serif; letter-spacing: -.04em; }
+.choice.creator-choice { background: var(--jo-ink); color: var(--jo-paper); }
+@media (prefers-color-scheme: dark) { .choice.creator-choice { background: var(--jo-red); color: #151515; } }
 
 /* ---------- מרקטפלייס ---------- */
 .page-head { margin-bottom: 18px; }
@@ -333,7 +345,7 @@ details[open] > summary { margin-bottom: 14px; }
 .show-page { display: grid; gap: 24px; }
 @media (min-width: 800px) { .show-page { grid-template-columns: 1fr 1fr; align-items: start; } main:has(.show-page) { max-width: var(--max-wide); } .show-media { position: sticky; top: 80px; } }
 .show-main h1 { font-size: clamp(2.4rem, 8vw, 4.2rem); font-weight: 900; letter-spacing: -.045em; line-height: .92; }
-.ref { border-inline-start: 4px solid var(--c1); padding: 6px 14px; font-weight: 400; }
+.ref { border-inline-start: 4px solid var(--jo-acid); padding: 6px 14px; font-weight: 400; }
 .ref small { display: block; color: var(--ink-2); }
 .desc { white-space: pre-line; font-weight: 400; font-size: 1.08rem; }
 .buy-box, .promo-box { border-top: 1px solid var(--rule); padding: 18px 0 0; margin: 22px 0; display: grid; gap: 14px; }
@@ -351,11 +363,9 @@ details[open] > summary { margin-bottom: 14px; }
   border: 0; cursor: pointer; transition: filter .15s ease;
 }
 .share:hover { filter: brightness(1.1); }
-.share.wa { background: var(--c2); color: var(--on-c2); }
-.share.tg { background: var(--c4); color: var(--on-c4); }
-.share.fb { background: var(--c3); color: var(--on-c3); }
-.share.sms { background: var(--ink); color: var(--paper); }
-.share.ig { background: var(--c1); color: var(--on-c1); }
+.share.wa { background: var(--jo-acid); color: #151515; }
+.share.tg, .share.fb, .share.sms { background: var(--ink); color: var(--paper); box-shadow: inset -1px 0 0 var(--paper); }
+.share.ig { background: var(--jo-red); color: #151515; }
 .native-share { margin-top: 8px; }
 
 /* ---------- אמן ---------- */
@@ -401,19 +411,11 @@ blockquote { margin: 10px 0; padding: 4px 16px; border-inline-start: 1px solid v
 .goal { display: grid; gap: 4px; padding: 20px 0 20px 40px; border-bottom: 1px solid var(--hair); text-decoration: none; position: relative; }
 .goal::after { content: "←"; position: absolute; left: 0; top: 50%; transform: translateY(-50%); font-size: 1.6rem; font-weight: 300; transition: transform .2s ease; }
 .goal:hover::after { transform: translate(-6px, -50%); }
+.goal:hover { box-shadow: inset 6px 0 0 var(--jo-acid); }
 .goal b { font-size: clamp(1.25rem, 4.5vw, 1.6rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
 .goal span { color: var(--ink-2); font-weight: 400; }
-.goal:nth-child(6n+1):hover { box-shadow: inset 6px 0 0 var(--c0); }
-.goal:nth-child(6n+2):hover { box-shadow: inset 6px 0 0 var(--c3); }
-.goal:nth-child(6n+3):hover { box-shadow: inset 6px 0 0 var(--c2); }
-.goal:nth-child(6n+4):hover { box-shadow: inset 6px 0 0 var(--c4); }
 
-.avatar { width: 52px; height: 52px; border-radius: 50%; flex: none; display: inline-grid; place-items: center; overflow: hidden; background: var(--c3); color: #fff; font-weight: 800; font-size: 1.4rem; }
-.creator:nth-child(6n+2) .avatar { background: var(--c0); color: #111; }
-.creator:nth-child(6n+3) .avatar { background: var(--c2); }
-.creator:nth-child(6n+4) .avatar { background: var(--c5); color: #111; }
-.creator:nth-child(6n+5) .avatar { background: var(--c4); }
-.creator:nth-child(6n+6) .avatar { background: var(--c1); color: #111; }
+.avatar { width: 52px; height: 52px; border-radius: 50%; flex: none; display: inline-grid; place-items: center; overflow: hidden; background: var(--jo-acid); color: #151515; font-weight: 800; font-size: 1.4rem; }
 .avatar img, .avatar svg { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .avatar.big { width: 96px; height: 96px; font-size: 2.6rem; }
@@ -440,7 +442,7 @@ blockquote { margin: 10px 0; padding: 4px 16px; border-inline-start: 1px solid v
 .terms-box h2, .terms-box h3 { margin: 6px 0 0; }
 .total { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--rule); padding-top: 12px; margin-top: 6px; }
 .total b { font-size: 2.6rem; font-weight: 300; letter-spacing: -.04em; }
-.next { border: 1px solid var(--ink); box-shadow: 6px 6px 0 var(--c0); display: grid; gap: 14px; }
+.next { border: 1px solid var(--ink); box-shadow: 6px 6px 0 var(--jo-acid); display: grid; gap: 14px; }
 .next h2 { margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: -.03em; }
 pre.brief { white-space: pre-wrap; font: 400 1rem/1.75 var(--font); margin: 0; }
 
@@ -466,6 +468,9 @@ pre.brief { white-space: pre-wrap; font: 400 1rem/1.75 var(--font); margin: 0; }
 .upload-text small { color: var(--ink-2); font-weight: 400; }
 .upload-box input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 .ds-fig { margin: 0; }
+.ds-mark { width: 96px; height: 96px; }
+.ds-poster { width: 216px; height: auto; aspect-ratio: 4 / 5; box-shadow: inset 0 0 0 1px var(--ink); }
+@media (prefers-color-scheme: dark) { .ds-mark { filter: invert(1); } }
 .ds-fig figcaption { font-size: var(--t-small); padding-top: 8px; }
 .ds-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .ds-grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
@@ -484,3 +489,10 @@ body.sim input, body.sim select { border-radius: 8px; border-color: #c5ccd6; }
 .codes code { font-size: 1.2rem; letter-spacing: .12em; padding: 8px 12px; border: 2px dashed #2563eb; border-radius: 10px; display: inline-block; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+
+/* מובייל: חותמת Be Jo. בצד, והכותרת מפנה לה מקום, כדי שלא תסתיר אותה */
+@media (max-width: 700px) {
+  .hero .display { padding-inline-end: 96px; }
+  .hero-stamp { top: 18px; left: 0; right: auto; width: 88px; }
+  .hero-stamp b { font-size: 1.4rem; }
+}

@@ -8,9 +8,9 @@ export async function sendLoginCode(email, code) {
       method: "POST",
       headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({
-        from: process.env.MAIL_FROM || "ENCORE <login@encore.example>",
+        from: process.env.MAIL_FROM || "Jocares <login@jocares.example>",
         to: email,
-        subject: `הקוד שלך ל-ENCORE: ${code}`,
+        subject: `הקוד שלך ל-Jocares: ${code}`,
         text: `הקוד שלך: ${code}\nהוא בתוקף ל-10 דקות. אם לא ביקשת אותו, אפשר להתעלם מההודעה.`,
       }),
     });

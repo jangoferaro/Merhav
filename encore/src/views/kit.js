@@ -94,7 +94,7 @@ export function showCard(ctx, c) {
       <p class="earn-line">הרווח שלך <b>${money(c.reward_agorot)}</b> על כל כרטיס · מחיר ${money(c.price_agorot)}</p>
       ${c.promoting
         ? html`<a class="btn ghost block" href="/s/${c.id}/share">הלינק שלי</a>`
-        : html`<form method="post" action="/s/${c.id}/promote">${csrfField(ctx)}<button class="btn block">שיתוף והרווחה</button></form>`}
+        : html`<form method="post" action="/s/${c.id}/promote">${csrfField(ctx)}<button class="btn block">שתף והרוויח</button></form>`}
     </div>
   </article>`;
 }
@@ -119,13 +119,14 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${title ? `${title} · ENCORE` : "ENCORE · הקהל מקדם את ההופעה"}</title>
-<meta name="description" content="${description || "בוחרים הופעה, משתפים, ומרוויחים מכל כרטיס שנמכר בזכותכם."}">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
+<title>${title ? `${title} · jocares.` : "jocares. · אמנות צריכה קהל"}</title>
+<meta name="description" content="${description || "אמנות צריכה קהל. בוחרים הופעה, משתפים, ומרוויחים מכל כרטיס שנמכר בזכותכם."}">
+<meta name="theme-color" content="#EDECE4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151515" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/static/joker.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;700;800;900&family=Assistant:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Heebo:wght@700;800;900&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/app.js" defer></script>
 </head>
@@ -133,7 +134,7 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
 <a class="skip" href="#main">דילוג לתוכן</a>
 <header class="top">
   <div class="top-in">
-    <a href="/" class="logo" aria-label="ENCORE, דף הבית">encore<i aria-hidden="true"></i></a>
+    <a href="/" class="logo" aria-label="Jocares, דף הבית">jocares<i aria-hidden="true">.</i></a>
     <nav aria-label="ראשי">
       ${nav.map(([href, label]) => html`<a href="${href}"${(path === href || path.startsWith(href + "/")) ? raw(' aria-current="page"') : ""}>${label}</a>`)}
     </nav>
@@ -151,8 +152,8 @@ ${!config.isProd && flash?.dev ? html`<div class="flash dev">מצב פיתוח �
 ${body}
 </main>
 <footer class="foot">
-  <p class="foot-big">encore</p>
-  <p>הקהל מקדם את ההופעה</p>
+  <p class="foot-big" dir="ltr">jocares.</p>
+  <p class="foot-tag" dir="ltr" lang="en">Who cares? Jo cares. Because art deserves an audience.</p>
   <nav aria-label="תחתון"><a href="/how">איך זה עובד</a><a href="/terms">תנאים ופרטיות</a><a href="/design">שפה עיצובית</a></nav>
 </footer>
 </body>

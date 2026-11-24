@@ -112,7 +112,7 @@ test("מסע מלא: אמן מפרסם → מקדם משתף → חבר קונה
 
   // אמן רואה תוצאות
   r = await artist.get(`/artist/c/${cid}`);
-  assert.match(r.text, /<b>3<\/b><span>כרטיסים דרך מקדמים/);
+  assert.match(r.text, /<b>3<\/b><span>כרטיסים דרך ג׳וקרים/);
   assert.match(r.text, /<b>דני<\/b>/);
   assert.doesNotMatch(r.text, /dani@encore/);
 
