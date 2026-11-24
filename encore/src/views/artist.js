@@ -94,7 +94,13 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
   ${error ? html`<p class="flash bad">${error}</p>` : ""}
   <form method="post" action="/artist/new/preview" class="stack" enctype="multipart/form-data" data-busy="מעלים…">
     ${csrfField(ctx)}
-    <input type="hidden" name="source_url" value="${v.source_url ?? ""}">
+    <fieldset class="seg ticketing"><legend class="field">איפה מוכרים את הכרטיסים?</legend>
+      <label><input type="radio" name="ticketing" value="coupon" ${v.ticketing !== "sim" ? html`checked` : ""}> באתר הכרטוס שלי</label>
+      <label><input type="radio" name="ticketing" value="sim" ${v.ticketing === "sim" ? html`checked` : ""}> קופה לדוגמה (בדיקה)</label>
+    </fieldset>
+    <label class="field">לינק לעמוד הכרטיסים שלך
+      <input name="source_url" type="url" dir="ltr" value="${v.source_url ?? ""}" placeholder="https://">
+      <small class="hint">כל ג׳וקר מקבל קוד אישי. אנחנו מגדירים את הקודים במערכת הכרטוס שלך ומעדכנים את המכירות. את/ה לא צריך/ה לעשות כלום.</small></label>
     ${field("artist_name", "שם האמן / הלהקה", "required maxlength=120")}
     ${field("title", "שם ההופעה", "required maxlength=120")}
     <div class="field${found.includes("image_url") ? " found" : ""}">תמונה של ההופעה${found.includes("image_url") ? html` <small>נמצאה בעמוד ההופעה</small>` : ""}
@@ -183,7 +189,7 @@ const ACTION_CONFIRM = {
   cancelled: "לסמן שההופעה בוטלה? כל התגמולים של המקדמים יבוטלו. אי אפשר לחזור מזה.",
 };
 
-export function manageCampaign(ctx, { c, r, top, publicUrl }, opts) {
+export function manageCampaign(ctx, { c, r, top, publicUrl, lastImport = null }, opts) {
   const s = split(c.price_agorot, c.reward_agorot);
   const actions = TRANSITIONS[c.status].filter((t) => t !== "sold_out");
   return layout(
@@ -210,6 +216,9 @@ ${c.status === "draft" || c.status === "active"
          <p class="note">שתפו את דף ההופעה עם הקהל שלכם. מי שירצה יוכל להפוך למקדם בלחיצה.</p>`
   : ""}
 
+${c.provider === "coupon"
+  ? html`<p class="note">הכרטיסים נמכרים באתר הכרטוס שלך, וכל ג׳וקר מקבל קוד אישי. אנחנו מגדירים את הקודים ומעדכנים את המכירות כאן. עדכון אחרון: ${lastImport ? showDate(lastImport) : "עוד לא"}.</p>`
+  : ""}
 <section class="card">
   <h2>הג׳וקרים המובילים</h2>
   ${top.length

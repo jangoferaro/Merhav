@@ -149,3 +149,12 @@ document.addEventListener("change", async (e) => {
     // אם הדפדפן לא מצליח, מעלים את המקור והשרת יבדוק את הגודל
   }
 });
+
+// מסלול הקופונים: מעתיקים את הקוד ואז ממשיכים לקופה של האמן
+document.addEventListener("click", async (e) => {
+  const a = e.target.closest("[data-copy-then-go]");
+  if (!a) return;
+  e.preventDefault();
+  try { await navigator.clipboard.writeText(a.dataset.copyThenGo); } catch {}
+  window.location.href = a.href;
+});

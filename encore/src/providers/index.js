@@ -6,8 +6,9 @@
 //   verifyWebhook(rawBody, headers)    → אירוע מאומת { id, type, data } או זריקת שגיאה
 // כרגע יש רק ספק Sandbox. ספק אמיתי (מסלול A ב-PRD) מתווסף כאן בלי לגעת בשאר המערכת.
 import { simProvider } from "./sim.js";
+import { couponProvider } from "./coupon.js";
 
-const providers = { sim: simProvider };
+const providers = { sim: simProvider, coupon: couponProvider };
 
 export function provider(name) {
   const p = providers[name];

@@ -534,3 +534,9 @@ main:has(.lp-hero) { max-width: var(--max-wide); }
 .btn-google:hover { background: #f2f2f2; color: #1f1f1f; border-color: #747775; }
 .or-divider { display: flex; align-items: center; gap: 12px; color: var(--ink-2); font-size: var(--t-small); margin: 18px 0; }
 .or-divider::before, .or-divider::after { content: ""; flex: 1; border-top: 1px solid var(--hair); }
+
+/* ---------- תפעול קופונים ---------- */
+.codes-box { font: 500 1rem/1.6 var(--font-mono); width: 100%; margin-bottom: 10px; }
+.map-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin-bottom: 12px; }
+tr.unread td:first-child { box-shadow: inset -3px 0 0 var(--jo-red); }
+.code-big { font: 500 clamp(2rem, 9vw, 3rem)/1 var(--font-mono); letter-spacing: .06em; background: var(--jo-acid); color: #151515; padding: 14px 18px; display: inline-block; direction: ltr; }

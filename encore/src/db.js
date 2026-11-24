@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 // כל הסכומים באגורות (INTEGER). כל הזמנים ב-ISO UTC (TEXT).
 const SCHEMA = `
@@ -366,6 +367,20 @@ CREATE TABLE IF NOT EXISTS service_payments (
   updated_at       TEXT NOT NULL
 );
 
+-- ---------- ייבוא מכירות (מסלול הקופונים): הצוות מעלה את ייצוא המכירות של מערכת הכרטוס ----------
+CREATE TABLE IF NOT EXISTS sales_imports (
+  id           INTEGER PRIMARY KEY,
+  campaign_id  INTEGER NOT NULL REFERENCES campaigns(id),
+  filename     TEXT NOT NULL DEFAULT '',
+  raw_csv      TEXT NOT NULL,
+  mapping      TEXT NOT NULL DEFAULT '{}',
+  status       TEXT NOT NULL DEFAULT 'preview' CHECK (status IN ('preview','applied','discarded')),
+  summary      TEXT NOT NULL DEFAULT '{}',
+  created_by   INTEGER REFERENCES users(id),
+  created_at   TEXT NOT NULL,
+  applied_at   TEXT
+);
+
 -- ---------- ספק כרטוס מדומה (Sandbox) — מחליף מערכת כרטוס אמיתית בפיתוח ובדמו ----------
 CREATE TABLE IF NOT EXISTS sim_events (
   external_id   TEXT PRIMARY KEY,
@@ -392,7 +407,34 @@ export function openDb(file = process.env.ENCORE_DB ?? "data/encore.db") {
   if (file !== ":memory:") fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec(SCHEMA);
+  migrate(db);
   return db;
+}
+
+/**
+ * הגירות קטנות למסדים קיימים (CREATE TABLE IF NOT EXISTS לא מוסיף עמודות לטבלה שכבר קיימת).
+ * כל צעד בודק אם כבר בוצע, כך שאפשר להריץ שוב ושוב.
+ */
+function migrate(db) {
+  const cols = (t) => new Set(db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name));
+  const add = (t, col, def) => {
+    if (!cols(t).has(col)) db.exec(`ALTER TABLE ${t} ADD COLUMN ${col} ${def}`);
+  };
+  // קופונים: קוד אישי לכל לינק, ומתי הצוות הגדיר אותו במערכת הכרטוס של האמן
+  add("referral_links", "coupon_code", "TEXT");
+  add("referral_links", "coupon_registered_at", "TEXT");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS referral_links_coupon ON referral_links(coupon_code) WHERE coupon_code IS NOT NULL");
+  const missing = db.prepare("SELECT id FROM referral_links WHERE coupon_code IS NULL").all();
+  for (const { id } of missing) db.prepare("UPDATE referral_links SET coupon_code = ? WHERE id = ?").run(newCouponCode(db), id);
+}
+
+const COUPON_ABC = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+/** JO + 6 תווים בלי אותיות מבלבלות (0/O, 1/I). ייחודי בכל המערכת. */
+export function newCouponCode(db) {
+  for (;;) {
+    const code = "JO" + Array.from(crypto.randomBytes(6), (b) => COUPON_ABC[b % COUPON_ABC.length]).join("");
+    if (!db.prepare("SELECT 1 FROM referral_links WHERE coupon_code = ?").get(code)) return code;
+  }
 }
 
 /** טרנזקציה: הכל או כלום. תומך בקינון (פנימי פשוט רץ בתוך החיצוני). */

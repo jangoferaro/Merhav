@@ -1,4 +1,4 @@
-import { config } from "../util.js";
+import { config, shortDate } from "../util.js";
 import { csrfField, empty, html, layout, money, poster, showCard, showDate, stat, stamp, raw } from "./kit.js";
 
 // ---------- כניסה למוצר: שתי אפשרויות בלבד (PRD §7) ----------
@@ -183,7 +183,7 @@ export function showPage(ctx, { c, referrer, link, stats, buyable }, opts) {
 
 // ---------- ערכת שיתוף ----------
 
-export function sharePage(ctx, { c, url, text, stats }, opts) {
+export function sharePage(ctx, { c, url, text, stats, code = null, lastImport = null }, opts) {
   const enc = encodeURIComponent;
   return layout(
     ctx,
@@ -195,6 +195,9 @@ export function sharePage(ctx, { c, url, text, stats }, opts) {
   <p class="lead">כל כרטיס שנקנה דרכו = <b class="money">${money(c.reward_agorot)}</b> בשבילך.</p>
 
   <div class="linkbox"><code dir="ltr">${url}</code><button type="button" class="btn small" data-copy="${url}">העתקה</button></div>
+  ${code
+    ? html`<p class="muted">והקוד האישי שלך: <b class="num" dir="ltr">${code}</b>. הוא כבר בתוך ההודעה, ומי שנכנס דרך הלינק יקבל אותו אוטומטית. גם מי שקונה ישר באתר הכרטיסים עם הקוד נספר לך.</p>`
+    : ""}
 
   <button type="button" class="btn big block native-share" data-share-title="${c.title}" data-share-url="${url}" hidden>שיתוף…</button>
   <div class="share-grid" id="share-targets">
@@ -215,6 +218,7 @@ export function sharePage(ctx, { c, url, text, stats }, opts) {
     ${stat(stats.tickets, "כרטיסים נמכרו")}
     ${stat(money(stats.tickets * c.reward_agorot), "הרווחת (לפני החזרים)")}
   </div>
+  ${code ? html`<p class="note center">המכירות מאתר הכרטיסים מתעדכנות אצלנו מעת לעת. עדכון אחרון: ${lastImport ? shortDate(lastImport) : "עוד לא"}.</p>` : ""}
   <p class="center"><a href="/me/sales">כל המכירות שלי ←</a></p>
 </section>`,
     opts
@@ -422,6 +426,25 @@ export function pilotPage(ctx, { next }, opts) {
     <button class="btn big block">המשך</button>
   </form>
   <p class="center note"><a href="/">מה זה Jocares?</a></p>
+</section>`,
+    opts
+  );
+}
+
+// ---------- מסלול הקופונים: מעבר לקופה של האמן עם הקוד ----------
+
+export function couponHandoff(ctx, { c, code, referrer }, opts) {
+  return layout(
+    ctx,
+    "לקופה",
+    html`
+<section class="narrow center handoff">
+  <p class="eyebrow">${c.artist_name} · ${c.title}</p>
+  <h1>עוד רגע בקופה</h1>
+  <p class="lead">בקופה מדביקים את הקוד של ${referrer}. ככה ${referrer} מקבל/ת על ההמלצה, בלי עלות נוספת לכם.</p>
+  <p><span class="code-big" id="coupon">${code}</span></p>
+  <a class="btn big block" href="${c.source_url}" rel="noopener" data-copy-then-go="${code}">העתקת הקוד והמשך לקנייה</a>
+  <p class="note">הקוד מועתק אוטומטית כשממשיכים. אם לא, אפשר להקליד אותו.</p>
 </section>`,
     opts
   );

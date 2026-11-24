@@ -23,6 +23,7 @@ import * as CV from "./views/content.js";
 import { designPage } from "./views/design.js";
 import { imageFromForm, serveMedia } from "./media.js";
 import { finishGoogleLogin, googleEnabled, startGoogleLogin } from "./auth-google.js";
+import * as CP from "./domain/coupons.js";
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png" };
@@ -128,6 +129,15 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   // מעבר למערכת הכרטוס, עם מזהה ההפניה (אם יש) — הרוכש לא מקליד שום קוד
   r.get("/s/:id/buy", (ctx) => {
     const c = campaignOr404(ctx.params.id);
+    if (c.provider === "coupon") {
+      // מסלול הקופונים: אם הגיעו דרך ג׳וקר, מציגים את הקוד שלו (ומעתיקים אותו), ואז לעמוד הכרטיסים של האמן
+      const ref = refFor(ctx, c.id);
+      const link = ref ? db.prepare("SELECT l.coupon_code FROM referral_clicks k JOIN referral_links l ON l.id = k.link_id WHERE k.token = ?").get(ref.token) : null;
+      if (!/^https?:\/\//.test(c.source_url ?? "")) throw new UserError("עמוד הכרטיסים של ההופעה לא זמין כרגע", 404);
+      if (link?.coupon_code) return ctx.send(P.couponHandoff(ctx, { c, code: link.coupon_code, referrer: ID.publicName({ name: ref.name }) }, opts(ctx)));
+      ctx.res.writeHead(303, { location: c.source_url });
+      return ctx.res.end();
+    }
     const url = provider(c.provider).checkoutUrl(c, refFor(ctx, c.id)?.token);
     if (url.startsWith("/")) return ctx.redirect(url);
     ctx.res.writeHead(303, { location: url });
@@ -164,7 +174,8 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const c = campaignOr404(ctx.params.id);
     const link = R.getOrCreateLink(db, ctx.user, c.id);
     const url = `${origin(ctx)}/r/${link.code}`;
-    ctx.send(P.sharePage(ctx, { c, url, text: R.shareText(c, url), stats: R.linkStats(db, link.id) }, opts(ctx)));
+    const code = c.provider === "coupon" ? link.coupon_code : null;
+    ctx.send(P.sharePage(ctx, { c, url, code, text: R.shareText(c, url, link), stats: R.linkStats(db, link.id), lastImport: code ? CP.lastImportAt(db, c.id) : null }, opts(ctx)));
   });
 
   r.get("/me/sales", (ctx) => {
@@ -377,7 +388,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     ctx.send(
       A.manageCampaign(
         ctx,
-        { c, r: C.campaignResults(db, c.id), top: C.topPromoters(db, c.id), publicUrl: `${origin(ctx)}/s/${c.id}` },
+        { c, r: C.campaignResults(db, c.id), top: C.topPromoters(db, c.id), publicUrl: `${origin(ctx)}/s/${c.id}`, lastImport: c.provider === "coupon" ? CP.lastImportAt(db, c.id) : null },
         opts(ctx)
       )
     );
@@ -589,6 +600,8 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
         return ctx.send(AD.adminUsers(ctx, { rows: q(`SELECT * FROM users ORDER BY id DESC LIMIT 500`) }, o));
       case "audit":
         return ctx.send(AD.adminAudit(ctx, { rows: q(`SELECT a.*, u.email AS actor FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id ORDER BY a.id DESC LIMIT 300`) }, o));
+      case "coupons":
+        return ctx.send(AD.adminCoupons(ctx, { queue: CP.couponQueue(db) }, o));
       case "content":
         return ctx.send(AD.adminContentTab(ctx, {
           orders: K.allOrders(db),
@@ -619,6 +632,70 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
       requireAdmin(ctx);
       await fn(ctx, await ctx.form());
     });
+
+  // ---------- קופונים (צוות) ----------
+
+  const adminGet = (pathPattern, fn) =>
+    r.get(pathPattern, (ctx) => {
+      if (!requireUser(ctx)) return;
+      requireAdmin(ctx);
+      return fn(ctx);
+    });
+
+  adminGet("/admin/coupons/:id", (ctx) => {
+    const c = campaignOr404(ctx.params.id);
+    if (c.provider !== "coupon") throw new UserError("ההופעה לא במסלול הקופונים", 404);
+    ctx.send(AD.adminCouponCampaign(ctx, {
+      c, codes: CP.campaignCodes(db, c.id), lastImport: CP.lastImportAt(db, c.id),
+      imports: db.prepare("SELECT id, filename, status, summary, created_at FROM sales_imports WHERE campaign_id = ? ORDER BY id DESC LIMIT 20").all(c.id),
+    }, opts(ctx)));
+  });
+
+  adminGet("/admin/coupons/:id/codes.csv", (ctx) => {
+    const c = campaignOr404(ctx.params.id);
+    const rows = CP.campaignCodes(db, c.id).filter((x) => !x.coupon_registered_at);
+    ctx.res.writeHead(200, {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="jocares-codes-${c.id}.csv"`,
+    });
+    ctx.res.end("\uFEFFcode,discount_percent\n" + rows.map((x) => `${x.coupon_code},0`).join("\n") + "\n");
+  });
+
+  adminPost("/admin/coupons/:id/registered", (ctx) => {
+    const n = CP.markRegistered(db, ctx.user, ctx.params.id);
+    ctx.redirect(`/admin/coupons/${ctx.params.id}`, `${n} קודים סומנו כמוגדרים`);
+  });
+
+  adminPost("/admin/coupons/:id/import", (ctx, f) => {
+    if (!f.file?.data?.length) throw new UserError("לא נבחר קובץ");
+    let csv;
+    try {
+      csv = new TextDecoder("utf-8", { fatal: true }).decode(f.file.data);
+    } catch {
+      csv = new TextDecoder("windows-1255").decode(f.file.data); // ייצוא אקסל בעברית
+    }
+    const id = CP.previewImport(db, ctx.user, ctx.params.id, { csv, filename: f.file.filename });
+    ctx.redirect(`/admin/imports/${id}`);
+  });
+
+  adminGet("/admin/imports/:id", (ctx) => ctx.send(AD.adminImport(ctx, CP.describeImport(db, ctx.params.id), opts(ctx))));
+
+  adminPost("/admin/imports/:id/map", (ctx, f) => {
+    CP.remapImport(db, ctx.params.id, f);
+    ctx.redirect(`/admin/imports/${ctx.params.id}`);
+  });
+
+  adminPost("/admin/imports/:id/apply", (ctx) => {
+    const res = CP.applyImport(db, ctx.user, ctx.params.id);
+    const added = Object.entries(res).filter(([k]) => k === "new:ok").reduce((s, [, v]) => s + v, 0);
+    ctx.redirect(`/admin/imports/${ctx.params.id}`, `הוחל: ${added} מכירות שויכו לג׳וקרים, ${res.refund ?? 0} עדכוני החזר`);
+  });
+
+  adminPost("/admin/imports/:id/discard", (ctx) => {
+    db.prepare("UPDATE sales_imports SET status = 'discarded' WHERE id = ? AND status = 'preview'").run(Number(ctx.params.id));
+    const imp = db.prepare("SELECT campaign_id FROM sales_imports WHERE id = ?").get(Number(ctx.params.id));
+    ctx.redirect(`/admin/coupons/${imp?.campaign_id ?? ""}`, "בוטל");
+  });
 
   adminPost("/admin/settle", (ctx) => {
     const res = M.settle(db);

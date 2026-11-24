@@ -1,5 +1,5 @@
 // Referral: לינקים אישיים ולחיצות. השיוך עצמו מוכרע רק כשמגיע אישור רכישה מהספק (ingest.js).
-import { insert, tx } from "../db.js";
+import { insert, newCouponCode, tx } from "../db.js";
 import { clock, hmac, randomToken, shortCode, showDate, UserError } from "../util.js";
 import { getCampaign } from "./campaigns.js";
 import { audit } from "./identity.js";
@@ -12,7 +12,9 @@ export function getOrCreateLink(db, user, campaignId) {
     const existing = db.prepare("SELECT * FROM referral_links WHERE campaign_id = ? AND promoter_id = ?").get(c.id, user.id);
     if (existing) return existing;
     if (c.status !== "active") throw new UserError("ההופעה הזאת לא פתוחה לקידום כרגע");
-    const id = insert(db, "referral_links", { campaign_id: c.id, promoter_id: user.id, code: shortCode(7), created_at: clock.iso() });
+    const id = insert(db, "referral_links", {
+      campaign_id: c.id, promoter_id: user.id, code: shortCode(7), coupon_code: newCouponCode(db), created_at: clock.iso(),
+    });
     audit(db, user.id, "link.created", "referral_link", id, { campaign_id: c.id });
     return db.prepare("SELECT * FROM referral_links WHERE id = ?").get(id);
   });
@@ -50,7 +52,7 @@ export function linkStats(db, linkId) {
 }
 
 /** טקסט מוכן לשיתוף. גילוי נאות על העמלה כלול כברירת מחדל (PRD §9.3). */
-export function shareText(campaign, url) {
+export function shareText(campaign, url, link = null) {
   const custom = (campaign.share_text || "").trim();
   const intro = custom || `בואו איתי ל${campaign.artist_name} – ${campaign.title}`;
   return [
@@ -58,6 +60,7 @@ export function shareText(campaign, url) {
     `${showDate(campaign.starts_at)}`,
     `${campaign.venue}${campaign.city ? `, ${campaign.city}` : ""}`,
     `כרטיסים: ${url}`,
+    ...(campaign.provider === "coupon" && link?.coupon_code ? [`קוד בקופה: ${link.coupon_code}`] : []),
     "",
     "(גילוי נאות: אני מקבל/ת עמלה על כרטיסים שנקנים דרך הקישור)",
   ].join("\n");

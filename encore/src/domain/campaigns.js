@@ -80,6 +80,12 @@ export function parseCampaignInput(input) {
     reward_agorot: reward,
     promo_limit: parseLimit(input.promo_limit),
     share_text: text(input.share_text, "טקסט לשיתוף", { max: 600, required: false }),
+    // "coupon" = האמן מוכר במערכת הכרטוס שלו (ברירת מחדל כשיש לינק להופעה); "sim" = קופה לדוגמה
+    ticketing: (() => {
+      if (input.ticketing === "sim") return "sim";
+      if (input.ticketing === "coupon" && !source) throw new UserError("צריך לינק לעמוד הכרטיסים שלך, כדי שנדע לאן לשלוח את הקונים");
+      return source ? "coupon" : "sim";
+    })(),
   };
 }
 
@@ -100,7 +106,7 @@ export function createCampaign(db, user, input, { publish = true } = {}) {
       artist_id: artist.id, title: c.title, description: c.description, venue: c.venue, city: c.city,
       genre: c.genre, starts_at: c.starts_at, image_url: c.image_url, source_url: c.source_url, created_at: now,
     });
-    const p = provider("sim");
+    const p = provider(c.ticketing);
     const externalId = p.registerEvent(db, { title: c.title, price_agorot: c.price_agorot });
     const campaignId = insert(db, "campaigns", {
       event_id: eventId, artist_id: artist.id, created_by: user.id, status: "draft",

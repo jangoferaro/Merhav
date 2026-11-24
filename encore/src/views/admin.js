@@ -7,7 +7,7 @@ import { adminContent } from "./content.js";
 const COMMISSION_HE = { pending: "ממתין", payable: "זמין", paid: "שולם", reversed: "בוטל", disputed: "מוקפא" };
 
 const TABS = [
-  ["", "סקירה"], ["payouts", "תשלומים"], ["disputes", "פניות"], ["orders", "עסקאות"],
+  ["", "סקירה"], ["coupons", "קופונים"], ["payouts", "תשלומים"], ["disputes", "פניות"], ["orders", "עסקאות"],
   ["content", "תוכן"], ["campaigns", "קמפיינים"], ["users", "משתמשים"], ["audit", "יומן פעולות"], ["sim", "ספק מדומה"],
 ];
 
@@ -26,6 +26,113 @@ ${body}`,
 }
 
 const table = (head, rows) => html`<div class="table-wrap"><table><thead><tr>${head.map((h) => html`<th>${h}</th>`)}</tr></thead><tbody>${rows}</tbody></table></div>`;
+
+// ---------- קופונים: עבודת הצוות מאחורי הקלעים ----------
+
+const fmt = (iso) => (iso ? shortDate(iso) : "עוד לא");
+const REASON_HE = {
+  ok: "שויך לג׳וקר", direct: "בלי קוד", unknown_ref: "קוד לא מוכר", wrong_campaign: "קוד של הופעה אחרת",
+  campaign_paused: "הקמפיין היה מושהה", campaign_draft: "לפני שהקמפיין פורסם", campaign_ended: "אחרי שהקמפיין הסתיים",
+  campaign_cancelled: "הקמפיין בוטל", campaign_sold_out: "מכסת הקידום מלאה", promoter_frozen: "ג׳וקר מוקפא",
+  self_purchase: "רכישה עצמית", promo_limit: "מכסת הקידום מלאה",
+};
+
+export function adminCoupons(ctx, { queue }, opts) {
+  return shell(
+    ctx,
+    "coupons",
+    html`
+<p class="muted">הופעות במסלול הקופונים. האמן והג׳וקרים לא עושים כלום: אנחנו מגדירים את הקודים במערכת הכרטוס של האמן ומעלים את ייצוא המכירות.</p>
+${queue.length
+  ? table(["הופעה", "מתי", "קודים", "ממתינים להגדרה", "עדכון מכירות אחרון", ""],
+      queue.map((q) => html`<tr${q.pending ? html` class="unread"` : ""}><td><b>${q.title}</b><br><small>${q.artist_name}</small></td><td>${shortDate(q.starts_at)}</td>
+        <td>${q.codes}</td><td>${q.pending ? html`<b>${q.pending}</b>` : "0"}</td><td>${fmt(q.last_import)}</td>
+        <td><a class="btn small" href="/admin/coupons/${q.campaign_id}">טיפול</a></td></tr>`))
+  : html`<p class="muted">אין עדיין הופעות במסלול הקופונים.</p>`}`,
+    opts
+  );
+}
+
+export function adminCouponCampaign(ctx, { c, codes, imports, lastImport }, opts) {
+  const pending = codes.filter((x) => !x.coupon_registered_at);
+  return shell(
+    ctx,
+    "coupons",
+    html`
+<p><a href="/admin?tab=coupons">→ כל ההופעות</a></p>
+<h2>${c.title} <small class="muted">· ${c.artist_name}</small></h2>
+<p class="meta">עמוד הכרטיסים של האמן: ${c.source_url ? html`<a href="${c.source_url}" target="_blank" rel="noopener" dir="ltr">${c.source_url}</a>` : "חסר"} · עדכון מכירות אחרון: ${fmt(lastImport)}</p>
+
+<section class="card">
+  <h2>1. קודים להגדרה במערכת הכרטוס (${pending.length})</h2>
+  ${pending.length
+    ? html`<p class="muted">מגדירים קוד הנחה של 0% לכל אחד מהקודים, ואז מסמנים.</p>
+      <textarea class="codes-box" rows="${Math.min(10, pending.length + 1)}" readonly id="pending-codes" dir="ltr">${pending.map((x) => x.coupon_code).join("\n")}</textarea>
+      <div class="inline">
+        <button type="button" class="btn small ghost" data-copy-from="pending-codes">העתקת כל הקודים</button>
+        <a class="btn small ghost" href="/admin/coupons/${c.id}/codes.csv">הורדה כקובץ</a>
+        ${postButton(ctx, `/admin/coupons/${c.id}/registered`, `סימון ${pending.length} הקודים כמוגדרים`, { cls: "btn small" })}
+      </div>`
+    : html`<p class="ok">כל הקודים מוגדרים.</p>`}
+  <details><summary>כל הקודים (${codes.length})</summary>
+    ${table(["קוד", "ג׳וקר", "נוצר", "הוגדר"], codes.map((x) => html`<tr><td dir="ltr"><code>${x.coupon_code}</code></td><td>${x.name ?? ""}</td><td>${shortDate(x.created_at)}</td><td>${fmt(x.coupon_registered_at)}</td></tr>`))}
+  </details>
+</section>
+
+<section class="card">
+  <h2>2. עדכון מכירות</h2>
+  <p class="muted">מעלים את ייצוא המכירות ממערכת הכרטוס (CSV, גם בעברית). אפשר להעלות את כל המכירות מההתחלה בכל פעם: הזמנות קיימות לא נספרות פעמיים, והחזרים מתעדכנים.</p>
+  <form method="post" action="/admin/coupons/${c.id}/import" enctype="multipart/form-data" class="inline">
+    ${csrfField(ctx)}
+    <input type="file" name="file" accept=".csv,text/csv,text/plain" required>
+    <button class="btn">העלאה ותצוגה מקדימה</button>
+  </form>
+  ${imports.length
+    ? table(["מתי", "קובץ", "מצב", "תוצאה"], imports.map((i) => html`<tr><td>${shortDate(i.created_at)}</td><td><a href="/admin/imports/${i.id}">${i.filename || "ללא שם"}</a></td><td>${{ preview: "ממתין לאישור", applied: "הוחל", discarded: "בוטל" }[i.status]}</td><td><small dir="ltr">${i.summary !== "{}" ? i.summary : ""}</small></td></tr>`))
+    : ""}
+</section>`,
+    opts
+  );
+}
+
+export function adminImport(ctx, d, opts) {
+  const { imp, c, parsed, mapping, missing, sales, errors, counts } = d;
+  const FIELDS = [["order", "מספר הזמנה *"], ["coupon", "קוד קופון *"], ["qty", "כמות"], ["amount", "סכום"], ["date", "תאריך"], ["email", "מייל הקונה"], ["status", "סטטוס (להחזרים)"]];
+  const outcome = (s) =>
+    s.action === "new" ? html`<span class="badge ${s.attribution.reason === "ok" ? "os-completed" : ""}">${s.attribution.reason === "ok" ? "חדש, שויך" : `חדש · ${REASON_HE[s.attribution.reason] ?? s.attribution.reason}`}</span>`
+      : s.action === "refund" ? html`<span class="badge os-cancelled">עדכון החזר</span>` : html`<span class="badge">כבר קיים</span>`;
+  return shell(
+    ctx,
+    "coupons",
+    html`
+<p><a href="/admin/coupons/${c.id}">→ ${c.title}</a></p>
+<h2>ייבוא מכירות · ${imp.filename || "קובץ"}</h2>
+<form method="post" action="/admin/imports/${imp.id}/map" class="card">
+  ${csrfField(ctx)}
+  <h3>אילו עמודות?</h3>
+  <div class="map-grid">${FIELDS.map(([f, label]) => html`<label class="field">${label}
+    <select name="${f}"><option value="">—</option>${parsed.header.map((h, i) => html`<option value="${i}"${mapping[f] === i ? html` selected` : ""}>${h}</option>`)}</select></label>`)}</div>
+  ${imp.status === "preview" ? html`<button class="btn small ghost">עדכון התצוגה</button>` : ""}
+</form>
+${missing.length
+  ? html`<p class="flash bad">צריך לבחור עמודה למספר הזמנה ולקוד הקופון.</p>`
+  : html`
+<div class="stats">
+  <div class="stat"><b>${counts.total}</b><span>הזמנות בקובץ</span></div>
+  <div class="stat"><b>${counts.newMatched}</b><span>חדשות ששויכו לג׳וקרים</span></div>
+  <div class="stat"><b>${counts.newOther}</b><span>חדשות בלי תגמול</span></div>
+  <div class="stat"><b>${counts.refunds}</b><span>עדכוני החזר</span></div>
+  <div class="stat"><b>${counts.unchanged}</b><span>כבר קיימות</span></div>
+</div>
+${counts.unknownCodes.length ? html`<p class="flash bad">קודים לא מוכרים: <span dir="ltr">${counts.unknownCodes.join(", ")}</span>. אולי טעות הקלדה במערכת הכרטוס.</p>` : ""}
+${errors.length ? html`<details class="card"><summary>${errors.length} שורות לא נקראו</summary><ul>${errors.map((e) => html`<li>${e}</li>`)}</ul></details>` : ""}
+${imp.status === "preview"
+  ? html`<div class="actions">${postButton(ctx, `/admin/imports/${imp.id}/apply`, `אישור והחלה (${counts.newMatched + counts.refunds} שינויים בתגמולים)`, { cls: "btn" })}${postButton(ctx, `/admin/imports/${imp.id}/discard`, "ביטול", { cls: "btn ghost" })}</div>`
+  : html`<p class="ok">הייבוא הוחל ב-${shortDate(imp.applied_at)}.</p>`}
+${table(["הזמנה", "קוד", "כמות", "הוחזרו", "תאריך", "מה יקרה"], sales.slice(0, 300).map((s) => html`<tr><td>${s.orderId}</td><td dir="ltr">${s.coupon || "—"}</td><td>${s.qty}</td><td>${s.refundedQty || ""}</td><td>${s.orderedAt ? shortDate(s.orderedAt) : "—"}</td><td>${outcome(s)}</td></tr>`))}`}`,
+    opts
+  );
+}
 
 export const adminContentTab = (ctx, data, opts) => shell(ctx, "content", adminContent(ctx, data), opts);
 

@@ -59,6 +59,10 @@ sell(dani, ids[1], { clicks: 9, orders: [1, 2] });
 sell(tom, ids[3], { clicks: 3, orders: [1] });
 simBuy(db, C.getCampaign(db, ids[0]).external_event_id, { name: "ישיר", email: "direct@example.com", qty: 2 });
 
+// מסלול הקופונים: הופעה שנמכרת באתר הכרטוס של האמן. לצוות יש קודים להגדיר ומכירות להעלות.
+const cpn = C.createCampaign(db, band, { artist_name: "הקרוואן", title: "ערב קופונים בלבונטין", venue: "לבונטין 7", city: "תל אביב", genre: "רוק", starts_at: inDays(12), price: "90", reward: "20", image_url: img("rays"), source_url: "https://tickets.example.com/caravan", ticketing: "coupon" });
+for (const u of [dani, maya, tom]) R.getOrCreateLink(db, u, cpn);
+
 // הופעה שכבר עברה: התגמולים של דני שם כבר זמינים לתשלום
 const past = C.createCampaign(db, noa, { artist_name: "נועה ברק", title: "הופעת חנוכה", venue: "צוללת צהובה", city: "ירושלים", starts_at: inDays(1), price: "70", reward: "15", image_url: img("blur") });
 sell(dani, past, { clicks: 5, orders: [2, 2] });

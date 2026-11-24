@@ -313,3 +313,58 @@ test("מדריך הסגנון פנימי: לא בתחתית העמוד ולא פ
   await ops.login("ops@encore.test", "Ops");
   assert.equal((await ops.req("/design")).status, 200);
 });
+
+test("מסלול קופונים מקצה לקצה: האמן והג׳וקר לא עושים כלום, הצוות מעלה ייצוא בעברית", async () => {
+  resetRateLimits();
+  const artist = new Browser();
+  await artist.login("cpn-artist@encore.test", "אמנית");
+  await artist.get("/artist/new/details");
+  let r = await artist.post("/artist/new", { artist_name: "אמנית", title: "הופעת קופון", starts_at: "2026-12-28T21:00", venue: "זאפה", price: "100", reward: "25", image_url: "https://img.example/c.jpg", source_url: "https://tickets.example/show", ticketing: "coupon", publish: "1" });
+  assert.match(r.text, /אנחנו מגדירים את הקודים/);
+  const cid = db.prepare("SELECT id FROM campaigns WHERE provider = 'coupon' ORDER BY id DESC").get().id;
+
+  // ג׳וקר: לוחץ "שתף והרוויח" ומקבל קוד בתוך ההודעה
+  const jo = new Browser();
+  await jo.login("cpn-jo@encore.test", "יואב");
+  r = await jo.get(`/s/${cid}/share`);
+  const code = r.text.match(/JO[A-Z2-9]{6}/)[0];
+  assert.match(r.text, new RegExp(`קוד בקופה: ${code}`));
+  const link = r.text.match(/\/r\/([a-z0-9]{7})/)[0];
+
+  // קונה: לינק → "לקנייה" → מסך עם הקוד → אתר הכרטיסים של האמן
+  const buyer = new Browser();
+  await buyer.get(link);
+  r = await buyer.req(`/s/${cid}/buy`);
+  assert.equal(r.status, 200);
+  assert.match(r.text, new RegExp(code));
+  assert.match(r.text, /href="https:\/\/tickets\.example\/show"/);
+  assert.equal((await new Browser().req(`/s/${cid}/buy`)).location, "https://tickets.example/show"); // בלי ג׳וקר: ישר לקופה
+
+  // צוות: מסמן קודים כמוגדרים, מעלה ייצוא (Windows-1255), מאשר
+  const ops = new Browser();
+  await ops.login("ops@encore.test", "Ops");
+  r = await ops.get("/admin?tab=coupons");
+  assert.match(r.text, /הופעת קופון/);
+  r = await ops.get(`/admin/coupons/${cid}`);
+  assert.match(r.text, new RegExp(code));
+  await ops.post(`/admin/coupons/${cid}/registered`);
+  const csv = `מס הזמנה,קוד קופון,כמות,סה"כ,תאריך\r\n5001,${code},2,200,02/12/2026 19:00\r\n5002,,1,100,02/12/2026\r\n`;
+  // ייצוא אקסל בעברית מגיע לרוב ב-Windows-1255: אותיות עבריות בטווח 0xE0–0xFA
+  const toWin = (s) => Buffer.from([...s].map((ch) => { const c = ch.codePointAt(0); return c >= 0x5d0 && c <= 0x5ea ? c - 0x5d0 + 0xe0 : c; }));
+  const fd = new FormData();
+  fd.append("_csrf", ops.csrf());
+  fd.append("file", new Blob([toWin(csv)], { type: "text/csv" }), "sales.csv");
+  const res = await fetch(`${base}/admin/coupons/${cid}/import`, { method: "POST", body: fd, redirect: "manual", headers: { cookie: Object.entries(ops.jar).map(([k, v]) => `${k}=${v}`).join("; "), referer: `${base}/admin/coupons/${cid}` } });
+  assert.equal(res.status, 303);
+  r = await ops.get(res.headers.get("location"));
+  assert.match(r.text, /מס הזמנה/); // הכותרת העברית פוענחה נכון
+  assert.match(r.text, /<b>1<\/b><span>חדשות ששויכו לג׳וקרים/);
+  const importId = res.headers.get("location").match(/\d+$/)[0];
+  r = await ops.post(`/admin/imports/${importId}/apply`);
+  assert.match(r.text, /1 מכירות שויכו/);
+
+  r = await jo.get("/me/money");
+  assert.match(r.text, /ממתין לאישור<\/span><b>₪50/);
+  r = await artist.get(`/artist/c/${cid}`);
+  assert.match(r.text, /<b>2<\/b><span>כרטיסים דרך ג׳וקרים/);
+});
