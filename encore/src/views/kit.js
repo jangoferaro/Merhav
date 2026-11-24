@@ -167,7 +167,7 @@ ${body}
 <footer class="foot">
   <p class="foot-big" dir="ltr">jocares.</p>
   <p class="foot-tag" dir="ltr" lang="en">Who cares? Jo cares. Because art deserves an audience.</p>
-  <nav aria-label="תחתון"><a href="/how">איך זה עובד</a><a href="/terms">תנאים ופרטיות</a><a href="/design">שפה עיצובית</a></nav>
+  <nav aria-label="תחתון"><a href="/how">איך זה עובד</a><a href="/terms">תנאים ופרטיות</a></nav>
 </footer>
 </body>
 </html>`.s;

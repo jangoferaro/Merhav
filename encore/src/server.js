@@ -69,7 +69,12 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   );
   r.get("/how", (ctx) => ctx.send(P.how(ctx, opts(ctx))));
   r.get("/terms", (ctx) => ctx.send(P.terms(ctx, opts(ctx))));
-  r.get("/design", (ctx) => ctx.send(designPage(ctx, opts(ctx))));
+  // מדריך הסגנון הוא כלי פנימי של הצוות: רק למנהלים
+  r.get("/design", (ctx) => {
+    if (!requireUser(ctx)) return;
+    requireAdmin(ctx);
+    ctx.send(designPage(ctx, opts(ctx)));
+  });
 
   r.get("/shows", (ctx) => {
     const city = String(ctx.query.city ?? "").slice(0, 40);
@@ -668,7 +673,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   // בוטים של תצוגה מקדימה עוברים לדפי הופעה ולתמונות, כדי שאפשר יהיה לבדוק שיתוף בוואטסאפ.
   const pilotPass = () => process.env.STAGING_PASSWORD;
   const pilotToken = () => hmac(pilotPass(), "pilot-access");
-  const PUBLIC_PATHS = /^\/(|how|terms|design|pilot|health)$|^\/(static|media|webhooks)\//;
+  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health)$|^\/(static|media|webhooks)\//;
 
   function stagingGate(req, res, ctx) {
     if (!pilotPass()) return false;

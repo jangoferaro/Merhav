@@ -37,6 +37,7 @@ export function adminOverview(ctx, { counts, issues, webhooks }, opts) {
 <div class="stats">
   ${Object.entries(counts).map(([k, v]) => html`<div class="stat"><b>${v}</b><span>${k}</span></div>`)}
 </div>
+<p class="note"><a href="/design">שפה עיצובית (פנימי)</a></p>
 <section class="card">
   <h2>בדיקת התאמה כספית</h2>
   ${issues.length ? html`<ul class="bad-list">${issues.map((i) => html`<li>${i}</li>`)}</ul>` : html`<p class="ok">תקין: היומן, היתרות והתשלומים תואמים.</p>`}

@@ -300,3 +300,16 @@ test("סביבת בדיקה: דף נחיתה פתוח, השאר דורש קוד 
     delete process.env.STAGING_PASSWORD;
   }
 });
+
+test("מדריך הסגנון פנימי: לא בתחתית העמוד ולא פתוח לציבור", async () => {
+  resetRateLimits();
+  const home = await (await fetch(`${base}/`)).text();
+  assert.doesNotMatch(home, /שפה עיצובית/);
+  assert.equal((await fetch(`${base}/design`, { redirect: "manual" })).status, 303); // לא מחובר → כניסה
+  const u = new Browser();
+  await u.login("plain@encore.test", "P");
+  assert.equal((await u.req("/design")).status, 404);
+  const ops = new Browser();
+  await ops.login("ops@encore.test", "Ops");
+  assert.equal((await ops.req("/design")).status, 200);
+});
