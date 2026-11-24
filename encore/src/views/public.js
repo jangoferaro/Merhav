@@ -1,5 +1,5 @@
 import { config } from "../util.js";
-import { csrfField, empty, html, layout, money, poster, showCard, showDate, stat, raw } from "./kit.js";
+import { csrfField, empty, html, layout, money, poster, showCard, showDate, stat, stamp, raw } from "./kit.js";
 
 // ---------- כניסה למוצר: שתי אפשרויות בלבד (PRD §7) ----------
 
@@ -9,7 +9,8 @@ export function landing(ctx, shows, opts) {
     "",
     html`
 <section class="hero">
-  <h1>הקהל מקדם את ההופעה.<br><em>וכולם מרוויחים.</em></h1>
+  <h1 class="display">הקהל מקדם<br>את ההופעה.</h1>
+  <span class="stamp hero-stamp"><b>וכולם</b><small>מרוויחים</small></span>
   <p class="lead">אמנים מפרסמים הופעה. כל אחד יכול לשתף אותה ולהרוויח כסף מכל כרטיס שנמכר בזכותו.</p>
   <div class="choices">
     <a class="choice artist" href="/grow">
@@ -136,7 +137,7 @@ export function showPage(ctx, { c, referrer, link, stats, buyable }, opts) {
     `${c.artist_name} · ${c.title}`,
     html`
 <article class="show-page">
-  ${poster(c, "big")}
+  <div class="show-media">${poster(c, "big")}${c.status === "active" ? stamp(money(c.reward_agorot), "למקדם על כרטיס") : ""}</div>
   <div class="show-main">
     <p class="eyebrow">${c.artist_name}</p>
     <h1>${c.title}</h1>
@@ -180,7 +181,7 @@ export function sharePage(ctx, { c, url, text, stats }, opts) {
     html`
 <section class="share-page">
   <p class="eyebrow">${c.artist_name} · ${c.title}</p>
-  <h1>הלינק האישי שלך מוכן</h1>
+  <div class="share-head"><h1>הלינק האישי שלך מוכן</h1>${stamp(money(c.reward_agorot), "לכל כרטיס")}</div>
   <p class="lead">כל כרטיס שנקנה דרכו = <b class="money">${money(c.reward_agorot)}</b> בשבילך.</p>
 
   <div class="linkbox"><code dir="ltr">${url}</code><button type="button" class="btn small" data-copy="${url}">העתקה</button></div>

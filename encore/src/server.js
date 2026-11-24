@@ -20,6 +20,7 @@ import * as A from "./views/artist.js";
 import * as AD from "./views/admin.js";
 import * as K from "./domain/content.js";
 import * as CV from "./views/content.js";
+import { designPage } from "./views/design.js";
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml" };
@@ -59,6 +60,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
   r.get("/", (ctx) => ctx.send(P.landing(ctx, C.marketplace(db, { userId: ctx.user?.id }), opts(ctx))));
   r.get("/how", (ctx) => ctx.send(P.how(ctx, opts(ctx))));
   r.get("/terms", (ctx) => ctx.send(P.terms(ctx, opts(ctx))));
+  r.get("/design", (ctx) => ctx.send(designPage(ctx, opts(ctx))));
 
   r.get("/shows", (ctx) => {
     const city = String(ctx.query.city ?? "").slice(0, 40);

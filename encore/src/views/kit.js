@@ -35,18 +35,28 @@ export const postButton = (ctx, action, label, { cls = "", confirm = "", fields 
 
 // ---------- פוסטר: תמונה אמיתית, או גרדיאנט עם ראשי תיבות ----------
 
-function hue(s) {
-  let h = 0;
-  for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) % 360;
+function hash(s) {
+  let h = 7;
+  for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0;
   return h;
 }
 
+/**
+ * פוסטר גנרטיבי (שפה עיצובית, ראו DESIGN.md): שדה צבע שטוח מתוך ששת צבעי הפלטה,
+ * אות ענקית מוטה וחתוכה בצבע אחר, וקווי בנייה דקים מעליה. אותה הופעה = תמיד אותו פוסטר.
+ */
 export function poster(c, cls = "") {
   if (c.image_url) return html`<div class="poster ${cls}"><img src="${c.image_url}" alt="" loading="lazy" referrerpolicy="no-referrer"></div>`;
-  const h = hue(c.artist_name + c.title);
-  const initials = String(c.artist_name).trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("");
-  return html`<div class="poster ${cls}" style="--h:${h}" aria-hidden="true"><span>${initials}</span></div>`;
+  const h = hash(c.artist_name + "|" + c.title);
+  const bg = h % 6;
+  const fg = (bg + 1 + ((h >>> 4) % 5)) % 6;
+  const tilt = ((h >>> 8) % 29) - 14;
+  const glyph = String(c.artist_name).trim()[0] ?? "";
+  return html`<div class="poster pal-${bg} ${cls}" aria-hidden="true"><span class="glyph ink-${fg}" style="--tilt:${tilt}deg">${glyph}</span></div>`;
 }
+
+/** חותמת עגולה: הסכום החשוב במסך (העיגול הוא החריג היחיד לפינות הישרות) */
+export const stamp = (value, label, cls = "") => html`<span class="stamp ${cls}"><b>${value}</b><small>${label}</small></span>`;
 
 export const statusBadge = (s) => html`<span class="badge st-${s}">${STATUS_LABEL[s] ?? s}</span>`;
 
@@ -58,12 +68,12 @@ export const empty = (title, body, action = "") => html`<div class="empty"><h3>$
 export function showCard(ctx, c) {
   return html`
   <article class="show">
-    <a href="/s/${c.id}" class="show-link">${poster(c)}</a>
+    <a href="/s/${c.id}" class="show-link">${poster(c)}${stamp(money(c.reward_agorot), "לכל כרטיס")}</a>
     <div class="show-body">
       <p class="eyebrow">${c.artist_name}</p>
       <h3><a href="/s/${c.id}">${c.title}</a></h3>
       <p class="meta">${showDate(c.starts_at)} · ${c.city || c.venue}</p>
-      <div class="earn"><span>הרווח שלך</span><b>${money(c.reward_agorot)}</b><small>לכל כרטיס · מחיר ${money(c.price_agorot)}</small></div>
+      <p class="earn-line">הרווח שלך <b>${money(c.reward_agorot)}</b> על כל כרטיס · מחיר ${money(c.price_agorot)}</p>
       ${c.promoting
         ? html`<a class="btn ghost block" href="/s/${c.id}/share">הלינק שלי</a>`
         : html`<form method="post" action="/s/${c.id}/promote">${csrfField(ctx)}<button class="btn block">שיתוף והרווחה</button></form>`}
@@ -73,7 +83,7 @@ export function showCard(ctx, c) {
 
 // ---------- מסגרת הדף ----------
 
-const BELL = raw(`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`);
+const BELL = raw(`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`);
 
 export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreator = false, wide = false, description = "" } = {}) {
   const u = ctx.user;
@@ -93,10 +103,11 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${title ? `${title} · ENCORE` : "ENCORE · הקהל מקדם את ההופעה"}</title>
 <meta name="description" content="${description || "בוחרים הופעה, משתפים, ומרוויחים מכל כרטיס שנמכר בזכותכם."}">
-<meta name="theme-color" content="#16121f">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap">
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/app.js" defer></script>
 </head>
@@ -104,7 +115,7 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
 <a class="skip" href="#main">דילוג לתוכן</a>
 <header class="top">
   <div class="top-in">
-    <a href="/" class="logo" aria-label="ENCORE, דף הבית">ENCORE<i>.</i></a>
+    <a href="/" class="logo" aria-label="ENCORE, דף הבית">encore<i aria-hidden="true"></i></a>
     <nav aria-label="ראשי">
       ${nav.map(([href, label]) => html`<a href="${href}"${(path === href || path.startsWith(href + "/")) ? raw(' aria-current="page"') : ""}>${label}</a>`)}
     </nav>
@@ -122,7 +133,9 @@ ${!config.isProd && flash?.dev ? html`<div class="flash dev">מצב פיתוח �
 ${body}
 </main>
 <footer class="foot">
-  <p>ENCORE · הקהל מקדם את ההופעה · <a href="/how">איך זה עובד</a> · <a href="/terms">תנאים ופרטיות</a></p>
+  <p class="foot-big">encore</p>
+  <p>הקהל מקדם את ההופעה</p>
+  <nav aria-label="תחתון"><a href="/how">איך זה עובד</a><a href="/terms">תנאים ופרטיות</a><a href="/design">שפה עיצובית</a></nav>
 </footer>
 </body>
 </html>`.s;
