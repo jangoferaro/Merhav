@@ -6,6 +6,7 @@ import { audit, getUser, notify, publicName } from "./identity.js";
 import { getCampaign } from "./campaigns.js";
 import { getOrCreateLink } from "./referrals.js";
 import { simPay } from "../providers/simpay.js";
+import { validImageRef } from "../media.js";
 
 const payments = simPay;
 
@@ -103,7 +104,7 @@ export function saveProfile(db, user, input) {
     city: text(input.city, "עיר", { max: 40, required: false }),
     genres: list(input.genres).join(","),
     kinds: kinds.join(","),
-    image_url: input.image_url ? httpsUrl(input.image_url, "תמונה") : "",
+    image_url: validImageRef(input.image_url) || (() => { throw new UserError("צריך תמונה שלך לפרופיל. אמנים רוצים לראות מי יוצר בשבילם."); })(),
   };
   if (getProfile(db, user.id)) {
     db.prepare(

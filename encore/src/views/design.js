@@ -1,7 +1,12 @@
 // מדריך סגנון חי: /design. מציג את הטוקנים והרכיבים האמיתיים מאותו CSS, כך שאי אפשר שיתיישן.
-import { empty, html, layout, money, poster, stamp, stat, statusBadge } from "./kit.js";
+import { empty, html, imageInput, layout, money, poster, stamp, stat, statusBadge } from "./kit.js";
 import { orderBadge, avatar } from "./content.js";
-import { LAYOUTS } from "./art.js";
+import { TREATMENTS } from "./kit.js";
+import { demoImage, DEMO_STYLES } from "../demo-images.js";
+
+// תמונות הדגמה קטנות למדריך (נוצרות פעם אחת)
+let demo;
+const demoSrc = (i) => (demo ??= DEMO_STYLES.map((st, k) => `data:image/png;base64,${demoImage(101 + k, st, 480, 360).toString("base64")}`))[i % DEMO_STYLES.length];
 
 const SWATCHES = [
   ["--paper", "נייר", "#ffffff", "#111"],
@@ -14,7 +19,7 @@ const SWATCHES = [
   ["--c5", "צהוב", "#ffc400", "#111"],
 ];
 
-const sample = (artist_name, title) => ({ artist_name, title, image_url: "" });
+const sample = (artist_name, title, i = 0) => ({ artist_name, title, image_url: demoSrc(i) });
 
 export function designPage(ctx, opts) {
   return layout(
@@ -34,7 +39,7 @@ export function designPage(ctx, opts) {
     <li><div><b>שני גופנים, שני תפקידים</b><span>Heebo לכותרות (900, צפוף וענק) ולמספרים גדולים (300). Assistant פשוט וגנרי לכל טקסט התוכן.</span></div></li>
     <li><div><b>פינות ישרות, עיגול אחד</b><span>כל קופסה, כפתור, שדה ותמונה בפינות של 0. העיגול שמור למה שהכי חשוב: הסכום שמרוויחים, נקודת סטטוס, אווטאר.</span></div></li>
     <li><div><b>קווי שיער במקום קופסאות</b><span>היררכיה בעזרת קו מבני שחור וקו שיער אפור, לא צללים ולא רקעים. רשימות הן שורות על קווים.</span></div></li>
-    <li><div><b>הגרפיקה מגיעה מעולם הפוסטר</b><span>אות ענקית מוטה, אלפבית צבעוני על שחור, קרני שמש, קשת, פיקסל-ארט, פסים עם מדבקת כוכב, שחמט, ומילה ענקית עם קווי בנייה. בהשראת העבודות של Under ושל הדר לוזון.</span></div></li>
+    <li><div><b>תמיד יש תמונה</b><span>התמונה של האמן היא הגיבור. העיצוב עוטף אותה בקווי בנייה, במסגרת צבע או בפס עם השם, בהשראת העבודות של Under ושל הדר לוזון.</span></div></li>
     <li><div><b>בלי אימוג'ים</b><span>אייקונים בקו דק אחד (1.25px) בצבע הטקסט, או מילה במקומם.</span></div></li>
   </ol>
 </section>
@@ -60,16 +65,15 @@ export function designPage(ctx, opts) {
 </section>
 
 <section class="ds-section">
-  <h2>סדרת פוסטרים <span>8 פריסות, נבחרות לפי שם ההופעה</span></h2>
-  <p class="muted">כשאין תמונה, כל הופעה מקבלת פוסטר משלה. הפריסה, הצבעים והזווית נגזרים מהשם, כך שאותה הופעה נראית תמיד אותו דבר, והמרקטפלייס נראה כמו קיר פוסטרים ולא כמו טבלה.</p>
+  <h2>תמונה וטיפול <span>לכל הופעה יש תמונה. העיצוב עוטף אותה</span></h2>
+  <p class="muted">אין הופעה ואין יוצר בלי תמונה: מעלים מהטלפון, או שהתמונה נמשכת מעמוד ההופעה. כל תמונה מקבלת טיפול אחד מתוך שלושה, לפי השם, כך שאותה הופעה נראית תמיד אותו דבר, והמרקטפלייס נראה כמו קיר פוסטרים.</p>
   <div class="ds-grid">
-    ${Object.keys(LAYOUTS).map((l, i) => {
-      const [a, t] = [["נועה ברק", "ערב אקוסטי"], ["הקרוואן", "השקת אלבום"], ["שקד", "ג'אם ג'אז"], ["DJ Lila", "All Night"], ["מיה", "הופעה"], ["אורי", "סיבוב"], ["תמר", "בכורה"], ["רוני", "לילה לבן"]][i];
-      return html`<figure class="ds-fig"><a class="show-link" href="#" aria-label="דוגמה">${poster(sample(a, t), "", l)}${i % 3 === 0 ? stamp("₪20", "לכל כרטיס") : ""}</a><figcaption>${{ letter: "אות ענקית", alphabet: "אלפבית על שחור", sunburst: "קרני שמש", rainbow: "קשת", pixels: "יצור פיקסלים", stripes: "פסים ומדבקה", checker: "שחמט מתרחב", bigword: "מילה ענקית" }[l]}</figcaption></figure>`;
-    })}
+    ${TREATMENTS.map((t, i) => html`<figure class="ds-fig"><a class="show-link" href="#" aria-label="דוגמה">${poster(sample(["נועה ברק", "הקרוואן", "DJ Lila"][i], "הופעה", i + 1), "", t)}${i === 0 ? stamp("₪20", "לכל כרטיס") : ""}</a><figcaption>${{ lines: "קווי בנייה", frame: "מסגרת צבע", band: "פס עם שם האמן" }[t]}</figcaption></figure>`)}
   </div>
-  <h3 style="margin-top:24px">אווטארים ליוצרים</h3>
-  <div class="ds-row">${[1, 2, 3, 4, 5, 6, 7, 8].map((id) => avatar({ user_id: id, display_name: "x" }, "big"))}</div>
+  <h3 style="margin-top:24px">העלאת תמונה</h3>
+  <div style="max-width:420px">${imageInput({ current: demoSrc(4) })}</div>
+  <h3 style="margin-top:24px">יוצרים</h3>
+  <div class="ds-row">${[0, 1, 2, 3].map((i) => avatar({ image_url: demoSrc(i), display_name: "x" }, "big"))}</div>
 </section>
 
 <section class="ds-section">

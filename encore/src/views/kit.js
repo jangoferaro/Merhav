@@ -1,8 +1,6 @@
 // רכיבי תצוגה משותפים. כל ערך שעובר דרך html`` מקבל escape, חוץ מתוצאות html`` אחרות.
 import { config, money, showDate } from "../util.js";
 import { STATUS_LABEL } from "../domain/campaigns.js";
-import { posterSvg, pixelAvatarSvg } from "./art.js";
-export { pixelAvatarSvg };
 
 export class Raw {
   constructor(s) {
@@ -37,14 +35,42 @@ export const postButton = (ctx, action, label, { cls = "", confirm = "", fields 
 
 // ---------- פוסטר: תמונה אמיתית, או גרדיאנט עם ראשי תיבות ----------
 
+function hash(s) {
+  let h = 2166136261;
+  for (const ch of String(s)) h = Math.imul(h ^ ch.codePointAt(0), 16777619) >>> 0;
+  return h;
+}
+
+export const TREATMENTS = ["lines", "frame", "band"];
+
 /**
- * פוסטר: תמונה אם יש, אחרת פוסטר גנרטיבי מתוך סדרת פריסות (ראו art.js ו-DESIGN.md).
- * אותה הופעה = תמיד אותו פוסטר.
+ * פוסטר = התמונה של ההופעה (תמיד יש), עם טיפול גרפי אחד מתוך שפת העיצוב:
+ *  lines  קווי בנייה דקים מעל התמונה
+ *  frame  מסגרת עבה בצבע מהפלטה
+ *  band   פס צבע עם שם האמן באות כבדה
+ * הטיפול והצבע נגזרים מהשם, כך שאותה הופעה נראית תמיד אותו דבר.
  */
-export function poster(c, cls = "", layout) {
-  if (c.image_url) return html`<div class="poster ${cls}"><img src="${c.image_url}" alt="" loading="lazy" referrerpolicy="no-referrer"></div>`;
-  const size = cls.includes("big") ? "big" : cls.includes("thumb") ? "square" : "card";
-  return html`<div class="poster ${cls}">${raw(posterSvg(c, { size, layout }))}</div>`;
+export function poster(c, cls = "", treatment) {
+  const h = hash(`${c.artist_name}|${c.title}`);
+  const t = treatment ?? TREATMENTS[h % TREATMENTS.length];
+  const color = (h >>> 5) % 6;
+  const small = cls.includes("thumb");
+  return html`<div class="poster tr-${small ? "plain" : t} pc-${color} ${cls}">${c.image_url
+    ? html`<img src="${c.image_url}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+    : ""}${t === "band" && !small ? html`<span class="band" aria-hidden="true">${c.artist_name}</span>` : ""}</div>`;
+}
+
+/** העלאת תמונה: תצוגה מקדימה של הקיימת, ובחירת קובץ חדש מהטלפון או מהמחשב */
+export function imageInput({ current = "", label = "העלאת תמונה", hint = "JPG, PNG או WebP · עד 8MB", round = false } = {}) {
+  return html`
+<div class="upload${round ? " round" : ""}">
+  <input type="hidden" name="image_url" value="${current}">
+  <label class="upload-box">
+    <span class="upload-preview">${current ? html`<img src="${current}" alt="" referrerpolicy="no-referrer">` : ""}</span>
+    <span class="upload-text"><b data-label-change="החלפת תמונה">${current ? "החלפת תמונה" : label}</b><small>${hint}</small></span>
+    <input type="file" name="image" accept="image/jpeg,image/png,image/webp" ${current ? "" : html`required`} data-preview>
+  </label>
+</div>`;
 }
 
 /** חותמת עגולה: הסכום החשוב במסך (העיגול הוא החריג היחיד לפינות הישרות) */

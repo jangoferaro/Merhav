@@ -21,6 +21,7 @@ import * as AD from "./views/admin.js";
 import * as K from "./domain/content.js";
 import * as CV from "./views/content.js";
 import { designPage } from "./views/design.js";
+import { imageFromForm, serveMedia } from "./media.js";
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml" };
@@ -307,6 +308,9 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
     const f = await ctx.form();
     let c;
     try {
+      // התמונה נשמרת כבר עכשיו, והתצוגה המקדימה ממשיכה עם הנתיב שלה
+      f.image_url = imageFromForm(f, { required: false }) || f.image_url;
+      delete f.image;
       c = C.parseCampaignInput(f);
     } catch (e) {
       if (!(e instanceof UserError)) throw e;
@@ -354,7 +358,9 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
   r.post("/artist/c/:id/details", async (ctx) => {
     if (!requireUser(ctx)) return;
     const c = managed(ctx, ctx.params.id);
-    C.updateCampaignDetails(db, ctx.user, c.id, await ctx.form());
+    const f = await ctx.form();
+    f.image_url = imageFromForm(f, { required: false }) || c.image_url;
+    C.updateCampaignDetails(db, ctx.user, c.id, f);
     ctx.redirect(`/artist/c/${c.id}`, "נשמר");
   });
 
@@ -440,6 +446,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
     });
   creatorPost("/creator/profile", (ctx, f) => {
     const isNew = !K.getProfile(db, ctx.user.id);
+    f.image_url = imageFromForm(f, { required: false }) || K.getProfile(db, ctx.user.id)?.image_url || "";
     K.saveProfile(db, ctx.user, f);
     return isNew ? "/creator/services/new" : "/creator";
   }, "נשמר");
@@ -630,6 +637,10 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
         return fs.createReadStream(file).pipe(res);
       }
       if (req.method === "GET" && ctx.url.pathname === "/health") return ctx.json({ ok: true });
+      if (req.method === "GET" && ctx.url.pathname.startsWith("/media/")) {
+        if (serveMedia(ctx.url.pathname.slice(7), res)) return;
+        throw new UserError("התמונה לא נמצאה", 404);
+      }
 
       ctx.user = ID.userFromSession(db, ctx.cookies.sid);
       const route = r.match(req.method, ctx.url.pathname);

@@ -77,7 +77,7 @@ a:hover { text-decoration-color: var(--c0); }
 img { max-width: 100%; display: block; }
 h1, h2, h3, .display, .logo, .foot-big, .stat b, .bucket b, .price, .price-tag, .total b, .split b, .stamp b,
 .empty h3, .choice b, .goal b, .creator-head b, .svc h3, .principles li::before, .leaders li > span:first-child,
-.big-field input, .code-input, .poster .pt { font-family: var(--font-display); }
+.big-field input, .code-input, .band { font-family: var(--font-display); }
 h1, h2, h3 { margin: 0 0 .4em; font-weight: 800; letter-spacing: -.02em; line-height: 1.02; }
 h1 { font-size: var(--t-1); }
 h2 { font-size: var(--t-2); font-weight: 700; letter-spacing: -.01em; line-height: 1.2; }
@@ -247,10 +247,32 @@ details[open] > summary { margin-bottom: 14px; }
 /* ---------- פוסטר גנרטיבי ---------- */
 .poster { aspect-ratio: 4 / 3; overflow: hidden; position: relative; background: var(--wash); isolation: isolate; }
 .poster img { width: 100%; height: 100%; object-fit: cover; }
-.poster svg { width: 100%; height: 100%; display: block; }
-.poster .pt { font-weight: 900; letter-spacing: -.02em; }
-.poster svg > * { transition: transform .6s cubic-bezier(.2, .7, .2, 1); transform-origin: 50% 50%; }
-.show:hover .poster svg > :not(rect:first-child), .show-media:hover .poster svg > :not(rect:first-child) { transform: scale(1.035); }
+/* טיפולים גרפיים על התמונה */
+.pc-0 { --pc: var(--c0); --pc-on: var(--on-c0); } .pc-1 { --pc: var(--c1); --pc-on: var(--on-c1); }
+.pc-2 { --pc: var(--c2); --pc-on: var(--on-c2); } .pc-3 { --pc: var(--c3); --pc-on: var(--on-c3); }
+.pc-4 { --pc: var(--c4); --pc-on: var(--on-c4); } .pc-5 { --pc: var(--c5); --pc-on: var(--on-c5); }
+.poster img { transition: transform .6s cubic-bezier(.2, .7, .2, 1); }
+.show:hover .poster img, .show-media:hover .poster img { transform: scale(1.03); }
+/* lines: קווי בנייה מעל התמונה */
+.tr-lines::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    linear-gradient(to bottom, transparent calc(30% - .5px), rgb(255 255 255 / 75%) 30%, transparent calc(30% + .5px)),
+    linear-gradient(to bottom, transparent calc(74% - .5px), rgb(255 255 255 / 75%) 74%, transparent calc(74% + .5px)),
+    linear-gradient(to right, transparent calc(18% - .5px), rgb(255 255 255 / 75%) 18%, transparent calc(18% + .5px)),
+    linear-gradient(to right, transparent calc(82% - .5px), rgb(255 255 255 / 75%) 82%, transparent calc(82% + .5px));
+}
+/* frame: מסגרת עבה בצבע */
+.tr-frame { background: var(--pc); padding: clamp(10px, 3.2%, 18px); }
+.tr-frame img { outline: 1px solid rgb(0 0 0 / 15%); }
+/* band: פס צבע עם שם האמן */
+.band {
+  position: absolute; top: 0; inset-inline-start: 0; z-index: 1; max-width: 86%;
+  background: var(--pc); color: var(--pc-on); padding: 6px 12px 8px;
+  font: 900 clamp(1.3rem, 5.5vw, 2rem)/1 var(--font-display); letter-spacing: -.04em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.poster.big .band { font-size: clamp(1.8rem, 8vw, 3rem); padding: 8px 16px 12px; }
 .poster.thumb { width: 72px; flex: none; aspect-ratio: 1; }
 .poster.big { aspect-ratio: 4 / 5; }
 
@@ -393,7 +415,7 @@ blockquote { margin: 10px 0; padding: 4px 16px; border-inline-start: 1px solid v
 .creator:nth-child(6n+5) .avatar { background: var(--c4); }
 .creator:nth-child(6n+6) .avatar { background: var(--c1); color: #111; }
 .avatar img, .avatar svg { width: 100%; height: 100%; object-fit: cover; display: block; }
-.avatar.pixel { background: none; }
+
 .avatar.big { width: 96px; height: 96px; font-size: 2.6rem; }
 .creator { border-top: 1px solid var(--rule); padding: 18px var(--gutter) 24px; display: grid; gap: 12px; align-content: start; }
 @media (min-width: 600px) { .creator { padding: 18px 0 8px; } }
@@ -432,6 +454,17 @@ pre.brief { white-space: pre-wrap; font: 400 1rem/1.75 var(--font); margin: 0; }
 .swatch code { font-size: .8rem; unicode-bidi: isolate; text-align: right; }
 .typescale > * { border-bottom: 1px solid var(--hair); padding: 10px 0; margin: 0; }
 .typescale small { direction: ltr; text-align: right; unicode-bidi: isolate; display: block; font: 400 var(--t-micro) ui-monospace, Menlo, monospace; color: var(--ink-2); letter-spacing: 0; margin-bottom: 4px; }
+/* העלאת תמונה */
+.upload-box { display: flex; align-items: center; gap: 14px; border: 1px dashed var(--ink); padding: 10px; cursor: pointer; position: relative; font-weight: 400; }
+.upload-box:hover { border-style: solid; }
+.upload-box:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.upload-preview { width: 96px; aspect-ratio: 4 / 3; background: var(--wash); flex: none; overflow: hidden; display: grid; place-items: center; }
+.upload-preview:empty::after { content: "+"; font: 300 2rem/1 var(--font-display); color: var(--ink-2); }
+.upload-preview img { width: 100%; height: 100%; object-fit: cover; }
+.upload.round .upload-preview { width: 72px; aspect-ratio: 1; border-radius: 50%; }
+.upload-text { display: grid; gap: 2px; }
+.upload-text small { color: var(--ink-2); font-weight: 400; }
+.upload-box input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 .ds-fig { margin: 0; }
 .ds-fig figcaption { font-size: var(--t-small); padding-top: 8px; }
 .ds-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }

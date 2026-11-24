@@ -20,7 +20,7 @@ function user(email, name) {
 
 const SHOW = {
   artist_name: "נועה", title: "הופעה אקוסטית", venue: "הבארבי", city: "תל אביב",
-  starts_at: "2026-12-20T21:00", price: "80", reward: "20",
+  starts_at: "2026-12-20T21:00", price: "80", reward: "20", image_url: "https://img.example/show.jpg",
 };
 
 beforeEach(() => {

@@ -1,5 +1,6 @@
 // שכבת HTTP דקה: ניתוב, עוגיות, טפסים, CSRF, הגבלת קצב והודעות flash.
 import { config, hmac, randomToken, safeEqual, UserError } from "./util.js";
+import { MAX_IMAGE_BYTES, parseMultipart } from "./media.js";
 
 const MAX_BODY = 64 * 1024;
 
@@ -22,18 +23,18 @@ export function cookie(name, value, { maxAge, httpOnly = true } = {}) {
   ].filter(Boolean).join("; ");
 }
 
-export function readBody(req) {
+export function readBody(req, max = MAX_BODY, { raw = false } = {}) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
     req.on("data", (c) => {
       size += c.length;
-      if (size > MAX_BODY) {
+      if (size > max) {
         reject(new UserError("הבקשה גדולה מדי", 413));
         req.destroy();
       } else chunks.push(c);
     });
-    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("end", () => resolve(raw ? Buffer.concat(chunks) : Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
   });
 }
@@ -93,6 +94,10 @@ export function makeCtx(req, res) {
     setCookie: (c) => setCookies.push(c),
     _form: null,
     async form() {
+      if (!this._form && /^multipart\/form-data/i.test(req.headers["content-type"] ?? "")) {
+        const buf = await readBody(req, MAX_IMAGE_BYTES + 256 * 1024, { raw: true });
+        this._form = parseMultipart(buf, req.headers["content-type"]);
+      }
       if (!this._form) {
         const out = {};
         for (const [k, v] of new URLSearchParams(await readBody(req))) {
@@ -115,7 +120,7 @@ export function makeCtx(req, res) {
         "x-frame-options": "DENY",
         "referrer-policy": "strict-origin-when-cross-origin",
         "content-security-policy":
-          "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; form-action 'self'; frame-ancestors 'none'",
+          "default-src 'self'; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; form-action 'self'; frame-ancestors 'none'",
         ...headers,
       });
       res.end(html);

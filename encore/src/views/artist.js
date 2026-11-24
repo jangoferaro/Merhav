@@ -1,7 +1,7 @@
 // אזור האמן: מסך בית ממוקד תוצאות, פתיחת קמפיין בשלושה צעדים, וניהול קמפיין.
 import { config, isoToIsraelLocal } from "../util.js";
 import { split, STATUS_LABEL, TRANSITIONS } from "../domain/campaigns.js";
-import { csrfField, empty, html, layout, money, postButton, poster, showDate, stat, statusBadge } from "./kit.js";
+import { csrfField, empty, html, imageInput, layout, money, postButton, poster, showDate, stat, statusBadge } from "./kit.js";
 import { orderBadge } from "./content.js";
 
 function contentOrdersBlock(orders) {
@@ -92,11 +92,13 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
   ${steps(2)}
   ${found.length ? html`<p class="flash good">מצאנו ${found.length} פרטים. בדקו שהכל נכון והשלימו את מה שחסר.</p>` : ""}
   ${error ? html`<p class="flash bad">${error}</p>` : ""}
-  <form method="post" action="/artist/new/preview" class="stack">
+  <form method="post" action="/artist/new/preview" class="stack" enctype="multipart/form-data" data-busy="מעלים…">
     ${csrfField(ctx)}
     <input type="hidden" name="source_url" value="${v.source_url ?? ""}">
     ${field("artist_name", "שם האמן / הלהקה", "required maxlength=120")}
     ${field("title", "שם ההופעה", "required maxlength=120")}
+    <div class="field${found.includes("image_url") ? " found" : ""}">תמונה של ההופעה${found.includes("image_url") ? html` <small>נמצאה בעמוד ההופעה</small>` : ""}
+      ${imageInput({ current: v.image_url ?? "", label: "העלאת תמונה מהטלפון או מהמחשב" })}</div>
     ${field("starts_at", "מתי", "type=datetime-local required")}
     <div class="row2">
       ${field("venue", "איפה (מקום)", "required maxlength=120")}
@@ -120,7 +122,6 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
     <details>
       <summary>עוד אפשרויות (לא חובה)</summary>
       <div class="stack">
-        ${field("image_url", "תמונה (לינק https)", "type=url maxlength=500 dir=ltr")}
         ${field("genre", "סגנון", "maxlength=40 list=genres", html`<datalist id="genres"><option>פופ</option><option>רוק</option><option>אינדי</option><option>ג'אז</option><option>היפ הופ</option><option>אלקטרוני</option><option>ים תיכוני</option><option>סטנדאפ</option></datalist>`)}
         <label class="field">תיאור<textarea name="description" rows="3" maxlength="2000">${v.description ?? ""}</textarea></label>
         ${field("promo_limit", "מקסימום כרטיסים למכירה דרך מקדמים", "type=number min=1 inputmode=numeric")}
@@ -160,13 +161,13 @@ export function previewPage(ctx, { c, form }, opts) {
   ${c.promo_limit ? html`<p class="muted center">עד ${c.promo_limit} כרטיסים דרך מקדמים.</p>` : ""}
   <form method="post" action="/artist/new" class="stack">
     ${csrfField(ctx)}
-    ${Object.entries(form).filter(([k]) => k !== "_csrf").map(([k, val]) => html`<input type="hidden" name="${k}" value="${val}">`)}
+    ${Object.entries(form).filter(([k, val]) => k !== "_csrf" && typeof val === "string").map(([k, val]) => html`<input type="hidden" name="${k}" value="${val}">`)}
     <button class="btn big block" name="publish" value="1">פרסום</button>
     <button class="btn ghost block" name="publish" value="0">שמירה כטיוטה</button>
   </form>
   <form method="post" action="/artist/new/details" class="center">
     ${csrfField(ctx)}
-    ${Object.entries(form).filter(([k]) => k !== "_csrf").map(([k, val]) => html`<input type="hidden" name="${k}" value="${val}">`)}
+    ${Object.entries(form).filter(([k, val]) => k !== "_csrf" && typeof val === "string").map(([k, val]) => html`<input type="hidden" name="${k}" value="${val}">`)}
     <button class="linklike">חזרה לעריכה</button>
   </form>
 </section>`,
@@ -232,9 +233,9 @@ ${["ended", "cancelled"].includes(c.status)
 
 <details class="card">
   <summary>חומרי שיווק והגבלות</summary>
-  <form method="post" action="/artist/c/${c.id}/details" class="stack">
+  <form method="post" action="/artist/c/${c.id}/details" class="stack" enctype="multipart/form-data">
     ${csrfField(ctx)}
-    <label class="field">תמונה (https)<input name="image_url" type="url" value="${c.image_url}" dir="ltr"></label>
+    <div class="field">תמונה${imageInput({ current: c.image_url })}</div>
     <label class="field">תיאור<textarea name="description" rows="3" maxlength="2000">${c.description}</textarea></label>
     <label class="field">משפט פתיחה להודעת השיתוף<textarea name="share_text" rows="2" maxlength="600">${c.share_text}</textarea></label>
     <label class="field">מקסימום כרטיסים דרך מקדמים<input name="promo_limit" type="number" min="1" value="${c.promo_limit ?? ""}" placeholder="ללא הגבלה"></label>

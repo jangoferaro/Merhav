@@ -71,7 +71,7 @@ test("מסע מלא: אמן מפרסם → מקדם משתף → חבר קונה
 
   // אמן: פרטים → תצוגה מקדימה → פרסום
   await artist.get("/artist/new/details");
-  const show = { artist_name: "נועה", title: "ערב אקוסטי", starts_at: "2026-12-20T21:00", venue: "הבארבי", city: "תל אביב", price: "80", reward: "20" };
+  const show = { artist_name: "נועה", title: "ערב אקוסטי", starts_at: "2026-12-20T21:00", venue: "הבארבי", city: "תל אביב", price: "80", reward: "20", image_url: "https://img.example/show.jpg" };
   let r = await artist.post("/artist/new/preview", show);
   assert.match(r.text, /נשאר לכם מכל כרטיס/);
   assert.match(r.text, /₪56/);
@@ -159,7 +159,7 @@ test("אבטחה: CSRF, הפניה פתוחה, XSS, webhook לא חתום, הר�
   await a.get("/artist/new/details");
   r = await a.post("/artist/new", {
     artist_name: "<img src=x onerror=alert(1)>", title: "<script>alert(1)</script>", starts_at: "2026-12-30T20:00",
-    venue: "v", price: "50", reward: "10", publish: "1",
+    venue: "v", price: "50", reward: "10", publish: "1", image_url: "https://img.example/x.jpg",
   });
   assert.doesNotMatch(r.text, /<script>alert/);
   assert.doesNotMatch(r.text, /<img src=x/);
@@ -188,7 +188,7 @@ test("טיוטה לא מופיעה לציבור; קמפיין מושהה לא מ
   const a = new Browser();
   await a.login("draft@encore.test", "D");
   await a.get("/artist/new/details");
-  const r = await a.post("/artist/new", { artist_name: "D", title: "טיוטה", starts_at: "2026-12-30T20:00", venue: "v", price: "50", reward: "10", publish: "0" });
+  const r = await a.post("/artist/new", { artist_name: "D", title: "טיוטה", starts_at: "2026-12-30T20:00", venue: "v", price: "50", reward: "10", publish: "0", image_url: "https://img.example/x.jpg" });
   assert.match(r.text, /נשמר כטיוטה/);
   const cid = db.prepare("SELECT id FROM campaigns ORDER BY id DESC").get().id;
   assert.equal((await new Browser().req(`/s/${cid}`)).status, 404);
@@ -203,6 +203,9 @@ test("מסע תוכן: יוצר פותח פרופיל ושירות → אמן ב
   await creator.get("/creator");
   assert.match(creator.last, /לא צריך אלפי עוקבים/);
   let r = await creator.post("/creator/profile", { display_name: "ליאור", genres: "אינדי", kinds: "content", bio: "מצלמת הופעות" });
+  assert.match(r.text, /צריך תמונה שלך לפרופיל/); // אין יוצר בלי תמונה
+  await creator.get("/creator");
+  r = await creator.post("/creator/profile", { display_name: "ליאור", genres: "אינדי", kinds: "content", bio: "מצלמת הופעות", image_url: "https://img.example/lior.jpg" });
   assert.match(r.text, /איזה שירות\?/); // אחרי פרופיל: ישר לבחירת תבנית
   await creator.get("/creator/services/new?template=reel");
   r = await creator.post("/creator/services/new", { template: "reel", price: "200", title: "ריל לקידום", deliverable: "ריל 30 שניות", delivery_days: "5", revisions: "1", license: "organic" });

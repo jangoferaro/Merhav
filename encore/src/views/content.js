@@ -1,13 +1,13 @@
 // מודול התוכן: מסך מטרה לאמן, גילוי יוצרים, פרופיל, הזמנה, דף הזמנה משותף, ואזור היוצר.
 import { clock, config, shortDate } from "../util.js";
 import { GOALS, KIND_LABEL, LICENSES, ORDER_STATUS, TEMPLATES, serviceSplit } from "../domain/content.js";
-import { csrfField, empty, html, layout, money, postButton, raw, showDate, stat, pixelAvatarSvg } from "./kit.js";
+import { csrfField, empty, html, layout, money, postButton, showDate, stat, imageInput } from "./kit.js";
 
 const days = (n) => (n === 1 ? "יום אחד" : `${n} ימים`);
 
 export function avatar(p, cls = "") {
   if (p.image_url) return html`<span class="avatar ${cls}"><img src="${p.image_url}" alt="" referrerpolicy="no-referrer"></span>`;
-  return html`<span class="avatar pixel ${cls}" aria-hidden="true">${raw(pixelAvatarSvg(p.user_id ?? p.display_name))}</span>`;
+  return html`<span class="avatar ${cls}" aria-hidden="true">${String(p.display_name || "?").trim()[0]}</span>`;
 }
 
 export const orderBadge = (s) => html`<span class="badge os-${s}">${ORDER_STATUS[s]}</span>`;
@@ -396,7 +396,8 @@ export function creatorHome(ctx, { profile, services, orders, portfolio, channel
 function profileForm(ctx, p = {}) {
   const kinds = (p.kinds || "content").split(",");
   return html`
-<form method="post" action="/creator/profile" class="stack">${csrfField(ctx)}
+<form method="post" action="/creator/profile" class="stack" enctype="multipart/form-data" data-busy="שומרים…">${csrfField(ctx)}
+  <div class="field">תמונה שלך${imageInput({ current: p.image_url ?? "", label: "העלאת תמונה", round: true, hint: "אמנים רוצים לראות מי יוצר בשבילם" })}</div>
   <label class="field">שם שיוצג<input name="display_name" value="${p.display_name ?? ctx.user.name ?? ""}" required maxlength="60"></label>
   <label class="field">כמה מילים עליך<textarea name="bio" rows="3" maxlength="600" placeholder="מה את/ה אוהב/ת ליצור, ואיזו מוזיקה מדברת אליך">${p.bio ?? ""}</textarea></label>
   <div class="row2">
@@ -407,7 +408,6 @@ function profileForm(ctx, p = {}) {
     <label><input type="checkbox" name="kinds" value="content" ${kinds.includes("content") ? html`checked` : ""}> יצירת תוכן לאמנים</label>
     <label><input type="checkbox" name="kinds" value="exposure" ${kinds.includes("exposure") ? html`checked` : ""}> פרסום לקהל שלי</label>
   </fieldset>
-  <label class="field">תמונה (קישור https, לא חובה)<input name="image_url" type="url" dir="ltr" value="${p.image_url ?? ""}"></label>
   <button class="btn block">שמירה</button>
 </form>`;
 }

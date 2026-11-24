@@ -3,6 +3,7 @@ import { insert, tx } from "../db.js";
 import { clock, config, feePerTicket, israelLocalToIso, shekelsToAgorot, text, UserError } from "../util.js";
 import { audit, notify } from "./identity.js";
 import { provider } from "../providers/index.js";
+import { validImageRef } from "../media.js";
 
 // ---------- מחזור החיים של קמפיין ----------
 
@@ -60,8 +61,9 @@ export function parseCampaignInput(input) {
   const startsAt = israelLocalToIso(input.starts_at);
   if (!startsAt) throw new UserError("חסר תאריך ושעה");
   if (startsAt <= clock.iso()) throw new UserError("ההופעה כבר עברה");
-  const image = String(input.image_url ?? "").trim();
-  if (image && !/^https:\/\/\S+$/.test(image)) throw new UserError("כתובת התמונה צריכה להתחיל ב-https://");
+  // אין הופעה בלי תמונה: קובץ שהועלה (‎/media/…) או תמונה מעמוד ההופעה (https)
+  const image = validImageRef(input.image_url);
+  if (!image) throw new UserError("צריך תמונה להופעה. אפשר להעלות מהטלפון או מהמחשב.");
   const source = String(input.source_url ?? "").trim();
   if (source && !/^https?:\/\/\S+$/.test(source)) throw new UserError("הלינק להופעה לא תקין");
   return {
@@ -72,7 +74,7 @@ export function parseCampaignInput(input) {
     genre: text(input.genre, "סגנון", { max: 40, required: false }),
     description: text(input.description, "תיאור", { max: 2000, required: false }),
     starts_at: startsAt,
-    image_url: image.slice(0, 500),
+    image_url: image,
     source_url: source.slice(0, 500),
     price_agorot: price,
     reward_agorot: reward,
@@ -209,8 +211,8 @@ export function updateCampaignDetails(db, user, campaignId, input) {
     const limit = parseLimit(input.promo_limit);
     if (limit !== null && limit < promotedSold(db, c.id)) throw new UserError("המגבלה נמוכה ממה שכבר נמכר");
     const share = text(input.share_text, "טקסט לשיתוף", { max: 600, required: false });
-    const image = String(input.image_url ?? "").trim();
-    if (image && !/^https:\/\/\S+$/.test(image)) throw new UserError("כתובת התמונה צריכה להתחיל ב-https://");
+    const image = validImageRef(input.image_url);
+    if (!image) throw new UserError("צריך תמונה להופעה");
     db.prepare("UPDATE campaigns SET promo_limit = ?, share_text = ?, updated_at = ? WHERE id = ?").run(limit, share, clock.iso(), c.id);
     db.prepare("UPDATE events SET image_url = ?, description = ? WHERE id = ?").run(
       image, text(input.description, "תיאור", { max: 2000, required: false }), c.event_id

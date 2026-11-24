@@ -108,3 +108,19 @@
   input.addEventListener("input", calc);
   calc();
 })();
+
+// העלאת תמונה: תצוגה מקדימה מיידית של הקובץ שנבחר
+document.addEventListener("change", (e) => {
+  const input = e.target.closest("input[type=file][data-preview]");
+  if (!input || !input.files?.[0]) return;
+  const box = input.closest(".upload-box");
+  const preview = box.querySelector(".upload-preview");
+  preview.innerHTML = "";
+  const img = document.createElement("img");
+  img.alt = "";
+  img.src = URL.createObjectURL(input.files[0]);
+  preview.append(img);
+  const label = box.querySelector("[data-label-change]");
+  if (label) label.textContent = label.dataset.labelChange;
+  if (input.files[0].size > 8 * 1024 * 1024) alert("התמונה גדולה מ-8MB. נסו תמונה קטנה יותר.");
+});

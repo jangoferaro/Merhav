@@ -21,7 +21,7 @@ beforeEach(() => {
   artist = user("artist@x.com", "נועה");
   creator = user("lior@x.com", "ליאור");
   ops = user("ops@x.com", "Ops", 1);
-  K.saveProfile(db, creator, { display_name: "ליאור", genres: "אינדי, פופ", kinds: ["content"], city: "חיפה" });
+  K.saveProfile(db, creator, { display_name: "ליאור", genres: "אינדי, פופ", kinds: ["content"], city: "חיפה", image_url: "https://img.example/lior.jpg" });
 });
 
 const service = (over = {}) => K.saveService(db, creator, { template: "reel", price: "200", ...over });
@@ -127,7 +127,7 @@ test("הרשאות: רק הצד הנכון יכול לבצע כל פעולה", (
 });
 
 test("מודל היברידי: הזמנה שקשורה להופעה נותנת ליוצר לינק אישי, ומכירות דרכו מזכות אותו", () => {
-  const cid = C.createCampaign(db, artist, { artist_name: "נועה", title: "השקה", venue: "בארבי", starts_at: "2026-12-20T21:00", price: "80", reward: "20" });
+  const cid = C.createCampaign(db, artist, { artist_name: "נועה", title: "השקה", venue: "בארבי", starts_at: "2026-12-20T21:00", price: "80", reward: "20", image_url: "https://img.example/s.jpg" });
   const id = order(service(), { campaign_id: String(cid) });
   K.acceptOrder(db, creator, id);
   const o = K.getOrder(db, id);
@@ -144,10 +144,10 @@ test("מודל היברידי: הזמנה שקשורה להופעה נותנת �
 
 test("גילוי יוצרים: התאמת סגנון מעל מחיר, ובלי יוצרים מוסתרים", () => {
   const other = user("o@x.com", "אחר");
-  K.saveProfile(db, other, { display_name: "אחר", genres: "ג'אז" });
+  K.saveProfile(db, other, { display_name: "אחר", genres: "ג'אז", image_url: "https://img.example/o.jpg" });
   K.saveService(db, other, { template: "reel", price: "50" });
   service();
-  C.createCampaign(db, artist, { artist_name: "נועה", title: "x", venue: "v", genre: "אינדי", starts_at: "2026-12-20T21:00", price: "80", reward: "20" });
+  C.createCampaign(db, artist, { artist_name: "נועה", title: "x", venue: "v", genre: "אינדי", starts_at: "2026-12-20T21:00", price: "80", reward: "20", image_url: "https://img.example/s.jpg" });
   let list = K.discoverCreators(db, { viewerId: artist.id });
   assert.equal(list[0].user_id, creator.id);
   assert.deepEqual(list[0].match, ["אינדי"]);
