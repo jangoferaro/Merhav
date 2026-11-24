@@ -1,13 +1,13 @@
 // מודול התוכן: מסך מטרה לאמן, גילוי יוצרים, פרופיל, הזמנה, דף הזמנה משותף, ואזור היוצר.
 import { clock, config, shortDate } from "../util.js";
 import { GOALS, KIND_LABEL, LICENSES, ORDER_STATUS, TEMPLATES, serviceSplit } from "../domain/content.js";
-import { csrfField, empty, html, layout, money, postButton, showDate, stat } from "./kit.js";
+import { csrfField, empty, html, layout, money, postButton, raw, showDate, stat, pixelAvatarSvg } from "./kit.js";
 
 const days = (n) => (n === 1 ? "יום אחד" : `${n} ימים`);
 
 export function avatar(p, cls = "") {
   if (p.image_url) return html`<span class="avatar ${cls}"><img src="${p.image_url}" alt="" referrerpolicy="no-referrer"></span>`;
-  return html`<span class="avatar ${cls}" aria-hidden="true">${String(p.display_name || "?").trim()[0]}</span>`;
+  return html`<span class="avatar pixel ${cls}" aria-hidden="true">${raw(pixelAvatarSvg(p.user_id ?? p.display_name))}</span>`;
 }
 
 export const orderBadge = (s) => html`<span class="badge os-${s}">${ORDER_STATUS[s]}</span>`;

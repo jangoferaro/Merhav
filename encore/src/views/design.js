@@ -1,6 +1,7 @@
 // מדריך סגנון חי: /design. מציג את הטוקנים והרכיבים האמיתיים מאותו CSS, כך שאי אפשר שיתיישן.
 import { empty, html, layout, money, poster, stamp, stat, statusBadge } from "./kit.js";
-import { orderBadge } from "./content.js";
+import { orderBadge, avatar } from "./content.js";
+import { LAYOUTS } from "./art.js";
 
 const SWATCHES = [
   ["--paper", "נייר", "#ffffff", "#111"],
@@ -30,10 +31,10 @@ export function designPage(ctx, opts) {
   <h2>עקרונות</h2>
   <ol class="principles">
     <li><div><b>הדף לבן, הצבע בפוסטר</b><span>הממשק עצמו שחור-לבן. צבע מופיע רק בפוסטרים, בחותמות ובבלוקים גדולים, ותמיד שטוח, בלי גרדיאנטים.</span></div></li>
-    <li><div><b>קל מול כבד</b><span>טקסט ומספרים במשקל קל (300). כותרות במשקל 900, צפופות וגדולות מאוד. אין משקל בינוני "בטוח" באמצע.</span></div></li>
+    <li><div><b>שני גופנים, שני תפקידים</b><span>Heebo לכותרות (900, צפוף וענק) ולמספרים גדולים (300). IBM Plex Sans Hebrew פשוט וגנרי לכל טקסט התוכן.</span></div></li>
     <li><div><b>פינות ישרות, עיגול אחד</b><span>כל קופסה, כפתור, שדה ותמונה בפינות של 0. העיגול שמור למה שהכי חשוב: הסכום שמרוויחים, נקודת סטטוס, אווטאר.</span></div></li>
     <li><div><b>קווי שיער במקום קופסאות</b><span>היררכיה בעזרת קו מבני שחור וקו שיער אפור, לא צללים ולא רקעים. רשימות הן שורות על קווים.</span></div></li>
-    <li><div><b>קווי בנייה</b><span>על כל פוסטר מופיע גריד דק, כמו מסמך עבודה של מעצב. הוא מזכיר שמאחורי הפשטות יש מערכת.</span></div></li>
+    <li><div><b>הגרפיקה מגיעה מעולם הפוסטר</b><span>אות ענקית מוטה, אלפבית צבעוני על שחור, קרני שמש, קשת, פיקסל-ארט, פסים עם מדבקת כוכב, שחמט, ומילה ענקית עם קווי בנייה. בהשראת העבודות של Under ושל הדר לוזון.</span></div></li>
     <li><div><b>בלי אימוג'ים</b><span>אייקונים בקו דק אחד (1.25px) בצבע הטקסט, או מילה במקומם.</span></div></li>
   </ol>
 </section>
@@ -47,23 +48,28 @@ export function designPage(ctx, opts) {
 </section>
 
 <section class="ds-section">
-  <h2>טיפוגרפיה <span>Heebo · 300 / 400 / 500 / 800 / 900</span></h2>
+  <h2>טיפוגרפיה <span>Heebo לכותרות ומספרים · IBM Plex Sans Hebrew לטקסט</span></h2>
   <div class="typescale">
     <p class="display"><small>display · 900 · ‎-0.045em</small>הופעה הלילה</p>
     <h1><small>h1 · 800</small>שיתוף והרווחה</h1>
     <h2><small>h2 · 700</small>הזמנות פתוחות</h2>
-    <p class="lead"><small>lead · 300</small>בוחרים הופעה, משתפים, ומקבלים על כל כרטיס.</p>
-    <p><small>body · 400</small>הכסף ממתין לאישור עד שלושה ימים אחרי ההופעה, ואז עובר לזמין.</p>
-    <p class="meta"><small>meta · 300</small>יום ה׳, 3 בדצמבר · הבארבי, תל אביב</p>
+    <p class="lead"><small>lead · IBM Plex Sans Hebrew 400</small>בוחרים הופעה, משתפים, ומקבלים על כל כרטיס.</p>
+    <p><small>body · IBM Plex Sans Hebrew 400</small>הכסף ממתין לאישור עד שלושה ימים אחרי ההופעה, ואז עובר לזמין.</p>
+    <p class="meta"><small>meta · IBM Plex Sans Hebrew 400</small>יום ה׳, 3 בדצמבר · הבארבי, תל אביב</p>
   </div>
 </section>
 
 <section class="ds-section">
-  <h2>פוסטר גנרטיבי <span>שדה צבע + אות מוטה + קווי בנייה</span></h2>
-  <p class="muted">כשאין תמונה, כל הופעה מקבלת פוסטר משלה מהשם שלה: צבע רקע, צבע אות וזווית קבועים. האות הראשונה של האמן מוגדלת וחתוכה.</p>
+  <h2>סדרת פוסטרים <span>8 פריסות, נבחרות לפי שם ההופעה</span></h2>
+  <p class="muted">כשאין תמונה, כל הופעה מקבלת פוסטר משלה. הפריסה, הצבעים והזווית נגזרים מהשם, כך שאותה הופעה נראית תמיד אותו דבר, והמרקטפלייס נראה כמו קיר פוסטרים ולא כמו טבלה.</p>
   <div class="ds-grid">
-    ${[["נועה ברק", "ערב"], ["הקרוואן", "השקה"], ["DJ Lila", "All Night"], ["שקד", "ג'אם"]].map(([a, t]) => html`<a class="show-link" href="#" aria-label="דוגמה">${poster(sample(a, t))}${stamp("₪20", "לכל כרטיס")}</a>`)}
+    ${Object.keys(LAYOUTS).map((l, i) => {
+      const [a, t] = [["נועה ברק", "ערב אקוסטי"], ["הקרוואן", "השקת אלבום"], ["שקד", "ג'אם ג'אז"], ["DJ Lila", "All Night"], ["מיה", "הופעה"], ["אורי", "סיבוב"], ["תמר", "בכורה"], ["רוני", "לילה לבן"]][i];
+      return html`<figure class="ds-fig"><a class="show-link" href="#" aria-label="דוגמה">${poster(sample(a, t), "", l)}${i % 3 === 0 ? stamp("₪20", "לכל כרטיס") : ""}</a><figcaption>${{ letter: "אות ענקית", alphabet: "אלפבית על שחור", sunburst: "קרני שמש", rainbow: "קשת", pixels: "יצור פיקסלים", stripes: "פסים ומדבקה", checker: "שחמט מתרחב", bigword: "מילה ענקית" }[l]}</figcaption></figure>`;
+    })}
   </div>
+  <h3 style="margin-top:24px">אווטארים ליוצרים</h3>
+  <div class="ds-row">${[1, 2, 3, 4, 5, 6, 7, 8].map((id) => avatar({ user_id: id, display_name: "x" }, "big"))}</div>
 </section>
 
 <section class="ds-section">

@@ -1,6 +1,8 @@
 // רכיבי תצוגה משותפים. כל ערך שעובר דרך html`` מקבל escape, חוץ מתוצאות html`` אחרות.
 import { config, money, showDate } from "../util.js";
 import { STATUS_LABEL } from "../domain/campaigns.js";
+import { posterSvg, pixelAvatarSvg } from "./art.js";
+export { pixelAvatarSvg };
 
 export class Raw {
   constructor(s) {
@@ -35,24 +37,14 @@ export const postButton = (ctx, action, label, { cls = "", confirm = "", fields 
 
 // ---------- פוסטר: תמונה אמיתית, או גרדיאנט עם ראשי תיבות ----------
 
-function hash(s) {
-  let h = 7;
-  for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0;
-  return h;
-}
-
 /**
- * פוסטר גנרטיבי (שפה עיצובית, ראו DESIGN.md): שדה צבע שטוח מתוך ששת צבעי הפלטה,
- * אות ענקית מוטה וחתוכה בצבע אחר, וקווי בנייה דקים מעליה. אותה הופעה = תמיד אותו פוסטר.
+ * פוסטר: תמונה אם יש, אחרת פוסטר גנרטיבי מתוך סדרת פריסות (ראו art.js ו-DESIGN.md).
+ * אותה הופעה = תמיד אותו פוסטר.
  */
-export function poster(c, cls = "") {
+export function poster(c, cls = "", layout) {
   if (c.image_url) return html`<div class="poster ${cls}"><img src="${c.image_url}" alt="" loading="lazy" referrerpolicy="no-referrer"></div>`;
-  const h = hash(c.artist_name + "|" + c.title);
-  const bg = h % 6;
-  const fg = (bg + 1 + ((h >>> 4) % 5)) % 6;
-  const tilt = ((h >>> 8) % 29) - 14;
-  const glyph = String(c.artist_name).trim()[0] ?? "";
-  return html`<div class="poster pal-${bg} ${cls}" aria-hidden="true"><span class="glyph ink-${fg}" style="--tilt:${tilt}deg">${glyph}</span></div>`;
+  const size = cls.includes("big") ? "big" : cls.includes("thumb") ? "square" : "card";
+  return html`<div class="poster ${cls}">${raw(posterSvg(c, { size, layout }))}</div>`;
 }
 
 /** חותמת עגולה: הסכום החשוב במסך (העיגול הוא החריג היחיד לפינות הישרות) */
@@ -107,7 +99,7 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
 <meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;700;800;900&family=IBM+Plex+Sans+Hebrew:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/app.js" defer></script>
 </head>
