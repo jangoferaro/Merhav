@@ -254,3 +254,36 @@ test("אין אימוג'ים בממשק", async () => {
   const page = (await new Browser().get("/")).text + (await new Browser().get("/creators")).text + (await new Browser().get("/grow")).text;
   assert.doesNotMatch(page, /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
 });
+
+test("תצוגה מקדימה בוואטסאפ: תגיות OG עם תמונת ההופעה, ובוט לא נספר כלחיצה", async () => {
+  resetRateLimits();
+  const c = db.prepare("SELECT c.id, l.code, l.id AS link_id FROM campaigns c JOIN referral_links l ON l.campaign_id = c.id LIMIT 1").get();
+  const before = db.prepare("SELECT COUNT(*) n FROM referral_clicks WHERE link_id = ?").get(c.link_id).n;
+  const bot = { "user-agent": "WhatsApp/2.23.20.0 A" };
+  const r = await fetch(`${base}/r/${c.code}`, { headers: bot, redirect: "manual" });
+  assert.equal(r.status, 303);
+  assert.equal(r.headers.getSetCookie().filter((x) => x.startsWith("ref_")).length, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM referral_clicks WHERE link_id = ?").get(c.link_id).n, before);
+  const page = await (await fetch(base + r.headers.get("location"), { headers: bot })).text();
+  assert.match(page, /<meta property="og:image" content="https:\/\/img\.example\/show\.jpg">/);
+  assert.match(page, /<meta property="og:title" content="נועה: ערב אקוסטי">/);
+  assert.match(page, new RegExp(`<meta property="og:url" content="http://127\\.0\\.0\\.1:\\d+/s/${c.id}">`));
+  const home = await (await fetch(base + "/")).text();
+  assert.match(home, /og:image" content="http:\/\/127\.0\.0\.1:\d+\/static\/og\.png"/);
+  assert.equal((await fetch(base + "/static/og.png")).headers.get("content-type"), "image/png");
+});
+
+test("סביבת בדיקה: סיסמה לכל האתר, חוץ מבדיקת בריאות ובוטי תצוגה מקדימה", async () => {
+  process.env.STAGING_PASSWORD = "pilot-2026";
+  try {
+    assert.equal((await fetch(`${base}/shows`)).status, 401);
+    assert.equal((await fetch(`${base}/health`)).status, 200);
+    const auth = { authorization: "Basic " + Buffer.from("x:pilot-2026").toString("base64") };
+    assert.equal((await fetch(`${base}/shows`, { headers: auth })).status, 200);
+    assert.equal((await fetch(`${base}/shows`, { headers: { authorization: "Basic " + Buffer.from("x:nope").toString("base64") } })).status, 401);
+    const id = db.prepare("SELECT id FROM campaigns WHERE status = 'active' LIMIT 1").get().id;
+    assert.equal((await fetch(`${base}/s/${id}`, { headers: { "user-agent": "facebookexternalhit/1.1" } })).status, 200);
+  } finally {
+    delete process.env.STAGING_PASSWORD;
+  }
+});

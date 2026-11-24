@@ -97,6 +97,7 @@ p { margin: 0 0 .9em; }
 .skip:focus { inset-inline-start: var(--gutter); top: 8px; background: var(--paper); padding: 8px 12px; z-index: 20; }
 
 /* ---------- מסגרת ---------- */
+.staging-bar { background: var(--jo-acid); color: #151515; text-align: center; font-size: .85rem; font-weight: 600; padding: 6px 12px; }
 .top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--paper) 92%, transparent); backdrop-filter: blur(8px); }
 .top-in { max-width: var(--max-wide); margin: 0 auto; padding: 14px var(--gutter); display: flex; align-items: center; gap: 20px; }
 .logo { font: 700 1.7rem/1 "Space Grotesk", Arial, sans-serif; letter-spacing: -.06em; text-decoration: none; direction: ltr; display: inline-flex; align-items: baseline; }

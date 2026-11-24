@@ -167,7 +167,17 @@ export function showPage(ctx, { c, referrer, link, stats, buyable }, opts) {
       : ""}
   </div>
 </article>`,
-    { ...opts, description: `${c.artist_name} · ${c.title} · ${showDate(c.starts_at)} · ${c.venue}` }
+    {
+      ...opts,
+      description: `${c.artist_name} · ${c.title} · ${showDate(c.starts_at)} · ${c.venue}`,
+      og: {
+        type: "music.event",
+        title: `${c.artist_name}: ${c.title}`,
+        description: `${showDate(c.starts_at)} · ${c.venue}${c.city ? `, ${c.city}` : ""} · כרטיסים ${money(c.price_agorot)}`,
+        image: c.image_url,
+        url: `/s/${c.id}`,
+      },
+    }
   );
 }
 

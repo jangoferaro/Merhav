@@ -124,3 +124,28 @@ document.addEventListener("change", (e) => {
   if (label) label.textContent = label.dataset.labelChange;
   if (input.files[0].size > 8 * 1024 * 1024) alert("התמונה גדולה מ-8MB. נסו תמונה קטנה יותר.");
 });
+
+// לפני העלאה: מקטינים תמונה גדולה ל-1600px ושומרים כ-JPEG.
+// העלאה מהירה יותר מהטלפון, תצוגה מקדימה בוואטסאפ (שדורש תמונה קטנה), ומחיקת מטא-דאטה כמו מיקום GPS.
+document.addEventListener("change", async (e) => {
+  const input = e.target.closest("input[type=file][data-preview]");
+  const file = input?.files?.[0];
+  if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type) || !window.createImageBitmap || !window.DataTransfer) return;
+  try {
+    const bmp = await createImageBitmap(file);
+    const MAX = 1600;
+    const scale = Math.min(1, MAX / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.size < 900 * 1024) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext("2d").drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+    if (!blob) return;
+    const dt = new DataTransfer();
+    dt.items.add(new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }));
+    input.files = dt.files;
+  } catch {
+    // אם הדפדפן לא מצליח, מעלים את המקור והשרת יבדוק את הגודל
+  }
+});

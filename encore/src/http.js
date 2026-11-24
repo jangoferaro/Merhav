@@ -87,7 +87,7 @@ export function makeCtx(req, res) {
   }
   const ctx = {
     req, res, url, cookies, vid, params: {}, query: Object.fromEntries(url.searchParams),
-    ip: (config.isProd && String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim()) || req.socket.remoteAddress || "?",
+    ip: (config.trustProxy && String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim()) || req.socket.remoteAddress || "?",
     csrf: hmac(vid, "csrf"),
     user: null,
     flash: null,
@@ -145,6 +145,12 @@ export function makeCtx(req, res) {
   }
   return ctx;
 }
+
+/** בוטים של תצוגה מקדימה (וואטסאפ, פייסבוק, טלגרם...) ומנועי חיפוש: לא סופרים אותם כלחיצה */
+export const isCrawler = (req) =>
+  /WhatsApp|facebookexternalhit|Facebot|TelegramBot|Twitterbot|Slackbot|LinkedInBot|Discordbot|Googlebot|bingbot|Applebot|SkypeUriPreview|Pinterest|redditbot|Embedly/i.test(
+    String(req.headers["user-agent"] ?? "")
+  );
 
 /** next=... רק לנתיב פנימי */
 export const safeNext = (n) => (typeof n === "string" && /^\/(?!\/)[\w\-/?=&.%]*$/.test(n) ? n : "");

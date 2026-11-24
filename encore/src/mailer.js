@@ -17,7 +17,7 @@ export async function sendLoginCode(email, code) {
     if (!res.ok) throw new Error(`mail send failed: ${res.status}`);
     return { sent: true };
   }
-  if (config.isProd) throw new Error("RESEND_API_KEY חסר — אי אפשר לשלוח קודי כניסה");
+  if (!config.showLoginCodes) throw new Error("RESEND_API_KEY חסר — אי אפשר לשלוח קודי כניסה");
   console.log(`[dev] login code for ${email}: ${code}`);
   return { sent: false, devCode: code };
 }

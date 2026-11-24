@@ -1,10 +1,11 @@
 import http from "node:http";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDb } from "./db.js";
 import { clock, config, isEmail, normalizeEmail, UserError } from "./util.js";
-import { cookie, makeCtx, rateLimit, readBody, Router, safeNext } from "./http.js";
+import { cookie, isCrawler, makeCtx, rateLimit, readBody, Router, safeNext } from "./http.js";
 import { sendLoginCode } from "./mailer.js";
 import * as ID from "./domain/identity.js";
 import * as C from "./domain/campaigns.js";
@@ -24,7 +25,7 @@ import { designPage } from "./views/design.js";
 import { imageFromForm, serveMedia } from "./media.js";
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
-const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml" };
+const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png" };
 const REF_COOKIE_DAYS = config.attributionDays;
 
 export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
@@ -75,6 +76,8 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
     rateLimit(`click:${ctx.ip}`, 120, 60_000);
     const link = R.getLinkByCode(db, ctx.params.code);
     if (!link) throw new UserError("הלינק לא קיים", 404);
+    // בוט של תצוגה מקדימה (וואטסאפ וכו'): מקבל את דף ההופעה עם התמונה, בלי שזה ייספר כלחיצה
+    if (isCrawler(ctx.req)) return ctx.redirect(`/s/${link.campaign_id}`);
     const click = R.recordClick(db, link, ctx.vid, ctx.req.headers.referer);
     ctx.setCookie(cookie(`ref_${link.campaign_id}`, click.token, { maxAge: REF_COOKIE_DAYS * 86400 }));
     ctx.redirect(`/s/${link.campaign_id}`);
@@ -624,11 +627,29 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
     ctx.redirect("/admin?tab=sim", "ההופעה בוטלה אצל הספק");
   });
 
+  // ---------- סביבת בדיקה: סיסמה אחת לכל האתר ----------
+  // בוטים של תצוגה מקדימה עוברים לדפי הופעה ולתמונות, כדי שאפשר יהיה לבדוק שיתוף בוואטסאפ.
+  function stagingGate(req, res, ctx) {
+    const pass = process.env.STAGING_PASSWORD;
+    if (!pass) return false;
+    const p = ctx.url.pathname;
+    if (p === "/health" || p.startsWith("/webhooks/")) return false;
+    if (isCrawler(req) && req.method === "GET" && /^\/(s|r|media|static)\//.test(p)) return false;
+    const [scheme, b64] = String(req.headers.authorization ?? "").split(" ");
+    const given = scheme === "Basic" ? Buffer.from(b64 ?? "", "base64").toString().split(":").slice(1).join(":") : "";
+    if (given && given.length === pass.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(pass))) return false;
+    res.writeHead(401, { "www-authenticate": 'Basic realm="jocares staging", charset="UTF-8"', "content-type": "text/plain; charset=utf-8" });
+    res.end("סביבת בדיקה. צריך סיסמה.");
+    return true;
+  }
+
   // ---------- טיפול בבקשה ----------
 
   return async (req, res) => {
     const ctx = makeCtx(req, res);
+    ctx.origin = origin(ctx);
     try {
+      if (stagingGate(req, res, ctx)) return;
       if (req.method === "GET" && ctx.url.pathname.startsWith("/static/")) {
         const file = path.join(STATIC, path.basename(ctx.url.pathname));
         const type = STATIC_TYPES[path.extname(file)];

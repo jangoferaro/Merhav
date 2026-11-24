@@ -103,7 +103,10 @@ export function showCard(ctx, c) {
 
 const BELL = raw(`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`);
 
-export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreator = false, wide = false, description = "" } = {}) {
+export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreator = false, wide = false, description = "", og = {} } = {}) {
+  const abs = (u) => (/^https?:\/\//.test(u) ? u : `${ctx.origin ?? ""}${u}`);
+  const desc = description || "אמנות צריכה קהל. בוחרים הופעה, משתפים, ומרוויחים מכל כרטיס שנמכר בזכותכם.";
+  const ogTitle = og.title || (title ? `${title} · jocares.` : "jocares. · אמנות צריכה קהל");
   const u = ctx.user;
   const nav = [
     ["/shows", "הופעות"],
@@ -120,7 +123,16 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${title ? `${title} · jocares.` : "jocares. · אמנות צריכה קהל"}</title>
-<meta name="description" content="${description || "אמנות צריכה קהל. בוחרים הופעה, משתפים, ומרוויחים מכל כרטיס שנמכר בזכותכם."}">
+<meta name="description" content="${desc}">
+<meta property="og:site_name" content="jocares.">
+<meta property="og:type" content="${og.type || "website"}">
+<meta property="og:locale" content="he_IL">
+<meta property="og:title" content="${ogTitle}">
+<meta property="og:description" content="${og.description || desc}">
+<meta property="og:url" content="${abs(og.url || ctx.url.pathname)}">
+<meta property="og:image" content="${abs(og.image || "/static/og.png")}">
+${og.image ? "" : html`<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">`}
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#EDECE4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#151515" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/static/joker.svg" type="image/svg+xml">
@@ -132,6 +144,7 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
 </head>
 <body>
 <a class="skip" href="#main">דילוג לתוכן</a>
+${config.isStaging ? html`<div class="staging-bar" role="note">סביבת בדיקה · הנתונים לדוגמה · אין כאן כסף אמיתי</div>` : ""}
 <header class="top">
   <div class="top-in">
     <a href="/" class="logo" aria-label="Jocares, דף הבית">jocares<i aria-hidden="true">.</i></a>
@@ -148,7 +161,7 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
 </header>
 <main id="main" class="${wide ? "wide" : ""}">
 ${flash ? html`<div class="flash ${flash.ok === false ? "bad" : "good"}" role="status">${flash.m}</div>` : ""}
-${!config.isProd && flash?.dev ? html`<div class="flash dev">מצב פיתוח · ${flash.dev}</div>` : ""}
+${config.showLoginCodes && flash?.dev ? html`<div class="flash dev">${config.isStaging ? "סביבת בדיקה" : "מצב פיתוח"} · ${flash.dev}</div>` : ""}
 ${body}
 </main>
 <footer class="foot">

@@ -11,6 +11,18 @@ export const config = {
   get isProd() {
     return process.env.NODE_ENV === "production";
   },
+  /** סביבת בדיקה ציבורית: מתנהגת כמו ייצור, אבל קודי כניסה מוצגים על המסך ויש באנר */
+  get isStaging() {
+    return process.env.ENCORE_ENV === "staging";
+  },
+  /** האם להציג קוד כניסה על המסך (פיתוח, או סביבת בדיקה בלי ספק מייל) */
+  get showLoginCodes() {
+    return !this.isProd || (this.isStaging && !process.env.RESEND_API_KEY);
+  },
+  /** מאחורי פרוקסי (Railway וכו'): לקחת את כתובת הלקוח מ-X-Forwarded-For */
+  get trustProxy() {
+    return this.isProd || process.env.TRUST_PROXY === "1";
+  },
   /** עמלת הפלטפורמה בנקודות בסיס (500 = 5% ממחיר כרטיס שנמכר דרך מקדם) */
   get feeBps() {
     return Number(process.env.PLATFORM_FEE_BPS ?? 500);
