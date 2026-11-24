@@ -1,0 +1,13 @@
+{
+  "name": "kahal",
+  "private": true,
+  "version": "0.1.0",
+  "description": "מכירת כרטיסים לאומנים דרך שגרירים מהקהל",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --no-warnings=ExperimentalWarning src/server.js",
+    "dev": "node --no-warnings=ExperimentalWarning --watch src/server.js",
+    "test": "node --no-warnings=ExperimentalWarning --test test/*.test.js"
+  }
+}
