@@ -35,6 +35,8 @@ npm test         # 48 בדיקות: כרטיסים, תוכן, מסעות מלא�
 | `NODE_ENV=production` | חובה | עוגיות Secure, בלי הצגת קודים על המסך |
 | `RESEND_API_KEY`, `MAIL_FROM` | חובה | שליחת קודי כניסה (`src/mailer.js`) |
 | `PUBLIC_URL` | חובה | הכתובת הציבורית, לבניית הלינקים לשיתוף |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | | כניסה עם Google. בלעדיהם הכפתור לא מוצג. Redirect URI: `<PUBLIC_URL>/auth/google/callback` |
+| `ENCORE_ENV=staging`, `STAGING_PASSWORD` | | סביבת בדיקה: באנר, קודי כניסה על המסך כשאין ספק מייל, ו"קוד גישה לפיילוט". דף הנחיתה פתוח לכולם |
 | `ADMIN_EMAILS` | | רשימת מיילים מופרדת בפסיקים שיקבלו הרשאות ניהול בהרשמה |
 | `PLATFORM_FEE_BPS` | | עמלת הפלטפורמה על כרטיסים, בנקודות בסיס (ברירת מחדל 500, כלומר 5%) |
 | `CONTENT_FEE_BPS` | | עמלת הפלטפורמה על עבודות תוכן, מנוכה מהיוצר (ברירת מחדל 1000, כלומר 10%) |

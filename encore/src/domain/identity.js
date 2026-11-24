@@ -53,14 +53,30 @@ export function verifyLoginCode(db, rawEmail, rawCode) {
   return tx(db, () => {
     const used = db.prepare("UPDATE login_codes SET used_at = ? WHERE id = ? AND used_at IS NULL").run(clock.iso(), row.id);
     if (used.changes !== 1) throw new UserError("הקוד כבר שומש. בקשו קוד חדש.");
+    return signInVerifiedEmail(db, email, { method: "email_code" });
+  });
+}
+
+/**
+ * כניסה עם מייל שכבר אומת (בקוד למייל, או ע"י Google). אותו מייל = אותו חשבון,
+ * כך שמי שנכנס פעם בקוד ופעם עם Google מגיע לאותו מקום.
+ */
+export function signInVerifiedEmail(db, rawEmail, { name = "", method } = {}) {
+  const email = normalizeEmail(rawEmail);
+  if (!isEmail(email)) throw new UserError("כתובת המייל לא תקינה");
+  return tx(db, () => {
     let user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
     if (!user) {
+      const cleanName = String(name ?? "").trim().slice(0, 60);
       const id = insert(db, "users", {
-        email, email_hash: emailHash(email), created_at: clock.iso(),
+        email, email_hash: emailHash(email), created_at: clock.iso(), name: cleanName || null,
         is_admin: config.adminEmails.includes(email) ? 1 : 0,
       });
       user = getUser(db, id);
-      audit(db, id, "user.created", "user", id);
+      audit(db, id, "user.created", "user", id, { method });
+    } else if (!user.name && name) {
+      db.prepare("UPDATE users SET name = ? WHERE id = ?").run(String(name).trim().slice(0, 60), user.id);
+      user = getUser(db, user.id);
     }
     if (user.frozen_at) throw new UserError("החשבון מוקפא. פנו לצוות התמיכה.", 403);
     return { user, sessionToken: createSession(db, user.id) };

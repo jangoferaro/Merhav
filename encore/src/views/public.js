@@ -223,7 +223,9 @@ export function sharePage(ctx, { c, url, text, stats }, opts) {
 
 // ---------- כניסה ----------
 
-export function loginPage(ctx, { next, email = "", step = "email" }, opts) {
+const GOOGLE_G = raw(`<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`);
+
+export function loginPage(ctx, { next, email = "", step = "email", google = false }, opts) {
   return layout(
     ctx,
     "כניסה",
@@ -232,7 +234,11 @@ export function loginPage(ctx, { next, email = "", step = "email" }, opts) {
   ${step === "email"
     ? html`
   <h1>כניסה או הרשמה</h1>
-  <p class="muted">בלי סיסמה. נשלח לך קוד למייל.</p>
+  <p class="muted">אותו חשבון לכולם: ג׳וקרים, אמנים ויוצרים. בלי סיסמה.</p>
+  ${google
+    ? html`<a class="btn btn-google big block" href="/auth/google?next=${encodeURIComponent(next)}">${GOOGLE_G}<span>המשך עם Google</span></a>
+           <p class="or-divider"><span>או עם קוד למייל</span></p>`
+    : ""}
   <form method="post" action="/login" class="stack">
     ${csrfField(ctx)}<input type="hidden" name="next" value="${next}">
     <label class="field">מייל<input type="email" name="email" value="${email}" required autocomplete="email" inputmode="email" autofocus></label>
@@ -308,6 +314,115 @@ export function errorPage(ctx, status, message, opts) {
     ctx,
     "אופס",
     html`<section class="narrow center"><h1>${status === 404 ? "לא מצאנו את הדף" : "אופס"}</h1><p class="lead">${message}</p><p><a class="btn ghost" href="/">לדף הבית</a></p></section>`,
+    opts
+  );
+}
+
+// ---------- דף נחיתה למבקר חדש ----------
+
+export function welcomeLanding(ctx, { shows, google }, opts) {
+  const join = (next) => `/login?next=${encodeURIComponent(next)}`;
+  const faq = [
+    ["צריך הרבה עוקבים?", "לא. מספיק שיש לך חברים, קבוצת וואטסאפ או קהילה שאוהבת מוזיקה. אנשים קונים כי מישהו שהם סומכים עליו המליץ."],
+    ["כמה זה עולה לי כג׳וקר?", "כלום. אין דמי הצטרפות, אין יעדים ואין התחייבות. מקבלים כסף רק כשמישהו קונה כרטיס דרך הלינק שלך."],
+    ["מתי מקבלים את הכסף?", "הסכום ממתין עד כמה ימים אחרי ההופעה (למקרה של ביטול או החזר), ואז הוא זמין. מבקשים העברה לביט או לחשבון הבנק מ-₪50."],
+    ["כמה זה עולה לאמן?", "האמן קובע כמה לתת על כל כרטיס, ומשלם רק על כרטיסים שנמכרו בפועל דרך ג׳וקרים. על כל השאר אין עמלה."],
+    ["החברים שלי יודעים שאני מרוויח?", "כן. ההודעה המוכנה כוללת גילוי נאות, ודף ההופעה מציין שמי שהמליץ מקבל עמלה. זה הוגן, וזה גם עובד."],
+    ["זה שיווק רשתי?", "לא, ולעולם לא יהיה. מרוויחים רק ממכירת כרטיסים, אף פעם לא מגיוס אנשים."],
+    ["מה אם ההופעה מתבטלת?", "הקונים מקבלים החזר ממערכת הכרטוס, והתגמול על אותם כרטיסים מתבטל. הכל מופיע במסך \"הכסף שלי\"."],
+  ];
+  return layout(
+    ctx,
+    "",
+    html`
+<section class="lp-hero">
+  <p class="eyebrow" dir="ltr" lang="en">jocares. · Be Jo.</p>
+  <h1 class="display">אמנות<br>צריכה קהל.</h1>
+  <p class="lead">Jocares מחברת בין אמנים לאנשים שאוהבים אותם. משתפים הופעה עם החברים, ומרוויחים מכל כרטיס שנמכר בזכותכם.</p>
+  <div class="lp-ctas">
+    <a class="btn big acid" href="${join("/shows")}"><span lang="en" dir="ltr">Be Jo.</span> אני רוצה להצטרף</a>
+    <a class="btn big ghost" href="${join("/grow")}">אני אמן/ית</a>
+  </div>
+  <p class="note">כבר יש לך חשבון? <a href="${join("/shows")}">כניסה</a>${google ? " · אפשר גם עם Google" : ""}</p>
+</section>
+
+<section class="lp-section">
+  <h2 class="lp-h">איך זה עובד</h2>
+  <ol class="lp-steps">
+    <li><b>01</b><h3>בוחרים הופעה</h3><p>הופעות של אמנים עצמאיים, וליד כל אחת כתוב כמה תקבלו על כל כרטיס.</p></li>
+    <li><b>02</b><h3>משתפים לינק אישי</h3><p>בוואטסאפ, באינסטגרם או בקבוצה. ההודעה כבר מוכנה, ואפשר לערוך אותה.</p></li>
+    <li><b>03</b><h3>מרוויחים על כל כרטיס</h3><p>כל מי שקונה דרך הלינק שלכם נספר. רואים הכל בזמן אמת.</p></li>
+  </ol>
+</section>
+
+<section class="lp-section lp-split-wrap">
+  <h2 class="lp-h">שקוף מההתחלה</h2>
+  <p class="muted">דוגמה: כרטיס ב-<span class="num">₪80</span></p>
+  <div class="split static lp-split">
+    <div><span>לג׳וקר שהביא את הקונה</span><b>₪20</b></div>
+    <div><span>Jocares</span><b>₪4</b></div>
+    <div class="you"><span>לאמן</span><b>₪56</b></div>
+  </div>
+  <p class="note">האמן קובע את התגמול. הסכום מוצג על כל הופעה לפני ששיתפתם משהו.</p>
+</section>
+
+<section class="lp-section">
+  <h2 class="lp-h">למי זה</h2>
+  <div class="choices lp-aud">
+    <a class="choice promoter" href="${join("/shows")}">
+      <span class="choice-tag" lang="en" dir="ltr">Be Jo.</span>
+      <b>לכל מי שאכפת לו</b>
+      <small>מרוויחים מהמלצה על מוזיקה שאתם אוהבים. בלי השקעה, בלי יעדים, בלי ניסיון.</small>
+    </a>
+    <a class="choice artist" href="${join("/grow")}">
+      <span class="choice-tag">לאמנים</span>
+      <b>קהל חדש, ומשלמים על תוצאות</b>
+      <small>מפרסמים הופעה, קובעים תגמול לכרטיס, ומקבלים מחלקת שיווק של אנשים שאוהבים אתכם. אפשר גם להזמין תוכן מיוצרים.</small>
+    </a>
+    <a class="choice creator-choice" href="${join("/creator")}">
+      <span class="choice-tag">ליוצרים</span>
+      <b>מרוויחים מיצירת תוכן</b>
+      <small>ריל, סקירה, צילום בהופעה או פרסום בערוץ שלכם. מחיר שאתם קובעים, ותשלום שמובטח מראש.</small>
+    </a>
+  </div>
+</section>
+
+${shows.length
+  ? html`<section class="lp-section">
+      <div class="row-head"><h2 class="lp-h">קורה עכשיו</h2><a href="${join("/shows")}">לכל ההופעות ←</a></div>
+      <div class="grid-shows">${shows.map((c) => showCard(ctx, c))}</div>
+    </section>`
+  : ""}
+
+<section class="lp-section">
+  <h2 class="lp-h">שאלות</h2>
+  <div class="faq">${faq.map(([q, a]) => html`<details><summary>${q}</summary><p>${a}</p></details>`)}</div>
+</section>
+
+<section class="lp-final">
+  <p class="lp-final-big" lang="en" dir="ltr">Who cares?<br>Jo cares.</p>
+  <a class="btn big" href="${join("/shows")}">מצטרפים עכשיו</a>
+</section>`,
+    opts
+  );
+}
+
+export function pilotPage(ctx, { next }, opts) {
+  return layout(
+    ctx,
+    "פיילוט סגור",
+    html`
+<section class="narrow card">
+  <p class="eyebrow">פיילוט סגור</p>
+  <h1>כמעט בפנים</h1>
+  <p class="muted">Jocares נמצאת כרגע בפיילוט עם קבוצה קטנה של אמנים וג׳וקרים. הכניסו את קוד הגישה שקיבלתם.</p>
+  <form method="post" action="/pilot" class="stack">
+    ${csrfField(ctx)}<input type="hidden" name="next" value="${next}">
+    <label class="field">קוד גישה<input name="code" required autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr" autofocus></label>
+    <button class="btn big block">המשך</button>
+  </form>
+  <p class="center note"><a href="/">מה זה Jocares?</a></p>
+</section>`,
     opts
   );
 }

@@ -497,3 +497,40 @@ body.sim input, body.sim select { border-radius: 8px; border-color: #c5ccd6; }
   .hero-stamp { top: 18px; left: 0; right: auto; width: 88px; }
   .hero-stamp b { font-size: 1.4rem; }
 }
+
+
+/* ---------- דף נחיתה ---------- */
+main:has(.lp-hero) { max-width: var(--max-wide); }
+.lp-hero { padding: 28px 0 40px; max-width: 900px; }
+.lp-hero .display { font-size: clamp(3rem, 13vw, 8rem); }
+.lp-hero .lead { margin-top: 18px; max-width: 40ch; }
+.lp-ctas { display: flex; gap: 10px; flex-wrap: wrap; margin: 26px 0 12px; }
+.btn.acid { background: var(--jo-acid); color: #151515; border-color: #151515; }
+.btn.acid:hover { background: #151515; color: var(--jo-acid); }
+.lp-section { border-top: 1px solid var(--rule); padding: 18px 0 44px; }
+.lp-h { font-size: clamp(1.6rem, 5vw, 2.6rem); font-weight: 800; letter-spacing: -.03em; margin-bottom: 20px; }
+.lp-steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 0; }
+@media (min-width: 760px) { .lp-steps { grid-template-columns: repeat(3, 1fr); } .lp-steps li + li { border-inline-start: 1px solid var(--hair); padding-inline-start: 20px; } }
+.lp-steps li { padding: 14px 0 18px; border-bottom: 1px solid var(--hair); }
+.lp-steps b { font: 500 2.6rem/1 var(--font-mono); letter-spacing: -.05em; color: var(--jo-red); display: block; margin-bottom: 10px; }
+.lp-steps h3 { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; }
+.lp-steps p { color: var(--ink-2); margin: 0; }
+.lp-split { max-width: 640px; }
+.lp-split b { font-size: clamp(2rem, 7vw, 3rem); }
+.num { font-family: var(--font-mono); }
+.lp-aud { margin-top: 0; }
+.faq { border-top: 1px solid var(--hair); max-width: 760px; }
+.faq details { border-bottom: 1px solid var(--hair); padding: 14px 0; }
+.faq summary { font-weight: 600; font-size: 1.08rem; }
+.faq p { color: var(--ink-2); margin: 10px 0 0; max-width: 62ch; }
+.lp-final { background: var(--jo-acid); color: #151515; margin: 20px calc(var(--gutter) * -1) 0; padding: 44px var(--gutter) 48px; display: grid; gap: 22px; justify-items: start; }
+@media (min-width: 1212px) { .lp-final { margin-inline: 0; padding-inline: 40px; } }
+.lp-final-big { font: 700 clamp(2.8rem, 11vw, 6.5rem)/.9 "Space Grotesk", Arial, sans-serif; letter-spacing: -.06em; margin: 0; text-align: left; justify-self: stretch; }
+.lp-final .btn { background: #151515; color: var(--jo-acid); border-color: #151515; }
+.lp-final .btn:hover { background: var(--jo-red); color: #151515; border-color: #151515; }
+
+/* ---------- כניסה ---------- */
+.btn-google { background: #fff; color: #1f1f1f; border-color: #747775; gap: 12px; font-family: var(--font); }
+.btn-google:hover { background: #f2f2f2; color: #1f1f1f; border-color: #747775; }
+.or-divider { display: flex; align-items: center; gap: 12px; color: var(--ink-2); font-size: var(--t-small); margin: 18px 0; }
+.or-divider::before, .or-divider::after { content: ""; flex: 1; border-top: 1px solid var(--hair); }

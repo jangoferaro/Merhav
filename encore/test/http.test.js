@@ -273,16 +273,29 @@ test("תצוגה מקדימה בוואטסאפ: תגיות OG עם תמונת ה
   assert.equal((await fetch(base + "/static/og.png")).headers.get("content-type"), "image/png");
 });
 
-test("סביבת בדיקה: סיסמה לכל האתר, חוץ מבדיקת בריאות ובוטי תצוגה מקדימה", async () => {
+test("סביבת בדיקה: דף נחיתה פתוח, השאר דורש קוד גישה (לא חלון סיסמה של הדפדפן)", async () => {
+  resetRateLimits();
   process.env.STAGING_PASSWORD = "pilot-2026";
   try {
-    assert.equal((await fetch(`${base}/shows`)).status, 401);
-    assert.equal((await fetch(`${base}/health`)).status, 200);
-    const auth = { authorization: "Basic " + Buffer.from("x:pilot-2026").toString("base64") };
-    assert.equal((await fetch(`${base}/shows`, { headers: auth })).status, 200);
-    assert.equal((await fetch(`${base}/shows`, { headers: { authorization: "Basic " + Buffer.from("x:nope").toString("base64") } })).status, 401);
+    const anon = new Browser();
+    let r = await anon.req("/");
+    assert.equal(r.status, 200);
+    assert.match(r.text, /אמנות<br>צריכה קהל/);
+    assert.match(r.text, /איך זה עובד/);
+    assert.equal((await anon.req("/how")).status, 200);
+    assert.equal((await anon.req("/health")).status, 200);
+    r = await anon.req("/shows");
+    assert.equal(r.status, 303);
+    assert.equal(r.location, "/pilot?next=%2Fshows");
+    await anon.get("/pilot?next=%2Fshows");
+    r = await anon.post("/pilot", { code: "nope", next: "/shows" });
+    assert.match(r.text, /הקוד לא נכון/);
+    r = await anon.post("/pilot", { code: "pilot-2026", next: "/shows" }, { follow: false });
+    assert.equal(r.location, "/shows");
+    assert.equal((await anon.req("/shows")).status, 200);
     const id = db.prepare("SELECT id FROM campaigns WHERE status = 'active' LIMIT 1").get().id;
-    assert.equal((await fetch(`${base}/s/${id}`, { headers: { "user-agent": "facebookexternalhit/1.1" } })).status, 200);
+    assert.equal((await fetch(`${base}/s/${id}`, { headers: { "user-agent": "facebookexternalhit/1.1" }, redirect: "manual" })).status, 200);
+    assert.equal((await fetch(`${base}/s/${id}`, { redirect: "manual" })).status, 303);
   } finally {
     delete process.env.STAGING_PASSWORD;
   }

@@ -1,10 +1,9 @@
 import http from "node:http";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDb } from "./db.js";
-import { clock, config, isEmail, normalizeEmail, UserError } from "./util.js";
+import { clock, config, hmac, isEmail, normalizeEmail, safeEqual, UserError } from "./util.js";
 import { cookie, isCrawler, makeCtx, rateLimit, readBody, Router, safeNext } from "./http.js";
 import { sendLoginCode } from "./mailer.js";
 import * as ID from "./domain/identity.js";
@@ -23,12 +22,13 @@ import * as K from "./domain/content.js";
 import * as CV from "./views/content.js";
 import { designPage } from "./views/design.js";
 import { imageFromForm, serveMedia } from "./media.js";
+import { finishGoogleLogin, googleEnabled, startGoogleLogin } from "./auth-google.js";
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png" };
 const REF_COOKIE_DAYS = config.attributionDays;
 
-export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
+export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fetch } = {}) {
   // הספק המדומה "שולח" webhooks לאותה נקודת קליטה שספק אמיתי ישתמש בה
   Sim.setSimDeliver((raw, headers) => I.ingestWebhook(db, "sim", raw, headers));
 
@@ -59,7 +59,14 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
 
   // ---------- ציבורי ----------
 
-  r.get("/", (ctx) => ctx.send(P.landing(ctx, C.marketplace(db, { userId: ctx.user?.id }), opts(ctx))));
+  // מבקר חדש מקבל דף נחיתה שמסביר; מי שמחובר מקבל את מסך הבחירה של המוצר
+  r.get("/", (ctx) =>
+    ctx.send(
+      ctx.user
+        ? P.landing(ctx, C.marketplace(db, { userId: ctx.user.id }), opts(ctx))
+        : P.welcomeLanding(ctx, { shows: C.marketplace(db, {}).slice(0, 3), google: googleEnabled() }, opts(ctx))
+    )
+  );
   r.get("/how", (ctx) => ctx.send(P.how(ctx, opts(ctx))));
   r.get("/terms", (ctx) => ctx.send(P.terms(ctx, opts(ctx))));
   r.get("/design", (ctx) => ctx.send(designPage(ctx, opts(ctx))));
@@ -221,7 +228,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
 
   r.get("/login", (ctx) => {
     if (ctx.user) return ctx.redirect(safeNext(ctx.query.next) || "/shows");
-    ctx.send(P.loginPage(ctx, { next: safeNext(ctx.query.next), step: "email" }, opts(ctx)));
+    ctx.send(P.loginPage(ctx, { next: safeNext(ctx.query.next), step: "email", google: googleEnabled() }, opts(ctx)));
   });
 
   r.post("/login", async (ctx) => {
@@ -248,6 +255,35 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
     ID.audit(db, result.user.id, "user.login", "user", result.user.id);
     const next = safeNext(f.next) || "/shows";
     ctx.redirect(result.user.name ? next : `/welcome?next=${encodeURIComponent(next)}`);
+  });
+
+  // ---------- כניסה עם Google ----------
+
+  const googleRedirect = (ctx) => `${origin(ctx)}/auth/google/callback`;
+
+  r.get("/auth/google", (ctx) => {
+    if (!googleEnabled()) throw new UserError("כניסה עם Google לא מוגדרת", 404);
+    rateLimit(`google:${ctx.ip}`, 20, 600_000);
+    const { url, cookieValue } = startGoogleLogin({ redirectUri: googleRedirect(ctx), next: safeNext(ctx.query.next) || "/shows" });
+    ctx.res.writeHead(302, { location: url, "set-cookie": [cookie("g_state", cookieValue, { maxAge: 600 })] });
+    ctx.res.end();
+  });
+
+  r.get("/auth/google/callback", async (ctx) => {
+    if (!googleEnabled()) throw new UserError("כניסה עם Google לא מוגדרת", 404);
+    ctx.setCookie(cookie("g_state", "", { maxAge: 0 }));
+    let info;
+    try {
+      info = await finishGoogleLogin({ query: ctx.query, cookieValue: ctx.cookies.g_state, redirectUri: googleRedirect(ctx), fetchImpl });
+    } catch (e) {
+      if (!(e instanceof UserError)) throw e;
+      return ctx.redirect("/login", { ok: false, m: e.message });
+    }
+    const { user, sessionToken } = ID.signInVerifiedEmail(db, info.email, { name: info.name, method: "google" });
+    ctx.setCookie(cookie("sid", sessionToken, { maxAge: 60 * 86400 }));
+    ID.audit(db, user.id, "user.login", "user", user.id, { method: "google" });
+    const next = safeNext(info.next) || "/shows";
+    ctx.redirect(user.name ? next : `/welcome?next=${encodeURIComponent(next)}`);
   });
 
   r.get("/welcome", (ctx) => {
@@ -627,21 +663,46 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL } = {}) {
     ctx.redirect("/admin?tab=sim", "ההופעה בוטלה אצל הספק");
   });
 
-  // ---------- סביבת בדיקה: סיסמה אחת לכל האתר ----------
+  // ---------- סביבת בדיקה: קוד גישה לפיילוט ----------
+  // דף הנחיתה, ההסבר והתנאים פתוחים לכולם. כל השאר דורש קוד גישה (נשמר בעוגייה ל-30 יום).
   // בוטים של תצוגה מקדימה עוברים לדפי הופעה ולתמונות, כדי שאפשר יהיה לבדוק שיתוף בוואטסאפ.
+  const pilotPass = () => process.env.STAGING_PASSWORD;
+  const pilotToken = () => hmac(pilotPass(), "pilot-access");
+  const PUBLIC_PATHS = /^\/(|how|terms|design|pilot|health)$|^\/(static|media|webhooks)\//;
+
   function stagingGate(req, res, ctx) {
-    const pass = process.env.STAGING_PASSWORD;
-    if (!pass) return false;
+    if (!pilotPass()) return false;
     const p = ctx.url.pathname;
-    if (p === "/health" || p.startsWith("/webhooks/")) return false;
-    if (isCrawler(req) && req.method === "GET" && /^\/(s|r|media|static)\//.test(p)) return false;
-    const [scheme, b64] = String(req.headers.authorization ?? "").split(" ");
-    const given = scheme === "Basic" ? Buffer.from(b64 ?? "", "base64").toString().split(":").slice(1).join(":") : "";
-    if (given && given.length === pass.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(pass))) return false;
-    res.writeHead(401, { "www-authenticate": 'Basic realm="jocares staging", charset="UTF-8"', "content-type": "text/plain; charset=utf-8" });
-    res.end("סביבת בדיקה. צריך סיסמה.");
+    if (PUBLIC_PATHS.test(p)) return false;
+    if (isCrawler(req) && req.method === "GET" && /^\/(s|r)\//.test(p)) return false;
+    if (ctx.cookies.pilot && safeEqual(ctx.cookies.pilot, pilotToken())) return false;
+    if (req.method !== "GET") {
+      res.writeHead(403, { "content-type": "text/plain; charset=utf-8" });
+      res.end("צריך קוד גישה לפיילוט");
+      return true;
+    }
+    ctx.redirect(`/pilot?next=${encodeURIComponent(p + ctx.url.search)}`);
     return true;
   }
+
+  r.get("/pilot", (ctx) => {
+    if (!pilotPass()) return ctx.redirect("/");
+    ctx.send(P.pilotPage(ctx, { next: safeNext(ctx.query.next) || "/login" }, opts(ctx)));
+  });
+
+  r.post("/pilot", async (ctx) => {
+    if (!pilotPass()) return ctx.redirect("/");
+    rateLimit(`pilot:${ctx.ip}`, 10, 600_000);
+    const f = await ctx.form();
+    const next = safeNext(f.next) || "/login";
+    const code = String(f.code ?? "").trim();
+    if (!(code.length === pilotPass().length && safeEqual(code, pilotPass()))) {
+      ctx.flash = { ok: false, m: "הקוד לא נכון" };
+      return ctx.send(P.pilotPage(ctx, { next }, opts(ctx)), 403);
+    }
+    ctx.setCookie(cookie("pilot", pilotToken(), { maxAge: 30 * 86400 }));
+    ctx.redirect(next);
+  });
 
   // ---------- טיפול בבקשה ----------
 
