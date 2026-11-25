@@ -79,10 +79,14 @@ export function setNote(db, user, linkId, value) {
 
 export const assetsOf = (db, campaignId) => db.prepare("SELECT * FROM campaign_assets WHERE campaign_id = ? ORDER BY id").all(campaignId);
 
-export function addAsset(db, user, campaignId, imageUrl) {
-  if (assetsOf(db, campaignId).length >= 12) throw new UserError("אפשר עד 12 תמונות. מחקו אחת כדי להוסיף.");
-  const id = insert(db, "campaign_assets", { campaign_id: campaignId, image_url: imageUrl, created_by: user.id, created_at: clock.iso() });
-  audit(db, user.id, "assets.add", "campaign", campaignId, { asset: id });
+export function addAsset(db, user, campaignId, { url, kind = "image", credit = null, serviceOrderId = null }) {
+  if (!serviceOrderId && assetsOf(db, campaignId).filter((a) => !a.service_order_id).length >= 12) {
+    throw new UserError("אפשר עד 12 קבצים. מחקו אחד כדי להוסיף.");
+  }
+  const id = insert(db, "campaign_assets", {
+    campaign_id: campaignId, image_url: url, kind, credit, service_order_id: serviceOrderId, created_by: user.id, created_at: clock.iso(),
+  });
+  audit(db, user.id, "assets.add", "campaign", campaignId, { asset: id, kind, order: serviceOrderId });
   return id;
 }
 

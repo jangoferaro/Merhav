@@ -4,9 +4,9 @@ import { insert, tx } from "../db.js";
 import { addDays, clock, config, feePerTicket, money, shekelsToAgorot, showDate, text, UserError } from "../util.js";
 import { audit, getUser, notify, publicName } from "./identity.js";
 import { getCampaign } from "./campaigns.js";
-import { getOrCreateLink } from "./referrals.js";
+import { addAsset, getOrCreateLink } from "./referrals.js";
 import { simPay } from "../providers/simpay.js";
-import { validImageRef } from "../media.js";
+import { ANY_MEDIA_RE, mediaKind, saveMedia, validImageRef } from "../media.js";
 
 const payments = simPay;
 
@@ -20,6 +20,7 @@ export const LICENSES = {
       "לא לפרסום ממומן",
       "מותר לקצר ולהוסיף כתוביות, לא לשנות את התוכן",
       "ל-12 חודשים",
+      "כשההזמנה קשורה להופעה: הג׳וקרים של ההופעה רשאים לשתף את התוכן בערוצים שלהם, עם קרדיט ליוצר",
       "הזכויות נשארות של היוצר, והוא רשאי להציג את העבודה בתיק העבודות",
     ],
   },
@@ -29,6 +30,7 @@ export const LICENSES = {
       "מותר לפרסם בכל ערוץ, כולל פרסום ממומן",
       "מותר לערוך",
       "ללא הגבלת זמן",
+      "כשההזמנה קשורה להופעה: הג׳וקרים של ההופעה רשאים לשתף את התוכן בערוצים שלהם, עם קרדיט ליוצר",
       "הזכויות נשארות של היוצר, והוא רשאי להציג את העבודה בתיק העבודות",
     ],
   },
@@ -306,6 +308,7 @@ export function placeOrder(db, artistUser, serviceId, input) {
       price_agorot: s.price_agorot, fee_bps: config.contentFeeBps, fee_agorot: split.fee, creator_amount_agorot: split.creator,
       delivery_days: s.delivery_days, revisions: s.revisions, license: s.license, license_points: LICENSES[s.license].points,
       includes_publication: !!s.includes_publication, auto_approve_days: config.autoApproveDays, agreed_at: clock.iso(),
+      joker_share: s.license !== "exposure",
     };
     const now = clock.iso();
     const orderId = insert(db, "service_orders", {
@@ -318,6 +321,10 @@ export function placeOrder(db, artistUser, serviceId, input) {
     });
     payments.authorize(db, orderId, s.price_agorot);
     audit(db, artistUser.id, "service_order.placed", "service_order", orderId, { price: s.price_agorot, creator: s.user_id });
+    // אם ההזמנה נולדה מהצעה של ג׳וקר, ההצעה נסגרת
+    if (campaign) {
+      db.prepare("UPDATE service_offers SET status = 'ordered', order_id = ?, updated_at = ? WHERE campaign_id = ? AND service_id = ? AND status = 'open'").run(orderId, now, campaign.id, s.id);
+    }
     notify(db, s.user_id, `הזמנה חדשה: ${s.title} מ${artistName}, ${money(split.creator)} בשבילך. מחכה לאישור שלך.`, `/orders/${orderId}`);
     return orderId;
   });
@@ -399,11 +406,12 @@ export function declineOrder(db, user, orderId, reason = "") {
   });
 }
 
-export function submitDeliverable(db, user, orderId, { url, note }) {
+export function submitDeliverable(db, user, orderId, { url, note, media }) {
   return tx(db, () => {
     const o = loadFor(db, user, orderId, "creator");
     const version = (db.prepare("SELECT MAX(version) v FROM deliverables WHERE order_id = ?").get(o.id).v ?? 0) + 1;
-    const link = httpsUrl(url, "קישור לתוצר");
+    // קובץ שהועלה (תמונה או סרטון) עדיף: אפשר להכניס אותו לערכת השיתוף אחרי אישור
+    const link = media?.data?.length ? saveMedia(media).url : httpsUrl(url, "קישור לתוצר");
     move(db, o, "submitted", user.id, { submitted_at: o.submitted_at ?? clock.iso() });
     insert(db, "deliverables", { order_id: o.id, version, url: link, note: text(note, "הערה", { max: 500, required: false }), created_at: clock.iso() });
     notify(db, o.artist_user_id, `התוצר של "${o.title}" מוכן לצפייה${version > 1 ? ` (גרסה ${version})` : ""}.`, `/orders/${o.id}`);
@@ -457,8 +465,69 @@ export function approveOrder(db, user, orderId, { auto = false } = {}) {
       move(db, o, "completed", user?.id, { approved_at: clock.iso(), completed_at: clock.iso() });
       payOut(db, o, o.price_agorot, auto ? "אושר אוטומטית" : "");
     }
+    addToKit(db, o);
   });
 }
+
+/**
+ * תוכן שאושר נכנס לערכת השיתוף של ההופעה, כך שכל הג׳וקרים יכולים לשתף אותו.
+ * רק כשההזמנה קשורה להופעה, הזכויות מאפשרות (joker_share), והתוצר הוא קובץ שהועלה אצלנו.
+ */
+function addToKit(db, o) {
+  const last = deliverablesOf(db, o.id)[0];
+  if (!o.campaign_id || !o.terms.joker_share || !last || !ANY_MEDIA_RE.test(last.url)) return false;
+  if (db.prepare("SELECT 1 FROM campaign_assets WHERE service_order_id = ?").get(o.id)) return false;
+  addAsset(db, { id: o.artist_user_id }, o.campaign_id, { url: last.url, kind: mediaKind(last.url), credit: o.creator_name, serviceOrderId: o.id });
+  notify(db, o.creator_id, `העבודה שלך על "${o.title}" נכנסה לערכת השיתוף של ההופעה. ג׳וקרים יכולים לשתף אותה, עם קרדיט לך.`, `/orders/${o.id}`);
+  return true;
+}
+
+// ---------- ג׳וקר מציע שירות לאמן ----------
+
+/**
+ * ג׳וקר שיש לו פרופיל יוצר מציע לאמן של ההופעה אחד מהשירותים שלו (למשל סרטון המלצה).
+ * האמן מקבל התראה, וההזמנה עצמה עוברת בדיוק כמו כל הזמנה: מחיר ידוע, תשלום רק אחרי אישור.
+ */
+export function offerService(db, user, campaignId, { service_id, message }) {
+  return tx(db, () => {
+    const c = getCampaign(db, campaignId);
+    if (!c || !["active", "paused"].includes(c.status)) throw new UserError("ההופעה לא פתוחה להצעות כרגע");
+    const s = getService(db, service_id);
+    if (!s || s.user_id !== user.id || !s.active) throw new UserError("בחרו אחד מהשירותים שלך");
+    if (getProfile(db, user.id)?.status !== "active") throw new UserError("הפרופיל שלך עוד לא פעיל");
+    const owners = db.prepare("SELECT user_id FROM artist_members WHERE artist_id = ?").all(c.artist_id).map((r) => r.user_id);
+    if (owners.includes(user.id)) throw new UserError("אי אפשר להציע שירות לעצמך");
+    if (db.prepare("SELECT 1 FROM service_offers WHERE campaign_id = ? AND creator_id = ? AND status = 'open'").get(c.id, user.id)) {
+      throw new UserError("כבר שלחת הצעה להופעה הזאת. האמן יחליט.");
+    }
+    const recent = db.prepare("SELECT COUNT(*) n FROM service_offers WHERE creator_id = ? AND created_at > ?").get(user.id, addDays(clock.iso(), -1)).n;
+    if (recent >= 5) throw new UserError("אפשר לשלוח עד 5 הצעות ביום");
+    const now = clock.iso();
+    const id = insert(db, "service_offers", {
+      campaign_id: c.id, service_id: s.id, creator_id: user.id, message: text(message, "הודעה לאמן", { max: 300, required: false }), created_at: now, updated_at: now,
+    });
+    const name = getProfile(db, user.id).display_name;
+    for (const uid of owners) notify(db, uid, `${name}, ג׳וקר/ית של "${c.title}", מציע/ה לך: ${s.title} ב-${money(s.price_agorot)}.`, `/artist/c/${c.id}#offers`);
+    audit(db, user.id, "offer.created", "campaign", c.id, { service: s.id });
+    return id;
+  });
+}
+
+export const offersFor = (db, campaignId) =>
+  db.prepare(
+    `SELECT f.*, s.title, s.price_agorot, s.deliverable, s.template, p.display_name, p.image_url, p.user_id AS creator_user_id,
+            (SELECT COUNT(*) FROM referral_links l JOIN orders x ON x.link_id = l.id WHERE l.campaign_id = f.campaign_id AND l.promoter_id = f.creator_id AND x.cancelled = 0) AS sales
+       FROM service_offers f JOIN creator_services s ON s.id = f.service_id JOIN creator_profiles p ON p.user_id = f.creator_id
+      WHERE f.campaign_id = ? AND f.status = 'open' ORDER BY f.id DESC`
+  ).all(campaignId);
+
+export function dismissOffer(db, user, campaignId, offerId) {
+  const n = db.prepare("UPDATE service_offers SET status = 'dismissed', updated_at = ? WHERE id = ? AND campaign_id = ? AND status = 'open'").run(clock.iso(), Number(offerId), campaignId).changes;
+  if (n) audit(db, user.id, "offer.dismissed", "campaign", campaignId, { offer: Number(offerId) });
+}
+
+export const myOffer = (db, userId, campaignId) =>
+  db.prepare("SELECT f.*, s.title FROM service_offers f JOIN creator_services s ON s.id = f.service_id WHERE f.creator_id = ? AND f.campaign_id = ? ORDER BY f.id DESC LIMIT 1").get(userId, campaignId);
 
 export function verifyPublication(db, user, orderId, { auto = false } = {}) {
   return tx(db, () => {

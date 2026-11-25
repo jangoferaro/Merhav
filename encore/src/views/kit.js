@@ -73,6 +73,25 @@ export function imageInput({ current = "", label = "העלאת תמונה", hint
 </div>`;
 }
 
+/** העלאת תמונה או סרטון (ערכת שיתוף, תוצרים) */
+export function mediaInput({ label = "העלאת תמונה או סרטון", required = true } = {}) {
+  return html`
+<div class="upload">
+  <label class="upload-box">
+    <span class="upload-preview"></span>
+    <span class="upload-text"><b data-label-change="החלפת קובץ">${label}</b><small>תמונה עד 8MB · סרטון MP4/MOV עד 80MB</small></span>
+    <input type="file" name="media" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" ${required ? html`required` : ""} data-preview>
+  </label>
+</div>`;
+}
+
+/** תמונה או סרטון מהערכה */
+export function mediaTile(url) {
+  return /\.(mp4|mov|webm)$/.test(url)
+    ? html`<video src="${url}" controls playsinline preload="metadata"></video>`
+    : html`<img src="${url}" alt="" loading="lazy">`;
+}
+
 /** חותמת עגולה: הסכום החשוב במסך (העיגול הוא החריג היחיד לפינות הישרות) */
 export const stamp = (value, label, cls = "") => html`<span class="stamp ${cls}"><b>${value}</b><small>${label}</small></span>`;
 

@@ -20,7 +20,7 @@ import * as AD from "./views/admin.js";
 import * as K from "./domain/content.js";
 import * as CV from "./views/content.js";
 import { designPage } from "./views/design.js";
-import { imageFromForm, serveMedia } from "./media.js";
+import { imageFromForm, saveMedia, serveMedia } from "./media.js";
 import { finishGoogleLogin, googleEnabled, startGoogleLogin } from "./auth-google.js";
 import * as CP from "./domain/coupons.js";
 import * as T from "./domain/tickets.js";
@@ -218,8 +218,22 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
       P.sharePage(ctx, {
         c, url, code, link, text: R.shareText(c, url, link), stats: R.linkStats(db, link.id), lastImport: code ? CP.lastImportAt(db, c.id) : null,
         assets: R.assetsOf(db, c.id), price: c.provider === "jocares" ? T.priceNow(db, c) : null,
+        offer: {
+          profile: K.getProfile(db, ctx.user.id),
+          services: K.servicesOf(db, ctx.user.id, { activeOnly: true }),
+          mine: K.myOffer(db, ctx.user.id, c.id),
+          isOwner: ID.canManageArtist(db, ctx.user, c.artist_id),
+        },
       }, opts(ctx))
     );
+  });
+
+  r.post("/s/:id/offer", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = campaignOr404(ctx.params.id);
+    rateLimit(`offer:${ctx.user.id}`, 10, 3600_000);
+    K.offerService(db, ctx.user, c.id, await ctx.form());
+    ctx.redirect(`/s/${c.id}/share#offer`, "ההצעה נשלחה לאמן. אם יזמין, תקבל/י התראה.");
   });
 
   r.post("/s/:id/share/note", async (ctx) => {
@@ -580,6 +594,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
             ? { s: T.salesSummary(db, c), orders: T.ordersOfCampaign(db, c.id), doorUrl: `${origin(ctx)}/door/${T.doorToken(db, c.id)}`, open: T.salesOpen(c), price: T.priceNow(db, c) }
             : null,
           assets: R.assetsOf(db, c.id),
+          offers: K.offersFor(db, c.id),
         },
         opts(ctx)
       )
@@ -623,9 +638,11 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   r.post("/artist/c/:id/assets", async (ctx) => {
     if (!requireUser(ctx)) return;
     const c = managed(ctx, ctx.params.id);
-    const img = imageFromForm(await ctx.form(), { required: true });
-    R.addAsset(db, ctx.user, c.id, img);
-    ctx.redirect(`/artist/c/${c.id}#kit`, "התמונה נוספה לערכת השיתוף");
+    const f = await ctx.form();
+    if (!f.media?.data?.length) throw new UserError("לא נבחר קובץ");
+    const m = saveMedia(f.media);
+    R.addAsset(db, ctx.user, c.id, { url: m.url, kind: m.kind });
+    ctx.redirect(`/artist/c/${c.id}#kit`, m.kind === "video" ? "הסרטון נוסף לערכת השיתוף" : "התמונה נוספה לערכת השיתוף");
   });
 
   r.post("/artist/c/:id/assets/:aid/delete", (ctx) => {
@@ -633,6 +650,13 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const c = managed(ctx, ctx.params.id);
     R.removeAsset(db, ctx.user, c.id, ctx.params.aid);
     ctx.redirect(`/artist/c/${c.id}#kit`, "נמחק");
+  });
+
+  r.post("/artist/c/:id/offers/:oid/dismiss", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = managed(ctx, ctx.params.id);
+    K.dismissOffer(db, ctx.user, c.id, ctx.params.oid);
+    ctx.redirect(`/artist/c/${c.id}#offers`, "ההצעה הוסרה");
   });
 
   r.post("/artist/c/:id/door/rotate", (ctx) => {
@@ -690,7 +714,8 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     if (!s || !s.active) throw new UserError("השירות לא זמין", 404);
     const artists = ID.artistsOf(db, ctx.user.id);
     const campaigns = C.campaignsOfUser(db, ctx.user.id).filter((c) => ["active", "paused", "draft"].includes(c.status));
-    ctx.send(CV.orderNewPage(ctx, { s, creator: K.getProfile(db, s.user_id), artistName: artists[0]?.name ?? ctx.user.name ?? "", campaigns, goal: ctx.query.goal ?? "" }, opts(ctx)));
+    const pre = campaigns.find((c) => c.id === Number(ctx.query.campaign));
+    ctx.send(CV.orderNewPage(ctx, { s, creator: K.getProfile(db, s.user_id), artistName: pre?.artist_name ?? artists[0]?.name ?? ctx.user.name ?? "", campaigns, campaignId: pre?.id ?? null, goal: ctx.query.goal ?? (pre ? "show" : "") }, opts(ctx)));
   });
 
   r.post("/services/:id/order", async (ctx) => {
@@ -1051,7 +1076,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
       }
       if (req.method === "GET" && ctx.url.pathname === "/health") return ctx.json({ ok: true });
       if (req.method === "GET" && ctx.url.pathname.startsWith("/media/")) {
-        if (serveMedia(ctx.url.pathname.slice(7), res)) return;
+        if (serveMedia(ctx.url.pathname.slice(7), res, req.headers.range)) return;
         throw new UserError("התמונה לא נמצאה", 404);
       }
 

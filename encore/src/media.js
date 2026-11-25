@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import { UserError } from "./util.js";
 
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 80 * 1024 * 1024;
 export const mediaDir = () => process.env.ENCORE_MEDIA_DIR ?? "data/media";
 
 const TYPES = {
@@ -13,6 +14,34 @@ const TYPES = {
   png: { mime: "image/png", test: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
   webp: { mime: "image/webp", test: (b) => b.subarray(0, 4).toString("latin1") === "RIFF" && b.subarray(8, 12).toString("latin1") === "WEBP" },
 };
+
+// וידאו: MP4 ו-MOV (ftyp בבית 4), WebM (חתימת EBML)
+const VIDEO = {
+  mp4: { mime: "video/mp4", test: (b) => b.subarray(4, 8).toString("latin1") === "ftyp" && !/^qt/.test(b.subarray(8, 12).toString("latin1")) },
+  mov: { mime: "video/quicktime", test: (b) => b.subarray(4, 8).toString("latin1") === "ftyp" && /^qt/.test(b.subarray(8, 12).toString("latin1")) },
+  webm: { mime: "video/webm", test: (b) => b.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])) },
+};
+const MIME = Object.fromEntries([...Object.entries(TYPES), ...Object.entries(VIDEO)].map(([k, v]) => [k, v.mime]));
+
+export function sniffVideo(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 12) return null;
+  for (const [ext, t] of Object.entries(VIDEO)) if (t.test(buf)) return ext;
+  return null;
+}
+
+/** תמונה או וידאו (לערכת השיתוף ולתוצרים של יוצרים). מחזיר { url, kind } */
+export function saveMedia(file) {
+  if (!file?.data?.length) throw new UserError("לא נבחר קובץ");
+  const vid = sniffVideo(file.data);
+  if (!vid) return { url: saveImage(file), kind: "image" };
+  if (file.data.length > MAX_VIDEO_BYTES) throw new UserError("הסרטון גדול מדי (עד 80MB). אפשר לקצר או לייצא באיכות נמוכה יותר.");
+  fs.mkdirSync(mediaDir(), { recursive: true });
+  const name = `${crypto.randomBytes(12).toString("base64url")}.${vid}`;
+  fs.writeFileSync(path.join(mediaDir(), name), file.data, { flag: "wx" });
+  return { url: `/media/${name}`, kind: "video" };
+}
+
+export const mediaKind = (url) => (/\.(mp4|mov|webm)$/.test(String(url)) ? "video" : "image");
 
 /** מזהה סוג לפי הבתים עצמם (לא לפי שם הקובץ או מה שהדפדפן טען) */
 export function sniffImage(buf) {
@@ -34,6 +63,7 @@ export function saveImage(file) {
 }
 
 export const MEDIA_RE = /^\/media\/[\w-]{16}\.(jpg|png|webp)$/;
+export const ANY_MEDIA_RE = /^\/media\/[\w-]{16}\.(jpg|png|webp|mp4|mov|webm)$/;
 
 /** תמונה תקינה לשמירה בשדה image_url: קובץ שהועלה אצלנו, או קישור https (למשל מחילוץ מעמוד ההופעה) */
 export function validImageRef(v) {
@@ -55,16 +85,35 @@ export function imageFromForm(form, { required = true } = {}) {
   return "";
 }
 
-export function serveMedia(name, res) {
-  if (!MEDIA_RE.test(`/media/${name}`)) return false;
+/** מגיש קובץ מדיה. תומך ב-Range, כי ספארי לא מנגן וידאו בלי זה. */
+export function serveMedia(name, res, range = "") {
+  if (!ANY_MEDIA_RE.test(`/media/${name}`)) return false;
   const file = path.join(mediaDir(), name);
   if (!fs.existsSync(file)) return false;
-  res.writeHead(200, {
-    "content-type": TYPES[name.split(".").pop()].mime,
+  const size = fs.statSync(file).size;
+  const headers = {
+    "content-type": MIME[name.split(".").pop()],
     "cache-control": "public, max-age=31536000, immutable",
     "x-content-type-options": "nosniff",
     "content-security-policy": "default-src 'none'; sandbox",
-  });
+    "accept-ranges": "bytes",
+  };
+  const m = /^bytes=(\d*)-(\d*)$/.exec(String(range));
+  if (m && (m[1] || m[2])) {
+    let start = m[1] ? Number(m[1]) : size - Number(m[2]);
+    let end = m[1] && m[2] ? Number(m[2]) : size - 1;
+    start = Math.max(0, start);
+    end = Math.min(end, size - 1);
+    if (start > end) {
+      res.writeHead(416, { "content-range": `bytes */${size}` });
+      res.end();
+      return true;
+    }
+    res.writeHead(206, { ...headers, "content-range": `bytes ${start}-${end}/${size}`, "content-length": end - start + 1 });
+    fs.createReadStream(file, { start, end }).pipe(res);
+    return true;
+  }
+  res.writeHead(200, { ...headers, "content-length": size });
   fs.createReadStream(file).pipe(res);
   return true;
 }

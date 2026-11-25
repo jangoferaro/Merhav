@@ -116,13 +116,16 @@ document.addEventListener("change", (e) => {
   const box = input.closest(".upload-box");
   const preview = box.querySelector(".upload-preview");
   preview.innerHTML = "";
-  const img = document.createElement("img");
-  img.alt = "";
-  img.src = URL.createObjectURL(input.files[0]);
-  preview.append(img);
+  const f = input.files[0];
+  const isVideo = f.type.startsWith("video/");
+  const el = document.createElement(isVideo ? "video" : "img");
+  if (isVideo) { el.muted = true; el.playsInline = true; el.preload = "metadata"; } else el.alt = "";
+  el.src = URL.createObjectURL(f);
+  preview.append(el);
   const label = box.querySelector("[data-label-change]");
   if (label) label.textContent = label.dataset.labelChange;
-  if (input.files[0].size > 8 * 1024 * 1024) alert("התמונה גדולה מ-8MB. נסו תמונה קטנה יותר.");
+  if (isVideo && f.size > 80 * 1024 * 1024) alert("הסרטון גדול מ-80MB. אפשר לקצר אותו או לייצא באיכות נמוכה יותר.");
+  else if (!isVideo && f.size > 8 * 1024 * 1024) alert("התמונה גדולה מ-8MB. נסו תמונה קטנה יותר.");
 });
 
 // לפני העלאה: מקטינים תמונה גדולה ל-1600px ושומרים כ-JPEG.
@@ -228,13 +231,13 @@ document.addEventListener("click", async (e) => {
   if (again) setTimeout(start, 900);
 })();
 
-// ערכת שיתוף: סטורי 1080x1920 שנבנה בדפדפן מהתמונה של ההופעה והקוד של הג׳וקר
+// ערכת שיתוף: עיצובים מוכנים שנבנים בדפדפן מהתמונה של ההופעה והקוד של הג׳וקר
 (() => {
   const cv = document.querySelector("[data-story]");
   if (!cv) return;
   const d = cv.dataset;
   const g = cv.getContext("2d");
-  const W = 1080, H = 1920, PAD = 80;
+  const PAD = 80;
   const INK = "#151515", PAPER = "#EDECE4", ACID = "#DFFF45", RED = "#FF493D";
   const load = (src, cors) =>
     new Promise((ok) => {
@@ -246,10 +249,9 @@ document.addEventListener("click", async (e) => {
       im.src = src;
     });
   const wrap = (text, maxW, maxLines) => {
-    const words = text.split(/\s+/);
     const lines = [];
     let cur = "";
-    for (const w of words) {
+    for (const w of text.split(/\s+/)) {
       const t = cur ? cur + " " + w : w;
       if (g.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t;
     }
@@ -257,70 +259,118 @@ document.addEventListener("click", async (e) => {
     if (lines.length > maxLines) { lines.length = maxLines; lines[maxLines - 1] += "…"; }
     return lines;
   };
-  const draw = async () => {
-    try { await Promise.all(["800 120px Heebo", "500 40px Assistant", "700 60px 'Space Grotesk'"].map((f) => document.fonts.load(f))); } catch {}
-    const sameOrigin = d.img.startsWith("/");
-    const [photo, qr] = await Promise.all([load(d.img, !sameOrigin), load(d.qr, false)]);
-    g.fillStyle = INK;
-    g.fillRect(0, 0, W, H);
-    const PH = 960;
-    if (photo) {
-      const s = Math.max(W / photo.width, PH / photo.height);
-      const w = photo.width * s, h = photo.height * s;
-      g.drawImage(photo, (W - w) / 2, (PH - h) / 2, w, h);
-      try {
-        const px = g.getImageData(0, 0, W, PH);
-        const a = px.data;
-        for (let i = 0; i < a.length; i += 4) {
-          const y = Math.min(255, (0.299 * a[i] + 0.587 * a[i + 1] + 0.114 * a[i + 2] - 128) * 1.08 + 128);
-          a[i] = a[i + 1] = a[i + 2] = y;
-        }
-        g.putImageData(px, 0, 0);
-      } catch {}
-    }
-    // חותמת Be Jo.
-    g.fillStyle = ACID;
-    g.beginPath(); g.arc(W - 190, 190, 120, 0, Math.PI * 2); g.fill();
+  const rtl = (font, color, align = "right") => { g.direction = "rtl"; g.textAlign = align; g.textBaseline = "alphabetic"; g.font = font; g.fillStyle = color; };
+  const photoBox = (photo, x, y, w, h) => {
+    if (!photo) { g.fillStyle = "#2a2a2a"; g.fillRect(x, y, w, h); return; }
+    const s = Math.max(w / photo.width, h / photo.height);
+    g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+    g.drawImage(photo, x + (w - photo.width * s) / 2, y + (h - photo.height * s) / 2, photo.width * s, photo.height * s);
+    g.restore();
+    try {
+      const px = g.getImageData(x, y, w, h), a = px.data;
+      for (let i = 0; i < a.length; i += 4) {
+        const v = Math.min(255, (0.299 * a[i] + 0.587 * a[i + 1] + 0.114 * a[i + 2] - 128) * 1.08 + 128);
+        a[i] = a[i + 1] = a[i + 2] = v;
+      }
+      g.putImageData(px, x, y);
+    } catch {}
+  };
+  const stampAt = (cx, cy, r) => {
+    g.fillStyle = ACID; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
     g.fillStyle = INK; g.textAlign = "center"; g.textBaseline = "middle"; g.direction = "ltr";
-    g.font = "700 64px 'Space Grotesk', sans-serif";
-    g.fillText("Be Jo.", W - 190, 194);
-    // טקסט
-    g.fillStyle = PAPER; g.fillRect(0, PH, W, H - PH);
-    g.direction = "rtl"; g.textAlign = "right"; g.textBaseline = "alphabetic"; g.fillStyle = INK;
-    let y = PH + 100;
-    g.font = "500 44px Assistant, Heebo, sans-serif";
-    g.fillText(d.artist, W - PAD, y);
-    g.font = "800 104px Heebo, sans-serif";
-    for (const line of wrap(d.title, W - PAD * 2, 2)) { y += 118; g.fillText(line, W - PAD, y); }
-    g.font = "500 46px Assistant, Heebo, sans-serif";
-    y += 84; g.fillText(d.when, W - PAD, y);
-    y += 60; g.fillText(d.where, W - PAD, y);
-    if (d.price) {
-      g.font = "700 46px Heebo, sans-serif";
-      const tw = g.measureText(d.price).width;
-      y += 92;
-      g.fillStyle = ACID; g.fillRect(W - PAD - tw - 28, y - 52, tw + 56, 72);
-      g.fillStyle = INK; g.fillText(d.price, W - PAD, y);
-    }
-    // QR והכתובת
-    const Q = 220, qx = PAD, qy = 1580;
-    if (qr) g.drawImage(qr, qx, qy, Q, Q);
-    g.direction = "ltr"; g.textAlign = "left";
-    g.font = "500 34px 'IBM Plex Mono', monospace"; g.fillStyle = INK;
-    g.fillText(d.url, qx, qy + Q + 60);
-    g.direction = "rtl"; g.textAlign = "right";
-    g.font = "700 52px Heebo, sans-serif";
-    g.fillText("כרטיסים בלינק", W - PAD, qy + 60);
-    g.font = "700 44px 'Space Grotesk', sans-serif"; g.fillStyle = INK;
-    g.direction = "ltr"; g.textAlign = "right";
-    g.fillText("JoCares", W - PAD - 22, qy + Q);
-    g.fillStyle = RED; g.beginPath(); g.arc(W - PAD - 6, qy + Q - 8, 9, 0, Math.PI * 2); g.fill();
+    g.font = `700 ${Math.round(r * 0.53)}px 'Space Grotesk', sans-serif`;
+    g.fillText("Be Jo.", cx, cy + 4);
+  };
+  const wordmark = (xRight, y, color, size = 44) => {
+    g.direction = "ltr"; g.textAlign = "right"; g.textBaseline = "alphabetic";
+    g.font = `700 ${size}px 'Space Grotesk', sans-serif`; g.fillStyle = color;
+    g.fillText("JoCares", xRight - size / 2, y);
+    g.fillStyle = RED; g.beginPath(); g.arc(xRight - size / 7, y - size / 5, size / 5, 0, Math.PI * 2); g.fill();
+  };
+  const qrBlock = (qr, x, y, q, urlColor, size = 32) => {
+    if (qr) { g.fillStyle = "#fff"; g.fillRect(x, y, q, q); g.drawImage(qr, x, y, q, q); }
+    g.direction = "ltr"; g.textAlign = "left"; g.textBaseline = "alphabetic";
+    g.font = `500 ${size}px 'IBM Plex Mono', monospace`; g.fillStyle = urlColor;
+    g.fillText(d.url, x, y + q + size * 1.6);
+  };
+  const priceChip = (y, bg = ACID, fg = INK) => {
+    if (!d.price) return y;
+    rtl("700 46px Heebo, sans-serif", fg);
+    const W = cv.width, tw = g.measureText(d.price).width;
+    y += 92;
+    g.fillStyle = bg; g.fillRect(W - PAD - tw - 28, y - 52, tw + 56, 72);
+    g.fillStyle = fg; g.fillText(d.price, W - PAD, y);
+    return y;
+  };
 
+  const VARIANTS = {
+    // תמונה למעלה, פרטים למטה
+    photo: { w: 1080, h: 1920, draw(photo, qr) {
+      const W = 1080, H = 1920, PH = 960;
+      g.fillStyle = PAPER; g.fillRect(0, 0, W, H);
+      photoBox(photo, 0, 0, W, PH);
+      stampAt(W - 190, 190, 120);
+      let y = PH + 100;
+      rtl("500 44px Assistant, Heebo, sans-serif", INK); g.fillText(d.artist, W - PAD, y);
+      g.font = "800 104px Heebo, sans-serif";
+      for (const line of wrap(d.title, W - PAD * 2, 2)) { y += 118; g.fillText(line, W - PAD, y); }
+      g.font = "500 46px Assistant, Heebo, sans-serif";
+      y += 84; g.fillText(d.when, W - PAD, y);
+      y += 60; g.fillText(d.where, W - PAD, y);
+      priceChip(y);
+      qrBlock(qr, PAD, 1580, 220, INK);
+      rtl("700 52px Heebo, sans-serif", INK); g.fillText("כרטיסים בלינק", W - PAD, 1640);
+      wordmark(W - PAD, 1800, INK);
+    } },
+    // בלי תמונה: כותרת ענקית על דיו
+    type: { w: 1080, h: 1920, draw(_photo, qr) {
+      const W = 1080, H = 1920;
+      g.fillStyle = INK; g.fillRect(0, 0, W, H);
+      stampAt(W - 200, 220, 130);
+      let y = 520;
+      rtl("500 50px Assistant, Heebo, sans-serif", PAPER); g.fillText(d.artist, W - PAD, y);
+      g.font = "800 150px Heebo, sans-serif"; g.fillStyle = ACID;
+      for (const line of wrap(d.title, W - PAD * 2, 4)) { y += 165; g.fillText(line, W - PAD, y); }
+      rtl("500 52px Assistant, Heebo, sans-serif", PAPER);
+      y += 110; g.fillText(d.when, W - PAD, y);
+      y += 66; g.fillText(d.where, W - PAD, y);
+      priceChip(y, ACID, INK);
+      qrBlock(qr, PAD, 1560, 240, PAPER);
+      rtl("700 56px Heebo, sans-serif", PAPER); g.fillText("בואו איתי", W - PAD, 1640);
+      wordmark(W - PAD, 1800, PAPER);
+    } },
+    // פוסט מרובע לפיד
+    square: { w: 1080, h: 1080, draw(photo, qr) {
+      const W = 1080, H = 1080, half = 540;
+      g.fillStyle = PAPER; g.fillRect(0, 0, W, H);
+      photoBox(photo, 0, 0, half, H);
+      stampAt(half - 120, 130, 90);
+      const X = W - 60, maxW = half - 100;
+      let y = 140;
+      rtl("500 32px Assistant, Heebo, sans-serif", INK); g.fillText(d.artist, X, y);
+      g.font = "800 72px Heebo, sans-serif";
+      for (const line of wrap(d.title, maxW, 3)) { y += 84; g.fillText(line, X, y); }
+      g.font = "500 34px Assistant, Heebo, sans-serif";
+      y += 66; g.fillText(d.when, X, y);
+      y += 46; g.fillText(d.where, X, y);
+      if (d.price) { g.font = "700 34px Heebo, sans-serif"; y += 60; const tw = g.measureText(d.price).width; g.fillStyle = ACID; g.fillRect(X - tw - 20, y - 38, tw + 40, 54); g.fillStyle = INK; g.fillText(d.price, X, y); }
+      qrBlock(qr, half + 60, 720, 170, INK, 22);
+      wordmark(X, 1020, INK, 38);
+    } },
+  };
+
+  let assets = null;
+  const render = async (name) => {
+    try { await Promise.all(["800 120px Heebo", "500 40px Assistant", "700 60px 'Space Grotesk'", "500 32px 'IBM Plex Mono'"].map((f) => document.fonts.load(f))); } catch {}
+    assets ??= await Promise.all([load(d.img, !d.img.startsWith("/")), load(d.qr, false)]);
+    const v = VARIANTS[name] ?? VARIANTS.photo;
+    cv.width = v.w; cv.height = v.h;
+    v.draw(...assets);
     cv.toBlob((blob) => {
       if (!blob) return;
       const a = document.querySelector("[data-story-download]");
-      if (a) a.href = URL.createObjectURL(blob);
-      const file = new File([blob], "jocares-story.png", { type: "image/png" });
+      if (a) { a.href = URL.createObjectURL(blob); a.download = `jocares-${name}.png`; }
+      const file = new File([blob], `jocares-${name}.png`, { type: "image/png" });
       const btn = document.querySelector("[data-story-share]");
       if (btn && navigator.canShare?.({ files: [file] })) {
         btn.hidden = false;
@@ -328,5 +378,6 @@ document.addEventListener("click", async (e) => {
       }
     }, "image/png");
   };
-  draw();
+  document.querySelectorAll('input[name="story-variant"]').forEach((r) => r.addEventListener("change", () => render(r.value)));
+  render("photo");
 })();

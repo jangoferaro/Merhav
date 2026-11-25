@@ -1,5 +1,5 @@
 import { config, shortDate } from "../util.js";
-import { csrfField, empty, html, inviteBox, layout, money, poster, priceTag, showCard, showDate, stat, stamp, raw } from "./kit.js";
+import { csrfField, empty, html, inviteBox, layout, mediaTile, money, poster, priceTag, showCard, showDate, stat, stamp, raw } from "./kit.js";
 
 // ---------- כניסה למוצר: שתי אפשרויות בלבד (PRD §7) ----------
 
@@ -183,7 +183,7 @@ ${inviter ? html`<div class="invite-top">${inviteBox(inviter)}</div>` : ""}
 
 // ---------- ערכת שיתוף ----------
 
-export function sharePage(ctx, { c, url, text, stats, code = null, lastImport = null, link = {}, assets = [], price = null }, opts) {
+export function sharePage(ctx, { c, url, text, stats, code = null, lastImport = null, link = {}, assets = [], price = null, offer = null }, opts) {
   const enc = encodeURIComponent;
   return layout(
     ctx,
@@ -225,7 +225,12 @@ export function sharePage(ctx, { c, url, text, stats, code = null, lastImport = 
 
   <section class="card kit" id="kit">
     <h2>ערכת שיתוף</h2>
-    <p class="muted">סטורי מוכן עם הקוד שלך. מורידים ומעלים לאינסטגרם או לסטטוס בוואטסאפ, ומוסיפים מדבקת לינק.</p>
+    <p class="muted">עיצוב מוכן עם הקוד שלך. מורידים ומעלים לאינסטגרם או לסטטוס בוואטסאפ, ומוסיפים מדבקת לינק.</p>
+    <div class="seg story-pick" role="radiogroup" aria-label="עיצוב">
+      <label><input type="radio" name="story-variant" value="photo" checked> סטורי עם תמונה</label>
+      <label><input type="radio" name="story-variant" value="type"> סטורי טקסט</label>
+      <label><input type="radio" name="story-variant" value="square"> פוסט מרובע</label>
+    </div>
     <div class="story-wrap"><canvas class="story" width="1080" height="1920" data-story
       data-img="${c.image_url}" data-artist="${c.artist_name}" data-title="${c.title}"
       data-when="${showDate(c.starts_at)}" data-where="${c.venue}${c.city ? `, ${c.city}` : ""}"
@@ -237,12 +242,14 @@ export function sharePage(ctx, { c, url, text, stats, code = null, lastImport = 
       <a class="btn ghost" data-story-download download="jocares-story-${c.id}.png" href="#">הורדה</a>
     </div>
     ${assets.length
-      ? html`<h3>תמונות מהאמן</h3>
-        <div class="asset-grid">${assets.map((a) => html`<a href="${a.image_url}" download target="_blank" rel="noopener"><img src="${a.image_url}" alt="" loading="lazy"></a>`)}</div>
-        <p class="note">לחיצה פותחת את התמונה בגודל מלא להורדה.</p>`
+      ? html`<h3>חומרים מהאמן</h3>
+        <div class="asset-grid">${assets.map((a) => html`<figure>${mediaTile(a.image_url)}<figcaption><a href="${a.image_url}" download>הורדה</a>${a.credit ? html` · <span class="muted">${a.credit}</span>` : ""}</figcaption></figure>`)}</div>
+        <p class="note">כשמשתפים תוכן של יוצר/ת, מתייגים אותו/ה.</p>`
       : ""}
     <p class="note"><a href="/s/${c.id}/share/qr.svg" download="jocares-qr-${c.id}.svg">הורדת QR של הלינק שלך</a> (להדפסה או לשקופית בהופעה)</p>
   </section>
+
+  ${offer && !offer.isOwner ? offerBox(ctx, c, offer) : ""}
 
   <div class="stats three">
     ${stat(stats.clicks, "נכנסו ללינק")}
@@ -254,6 +261,26 @@ export function sharePage(ctx, { c, url, text, stats, code = null, lastImport = 
 </section>`,
     opts
   );
+}
+
+/** ג׳וקר מציע לאמן שירות בתשלום, למשל סרטון המלצה */
+function offerBox(ctx, c, { profile, services, mine }) {
+  const head = html`<h2>מעבר ללינק: להציע לאמן שירות</h2>
+    <p class="muted">אוהבים את ${c.artist_name}? אפשר להציע סרטון המלצה, ריל או צילום בהופעה, במחיר שאתם קובעים. ${c.artist_name} מחליטים אם להזמין, והתשלום עובר רק אחרי שהם מאשרים את העבודה.</p>`;
+  if (mine && mine.status === "open") return html`<section class="card" id="offer">${head}<p class="flash good">שלחת הצעה: ${mine.title}. ממתינה להחלטת האמן.</p></section>`;
+  if (mine && mine.status === "ordered") return html`<section class="card" id="offer">${head}<p class="flash good">${c.artist_name} הזמינו ממך ${mine.title}. <a href="/orders/${mine.order_id}">להזמנה</a></p></section>`;
+  if (!profile || !services.length) {
+    return html`<section class="card" id="offer">${head}
+      <a class="btn ghost block" href="/creator">${profile ? "להוספת שירות, למשל סרטון המלצה" : "פתיחת פרופיל יוצר (דקה אחת)"}</a></section>`;
+  }
+  return html`<section class="card" id="offer">${head}
+    <form method="post" action="/s/${c.id}/offer" class="stack">
+      ${csrfField(ctx)}
+      <label class="field">מה להציע
+        <select name="service_id">${services.map((s) => html`<option value="${s.id}">${s.title} · ${money(s.price_agorot)}</option>`)}</select></label>
+      <label class="field">כמה מילים לאמן (לא חובה)<textarea name="message" rows="2" maxlength="300" placeholder="למשל: אני בא לכל ההופעות שלכם, ויש לי קהל שאוהב בדיוק את זה"></textarea></label>
+      <button class="btn">שליחת הצעה</button>
+    </form></section>`;
 }
 
 // ---------- כניסה ----------

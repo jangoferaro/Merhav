@@ -460,6 +460,20 @@ CREATE TABLE IF NOT EXISTS campaign_assets (
   created_at  TEXT NOT NULL
 );
 
+-- ג׳וקר מציע לאמן שירות בתשלום (למשל סרטון המלצה). האמן מחליט אם להזמין.
+CREATE TABLE IF NOT EXISTS service_offers (
+  id          INTEGER PRIMARY KEY,
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id),
+  service_id  INTEGER NOT NULL REFERENCES creator_services(id),
+  creator_id  INTEGER NOT NULL REFERENCES users(id),
+  message     TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'open',          -- open | ordered | dismissed
+  order_id    INTEGER,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS service_offers_open ON service_offers(campaign_id, creator_id) WHERE status = 'open';
+
 -- ספק תשלום מדומה (Sandbox): עמוד תשלום מתארח, כמו אצל ספקי סליקה אמיתיים
 CREATE TABLE IF NOT EXISTS pay_sandbox (
   ref           TEXT PRIMARY KEY,
@@ -507,6 +521,10 @@ function migrate(db) {
   // "בואו איתי": קונה מזמין חברים (בלי תגמול), וסופרים כמה באו בעקבותיו
   add("ticket_orders", "invite_code", "TEXT");
   add("ticket_orders", "invited_by", "INTEGER");
+  // ערכת שיתוף: גם סרטונים, וגם תוכן מאושר של יוצרים (עם קרדיט)
+  add("campaign_assets", "kind", "TEXT NOT NULL DEFAULT 'image'");
+  add("campaign_assets", "credit", "TEXT");
+  add("campaign_assets", "service_order_id", "INTEGER");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ticket_orders_invite ON ticket_orders(invite_code) WHERE invite_code IS NOT NULL");
   const missing = db.prepare("SELECT id FROM referral_links WHERE coupon_code IS NULL").all();
   for (const { id } of missing) db.prepare("UPDATE referral_links SET coupon_code = ? WHERE id = ?").run(newCouponCode(db), id);

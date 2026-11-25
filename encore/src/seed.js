@@ -58,7 +58,7 @@ const sell = (promoter, cid, buys) => {
 sell(dani, ids[0], { clicks: 14, orders: [2, 1, 3] });
 // הזמנה אישית וערכת שיתוף
 R.setNote(db, dani, R.getOrCreateLink(db, dani, ids[0]).id, "הייתי בהופעה הקודמת שלה. בכיתי. בואו.");
-for (const st of ["blur", "rings", "stripes"]) R.addAsset(db, noa, ids[0], img(st));
+for (const st of ["blur", "rings", "stripes"]) R.addAsset(db, noa, ids[0], { url: img(st) });
 // "בואו איתי": קונה ישיר הזמין שני חברים
 const host = purchase(ids[0], 1, null, "host@example.com");
 const inv = T.inviteCode(db, host);
@@ -107,12 +107,18 @@ K.saveService(db, yoni, { template: "graphic", price: "180" });
 
 const o1 = K.placeOrder(db, noa, K.servicesOf(db, lior.id)[0].id, { artist_name: "נועה ברק", goal: "show", campaign_id: String(ids[0]), rights: "on", notes: "רגע השיא: השיר האחרון" });
 K.acceptOrder(db, lior, o1);
-K.submitDeliverable(db, lior, o1, { url: "https://example.com/lior/noa-reel-v1", note: "גרסה ראשונה, 38 שניות" });
+// התוצר הוא קובץ שהועלה: כשנועה תאשר, הוא ייכנס לערכת השיתוף של ההופעה
+K.submitDeliverable(db, lior, o1, { media: { data: demoImage(4242, "rings") }, note: "גרסה ראשונה" });
 const o2 = K.placeOrder(db, noa, K.servicesOf(db, shira.id).find((s) => s.template === "song_review").id, { artist_name: "נועה ברק", goal: "music", music_url: "https://example.com/noa/single", rights: "on" });
 K.acceptOrder(db, shira, o2);
 K.submitDeliverable(db, shira, o2, { url: "https://example.com/shira/review" });
 K.approveOrder(db, noa, o2);
 K.placeOrder(db, band, K.servicesOf(db, yoni.id)[0].id, { artist_name: "הקרוואן", goal: "content", rights: "on" });
+
+// דני, ג׳וקר של ההופעה, מציע לנועה סרטון המלצה
+K.saveProfile(db, dani, { display_name: "דני כהן", city: "תל אביב", genres: "אינדי", kinds: ["content"], bio: "בא לכל הופעה אינדי בתל אביב, ומספר עליה לחברים.", image_url: img("blur") });
+K.saveService(db, dani, { template: "recommend", price: "120" });
+K.offerService(db, dani, ids[0], { service_id: K.servicesOf(db, dani.id)[0].id, message: "הבאתי כבר 6 אנשים להופעה. סרטון שלי יביא עוד." });
 
 console.log(`נוצר ${file}`);
 console.log("משתמשים לדוגמה (הקוד מוצג על המסך במצב פיתוח):");

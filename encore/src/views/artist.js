@@ -2,7 +2,7 @@
 import { artistSales, earlyFields } from "./tickets.js";
 import { config, isoToIsraelLocal } from "../util.js";
 import { split, STATUS_LABEL, TRANSITIONS } from "../domain/campaigns.js";
-import { csrfField, empty, html, imageInput, layout, money, postButton, poster, showDate, stat, statusBadge } from "./kit.js";
+import { csrfField, empty, html, imageInput, layout, mediaInput, mediaTile, money, postButton, poster, showDate, stat, statusBadge } from "./kit.js";
 import { orderBadge } from "./content.js";
 
 function contentOrdersBlock(orders) {
@@ -198,7 +198,7 @@ const ACTION_CONFIRM = {
   cancelled: "לסמן שההופעה בוטלה? כל התגמולים של המקדמים יבוטלו. אי אפשר לחזור מזה.",
 };
 
-export function manageCampaign(ctx, { c, r, top, publicUrl, lastImport = null, sales = null, assets = [] }, opts) {
+export function manageCampaign(ctx, { c, r, top, publicUrl, lastImport = null, sales = null, assets = [], offers = [] }, opts) {
   const s = split(c.price_agorot, c.reward_agorot);
   const actions = TRANSITIONS[c.status].filter((t) => t !== "sold_out");
   return layout(
@@ -229,13 +229,33 @@ ${c.provider === "coupon"
   ? html`<p class="note">הכרטיסים נמכרים באתר הכרטוס שלך, וכל ג׳וקר מקבל קוד אישי. אנחנו מגדירים את הקודים ומעדכנים את המכירות כאן. עדכון אחרון: ${lastImport ? showDate(lastImport) : "עוד לא"}.</p>`
   : ""}
 ${sales ? artistSales(ctx, { c, ...sales }) : ""}
+${offers.length
+  ? html`<section class="card" id="offers">
+  <h2>הצעות מג׳וקרים</h2>
+  <p class="muted">ג׳וקרים של ההופעה שמציעים לך שירות בתשלום. משלמים רק אחרי שמאשרים את העבודה.</p>
+  ${offers.map((f) => html`<div class="offer">
+    ${f.image_url ? html`<span class="avatar"><img src="${f.image_url}" alt=""></span>` : html`<span class="avatar">${f.display_name[0]}</span>`}
+    <div>
+      <p><b>${f.display_name}</b> · ${f.title} · <b class="money">${money(f.price_agorot)}</b></p>
+      ${f.sales ? html`<p class="muted">כבר מכר/ה ${f.sales} הזמנות להופעה הזאת</p>` : ""}
+      ${f.message ? html`<blockquote>${f.message}</blockquote>` : ""}
+      <div class="row2">
+        <a class="btn small" href="/services/${f.service_id}/order?campaign=${c.id}">להזמנה</a>
+        <a class="btn ghost small" href="/creators/${f.creator_user_id}">לפרופיל</a>
+        ${postButton(ctx, `/artist/c/${c.id}/offers/${f.id}/dismiss`, "לא תודה", { cls: "linklike" })}
+      </div>
+    </div>
+  </div>`)}
+</section>`
+  : ""}
+
 <section class="card" id="kit">
   <h2>ערכת שיתוף לג׳וקרים</h2>
-  <p class="muted">תמונות מההופעות, מהחזרות או מהסטודיו. הג׳וקרים יכולים להוריד אותן ולשתף. כל ג׳וקר מקבל גם סטורי מוכן עם הקוד שלו.</p>
-  ${assets.length ? html`<div class="asset-grid">${assets.map((a) => html`<figure><img src="${a.image_url}" alt="" loading="lazy">${postButton(ctx, `/artist/c/${c.id}/assets/${a.id}/delete`, "מחיקה", { cls: "linklike", confirm: "למחוק את התמונה מהערכה?" })}</figure>`)}</div>` : ""}
+  <p class="muted">סרטונים קצרים ותמונות מההופעות, מהחזרות או מהסטודיו. הג׳וקרים מורידים ומשתפים. סרטון אנכי קצר עובד הכי טוב. כל ג׳וקר מקבל גם עיצוב מוכן עם הקוד שלו, ותוכן שהזמנת מיוצרים ואישרת נכנס לכאן אוטומטית.</p>
+  ${assets.length ? html`<div class="asset-grid">${assets.map((a) => html`<figure>${mediaTile(a.image_url)}<figcaption>${a.credit ? html`<span class="muted">${a.credit}</span> · ` : ""}${postButton(ctx, `/artist/c/${c.id}/assets/${a.id}/delete`, "מחיקה", { cls: "linklike", confirm: "למחוק מהערכה?" })}</figcaption></figure>`)}</div>` : ""}
   <form method="post" action="/artist/c/${c.id}/assets" enctype="multipart/form-data" class="stack" data-busy="מעלים…">
     ${csrfField(ctx)}
-    ${imageInput({ label: "הוספת תמונה" })}
+    ${mediaInput({ label: "הוספת סרטון או תמונה" })}
     <button class="btn ghost">הוספה לערכה</button>
   </form>
 </section>

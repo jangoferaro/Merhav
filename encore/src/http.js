@@ -1,6 +1,6 @@
 // שכבת HTTP דקה: ניתוב, עוגיות, טפסים, CSRF, הגבלת קצב והודעות flash.
 import { config, hmac, randomToken, safeEqual, UserError } from "./util.js";
-import { MAX_IMAGE_BYTES, parseMultipart } from "./media.js";
+import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, parseMultipart } from "./media.js";
 
 const MAX_BODY = 64 * 1024;
 
@@ -95,7 +95,9 @@ export function makeCtx(req, res) {
     _form: null,
     async form() {
       if (!this._form && /^multipart\/form-data/i.test(req.headers["content-type"] ?? "")) {
-        const buf = await readBody(req, MAX_IMAGE_BYTES + 256 * 1024, { raw: true });
+        // וידאו מתקבל רק בנתיבים של ערכת השיתוף ותוצרים של יוצרים; בכל השאר, עד גודל תמונה
+        const big = /^\/(artist\/c\/\d+\/assets|orders\/\d+\/deliver)$/.test(this.url.pathname);
+        const buf = await readBody(req, (big ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES) + 256 * 1024, { raw: true });
         this._form = parseMultipart(buf, req.headers["content-type"]);
       }
       if (!this._form) {

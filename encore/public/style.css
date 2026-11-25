@@ -464,6 +464,7 @@ pre.brief { white-space: pre-wrap; font: 400 1rem/1.75 var(--font); margin: 0; }
 .upload-preview { width: 96px; aspect-ratio: 4 / 3; background: var(--wash); flex: none; overflow: hidden; display: grid; place-items: center; }
 .upload-preview:empty::after { content: "+"; font: 300 2rem/1 var(--font-display); color: var(--ink-2); }
 .upload-preview img { width: 100%; height: 100%; object-fit: cover; }
+.upload-preview video { width: 100%; height: 100%; object-fit: cover; }
 .upload.round .upload-preview { width: 72px; aspect-ratio: 1; border-radius: 50%; }
 .upload-text { display: grid; gap: 2px; }
 .upload-text small { color: var(--ink-2); font-weight: 400; }
@@ -614,3 +615,13 @@ s.muted { font-family: var(--font-mono); }
 .asset-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; filter: grayscale(1) contrast(1.08); }
 .asset-grid figure { margin: 0; }
 .come-with .share-grid { grid-template-columns: 1fr 1fr; }
+.story-pick { margin: 6px 0 4px; }
+.asset-grid figure { display: grid; gap: 6px; }
+.asset-grid video { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; background: #000; display: block; }
+.asset-grid figcaption { font-size: .85rem; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.asset-grid figcaption .inline-form { display: inline; }
+.deliverable video, .deliverable img { width: 100%; max-height: 70vh; object-fit: contain; background: #000; display: block; margin-bottom: 10px; }
+.offer { display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-top: 1px solid var(--hair); }
+.offer .avatar { width: 48px; height: 48px; flex: none; }
+.offer p { margin: 0 0 4px; }
+.offer .row2 { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }

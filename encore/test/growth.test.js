@@ -151,12 +151,12 @@ test("HTTP: הזמנה אישית של ג׳וקר, בואו איתי אחרי ק
     const png = Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000" + "1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082", "hex");
     const fd = new FormData();
     fd.set("_csrf", a.last.match(/name="_csrf" value="([^"]+)"/)[1]);
-    fd.set("image", new Blob([png], { type: "image/png" }), "x.png");
+    fd.set("media", new Blob([png], { type: "image/png" }), "x.png");
     const up = await fetch(`${base}/artist/c/${camp.id}/assets`, { method: "POST", body: fd, redirect: "manual", headers: { cookie: Object.entries(a.jar).map(([k, v]) => `${k}=${v}`).join("; "), referer: base } });
     assert.equal(up.status, 303);
     assert.equal(R.assetsOf(db, camp.id).length, 1);
     r = await j.get(`/s/${camp.id}/share`);
-    assert.match(r.text, /תמונות מהאמן/);
+    assert.match(r.text, /חומרים מהאמן/);
   } finally {
     server.close();
   }

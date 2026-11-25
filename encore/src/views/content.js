@@ -1,7 +1,7 @@
 // מודול התוכן: מסך מטרה לאמן, גילוי יוצרים, פרופיל, הזמנה, דף הזמנה משותף, ואזור היוצר.
 import { clock, config, shortDate } from "../util.js";
 import { GOALS, KIND_LABEL, LICENSES, ORDER_STATUS, TEMPLATES, serviceSplit } from "../domain/content.js";
-import { csrfField, empty, html, layout, money, postButton, showDate, stat, imageInput } from "./kit.js";
+import { csrfField, empty, html, layout, money, postButton, showDate, stat, imageInput, mediaInput, mediaTile } from "./kit.js";
 
 const days = (n) => (n === 1 ? "יום אחד" : `${n} ימים`);
 
@@ -132,7 +132,7 @@ ${c.channels.length
 
 // ---------- הזמנה: מטרה, תקציב (=המחיר), אישור ----------
 
-export function orderNewPage(ctx, { s, creator, artistName, campaigns, goal }, opts) {
+export function orderNewPage(ctx, { s, creator, artistName, campaigns, goal, campaignId = null }, opts) {
   const split = serviceSplit(s.price_agorot);
   const lic = LICENSES[s.license];
   return layout(
@@ -151,7 +151,7 @@ export function orderNewPage(ctx, { s, creator, artistName, campaigns, goal }, o
     </label>
     ${campaigns.length
       ? html`<label class="field">קשור להופעה? (לא חובה)
-          <select name="campaign_id"><option value="">לא</option>${campaigns.map((c) => html`<option value="${c.id}">${c.title} · ${showDate(c.starts_at, { weekday: undefined, hour: undefined, minute: undefined })}</option>`)}</select>
+          <select name="campaign_id"><option value="">לא</option>${campaigns.map((c) => html`<option value="${c.id}" ${c.id === campaignId ? html`selected` : ""}>${c.title} · ${showDate(c.starts_at, { weekday: undefined, hour: undefined, minute: undefined })}</option>`)}</select>
           <small class="hint">אם כן, היוצר יקבל גם לינק אישי ותגמול על כל כרטיס שנמכר דרכו.</small></label>`
       : ""}
     <label class="field">קישור לשיר / לקליפ (לא חובה)<input name="music_url" type="url" dir="ltr" placeholder="https://"></label>
@@ -214,9 +214,10 @@ export function orderPage(ctx, { o, role, deliverables, revisions, publication, 
     action = html`<div class="next card">
       <h2>${o.status === "revision_requested" ? "בקשת תיקון" : "העלאת התוצר"}</h2>
       ${o.status === "revision_requested" && revisions[0] ? html`<blockquote>${revisions[0].message}</blockquote>` : ""}
-      <p class="muted">עד ${showDate(o.due_at)}. מעלים קישור לקובץ (Google Drive, Dropbox, WeTransfer או סרטון לא רשום).</p>
-      <form method="post" action="/orders/${o.id}/deliver" class="stack">${csrfField(ctx)}
-        <label class="field">קישור לתוצר<input name="url" type="url" dir="ltr" required placeholder="https://"></label>
+      <p class="muted">עד ${showDate(o.due_at)}. הכי טוב להעלות את הקובץ עצמו${o.campaign_id && o.terms.joker_share ? ": אחרי האישור הוא נכנס לערכת השיתוף של ההופעה, וכל הג׳וקרים יוכלו לשתף אותו עם קרדיט לך" : ""}. אפשר גם קישור (Google Drive, Dropbox, סרטון לא רשום).</p>
+      <form method="post" action="/orders/${o.id}/deliver" class="stack" enctype="multipart/form-data" data-busy="מעלים…">${csrfField(ctx)}
+        ${mediaInput({ label: "העלאת הסרטון או התמונה", required: false })}
+        <label class="field">או קישור<input name="url" type="url" dir="ltr" placeholder="https://"></label>
         <label class="field">הערה לאמן (לא חובה)<input name="note" maxlength="500"></label>
         <button class="btn big block">שליחה לאמן</button></form>
     </div>`;
@@ -231,7 +232,8 @@ export function orderPage(ctx, { o, role, deliverables, revisions, publication, 
   } else if (isArtist && o.status === "submitted") {
     action = html`<div class="next card">
       <h2>התוצר מוכן</h2>
-      <a class="btn ghost block" href="${last.url}" target="_blank" rel="noopener nofollow">צפייה בתוצר${deliverables.length > 1 ? ` (גרסה ${last.version})` : ""}</a>
+      ${last.url.startsWith("/media/") ? html`<div class="deliverable">${mediaTile(last.url)}</div>` : ""}
+      <a class="btn ghost block" href="${last.url}" target="_blank" rel="noopener nofollow">${last.url.startsWith("/media/") ? "פתיחה בגודל מלא" : "צפייה בתוצר"}${deliverables.length > 1 ? ` (גרסה ${last.version})` : ""}</a>
       ${last.note ? html`<blockquote>${last.note}</blockquote>` : ""}
       ${postButton(ctx, `/orders/${o.id}/approve`, `אישור ותשלום ${money(o.price_agorot)}`, { cls: "btn big block" })}
       ${o.revisions_left
