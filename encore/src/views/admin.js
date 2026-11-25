@@ -7,7 +7,7 @@ import { adminContent } from "./content.js";
 const COMMISSION_HE = { pending: "ממתין", payable: "זמין", paid: "שולם", reversed: "בוטל", disputed: "מוקפא" };
 
 const TABS = [
-  ["", "סקירה"], ["coupons", "קופונים"], ["payouts", "תשלומים"], ["disputes", "פניות"], ["orders", "עסקאות"],
+  ["", "סקירה"], ["tickets", "כרטיסים"], ["coupons", "קופונים"], ["payouts", "תשלומים"], ["disputes", "פניות"], ["orders", "עסקאות"],
   ["content", "תוכן"], ["campaigns", "קמפיינים"], ["users", "משתמשים"], ["audit", "יומן פעולות"], ["sim", "ספק מדומה"],
 ];
 
@@ -26,6 +26,34 @@ ${body}`,
 }
 
 const table = (head, rows) => html`<div class="table-wrap"><table><thead><tr>${head.map((h) => html`<th>${h}</th>`)}</tr></thead><tbody>${rows}</tbody></table></div>`;
+
+// ---------- כרטיסים: הקופה של JoCares ----------
+
+const TICKET_STATUS = { pending: "ממתין לתשלום", paid: "שולם", expired: "פג", failed: "נכשל", rejected: "נדחה והוחזר" };
+const REFUND_STATUS = { pending: "ממתין", done: "בוצע", failed: "נכשל" };
+
+export function adminTickets(ctx, { totals, orders, refunds }, opts) {
+  return shell(ctx, "tickets", html`
+<div class="stats">
+  <div class="stat"><b>${totals.tickets}</b><span>כרטיסים נמכרו</span></div>
+  <div class="stat"><b>${money(totals.gross)}</b><span>מחזור</span></div>
+  <div class="stat"><b>${totals.failed}</b><span>החזרים שנכשלו</span></div>
+  <div class="stat"><b>${totals.pending}</b><span>החזרים ממתינים</span></div>
+</div>
+${refunds.length
+  ? html`<section class="card"><h2>החזרים שלא הושלמו</h2>
+    ${table(["#", "הזמנה", "קונה", "כרטיסים", "סכום", "סיבה", "מצב", "שגיאה"], refunds.map((r) => html`<tr>
+      <td>${r.id}</td><td>${r.order_id}</td><td>${r.buyer_name}</td><td>${r.qty}</td><td>${money(r.amount_agorot)}</td><td>${r.reason}</td><td>${REFUND_STATUS[r.status]}</td><td class="muted">${r.error ?? ""}</td></tr>`))}
+    ${postButton(ctx, "/admin/tickets/retry-refunds", "ניסיון חוזר עכשיו", { cls: "btn" })}
+  </section>`
+  : html`<p class="flash good">אין החזרים פתוחים.</p>`}
+<section class="card"><h2>הזמנות אחרונות</h2>
+${table(["#", "הופעה", "קונה", "מייל", "כרטיסים", "סכום", "מצב", "מתי"], orders.map((o) => html`<tr>
+  <td>${o.id}</td><td>${o.title}</td><td>${o.buyer_name}</td><td dir="ltr">${o.buyer_email}</td>
+  <td>${o.qty}${o.refunded_qty ? html` <small class="muted">(${o.refunded_qty} הוחזרו)</small>` : ""}</td>
+  <td>${money(o.total_agorot)}</td><td>${TICKET_STATUS[o.status] ?? o.status}</td><td>${shortDate(o.paid_at || o.created_at)}</td></tr>`))}
+</section>`, opts);
+}
 
 // ---------- קופונים: עבודת הצוות מאחורי הקלעים ----------
 

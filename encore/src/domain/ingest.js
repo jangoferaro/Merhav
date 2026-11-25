@@ -105,28 +105,30 @@ function handleOrderPaid(db, prov, d) {
     .prepare("SELECT 1 FROM orders o JOIN campaigns c ON c.id = o.campaign_id WHERE c.artist_id = ? AND o.buyer_email_hash = ?")
     .get(campaign.artist_id, buyerHash);
   const rewarded = att.reason === "ok" ? att.rewardedQty : 0;
+  // הנחה שהג׳וקר נתן לחבר יורדת מהתגמול שלו (לא מהאמן)
+  const discount = att.reason === "ok" ? Math.max(0, Math.min(Number(d.joker_discount_agorot) || 0, campaign.reward_agorot - 100)) : 0;
 
   const orderId = insert(db, "orders", {
     provider: prov, external_order_id: String(d.order_id), campaign_id: campaign.id, qty, unit_price_agorot: unit,
     total_agorot: qty * unit, buyer_email_hash: buyerHash, first_for_artist: firstForArtist ? 1 : 0,
     click_id: att.click?.id ?? null, link_id: att.link?.id ?? null, terms_id: campaign.terms_id,
     rewarded_qty: rewarded, fee_agorot: rewarded * feePerTicket(unit, campaign.fee_bps),
-    attribution: att.reason, ordered_at: orderedAt, created_at: clock.iso(),
+    attribution: att.reason, ordered_at: orderedAt, created_at: clock.iso(), joker_discount_agorot: discount,
   });
 
   if (att.reason === "ok") {
-    const amount = rewarded * campaign.reward_agorot;
+    const amount = rewarded * (campaign.reward_agorot - discount);
     const cid = insert(db, "commissions", {
       kind: "sale", order_id: orderId, campaign_id: campaign.id, promoter_id: att.promoter.id,
       amount_agorot: amount, status: "pending", created_at: clock.iso(), updated_at: clock.iso(),
     });
     insert(db, "ledger", {
       commission_id: cid, user_id: att.promoter.id, type: "accrue", amount_agorot: amount,
-      memo: `${rewarded} × ${money(campaign.reward_agorot)} · תנאים v${campaign.terms_version}`, created_at: clock.iso(),
+      memo: `${rewarded} × ${money(campaign.reward_agorot - discount)}${discount ? ` (אחרי הנחה של ${money(discount)} לחבר)` : ""} · תנאים v${campaign.terms_version}`, created_at: clock.iso(),
     });
     if (att.promoter.notify_sales) {
       const who = qty > 1 ? `מישהו רכש ${rewarded} כרטיסים` : "מישהו רכש כרטיס";
-      notify(db, att.promoter.id, `${who} ל"${campaign.title}" בזכותך. הרווחת ${money(amount)}, בכפוף לאישור העסקה.`, "/me/money");
+      notify(db, att.promoter.id, `${who} ל"${campaign.title}" בזכותך. הרווחת ${money(amount)}, בכפוף לאישור העסקה.`, "/me/money", { email: true });
     }
     if (campaign.promo_limit && promotedSold(db, campaign.id) >= campaign.promo_limit) {
       setStatus(db, null, campaign.id, "sold_out", { reason: "promo_limit_reached" });
@@ -186,7 +188,7 @@ export function reconcileOrder(db, orderId, actorId, memo) {
 
   const sale = db.prepare("SELECT * FROM commissions WHERE order_id = ? AND kind = 'sale'").get(order.id);
   if (!sale) return;
-  const target = remaining * terms.reward_agorot;
+  const target = remaining * (terms.reward_agorot - order.joker_discount_agorot);
   const now = clock.iso();
 
   if (sale.status === "paid" || sale.payout_id) {

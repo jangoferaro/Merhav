@@ -79,6 +79,56 @@ export function savePayoutDetails(db, user, input) {
   audit(db, user.id, "payout_details.updated", "user", user.id, { method }); // בלי הפרטים עצמם
 }
 
+// ---------- פרטי האמן לקבלת הכסף ממכירות ----------
+
+export const BUSINESS_TYPES = { private: "אדם פרטי (בלי תיק עוסק)", patur: "עוסק פטור", murshe: "עוסק מורשה", company: "חברה בע״מ" };
+
+/** פרטים לחברת הסליקה (צירוף האמן כבית עסק) ולהעברת הכסף. מוצפנים, ולא נכתבים ליומן. */
+export function saveArtistPayout(db, user, artistId, input) {
+  const owner = db.prepare("SELECT 1 FROM artist_members WHERE artist_id = ? AND user_id = ?").get(Number(artistId), user.id);
+  if (!owner && !user.is_admin) throw new UserError("אין הרשאה", 404);
+  const type = BUSINESS_TYPES[input.type] ? input.type : null;
+  if (!type) throw new UserError("בחרו סוג עסק");
+  const taxId = String(input.tax_id ?? "").replace(/\D/g, "");
+  if (!/^\d{8,9}$/.test(taxId)) throw new UserError(type === "company" ? "מספר ח״פ לא תקין" : "מספר ת״ז או עוסק לא תקין");
+  const phone = String(input.phone ?? "").replace(/\D/g, "");
+  if (!/^0\d{8,9}$/.test(phone)) throw new UserError("מספר טלפון לא תקין");
+  const d = {
+    type, legal_name: text(input.legal_name, "שם מלא או שם העסק", { max: 100 }), tax_id: taxId, phone,
+    bank: text(input.bank, "בנק", { max: 30 }), branch: text(input.branch, "סניף", { max: 10 }), account: text(input.account, "מספר חשבון", { max: 20 }),
+  };
+  if (input.confirm !== "on") throw new UserError("צריך לאשר שהחשבון רשום על שמך או על שם העסק");
+  db.prepare("UPDATE artists SET payout_details_enc = ? WHERE id = ?").run(encrypt(d), Number(artistId));
+  audit(db, user.id, "artist.payout_details", "artist", Number(artistId), { type });
+}
+
+export function artistPayout(db, artistId) {
+  const row = db.prepare("SELECT payout_details_enc FROM artists WHERE id = ?").get(Number(artistId));
+  return row?.payout_details_enc ? decrypt(row.payout_details_enc) : null;
+}
+
+/**
+ * סיכום כספי להופעה (קופת JoCares): כמה נמכר, כמה הולך לג׳וקרים, העמלה שלנו, וכמה נשאר לאמן.
+ * עמלת הסליקה עצמה תלויה בספק, ולכן מוצגת בנפרד כשיהיה ספק אמיתי.
+ */
+export function showStatement(db, campaignId) {
+  const t = db
+    .prepare(
+      `SELECT COALESCE(SUM((qty - refunded_qty) * (unit_price_agorot - discount_agorot)), 0) AS gross,
+              COALESCE(SUM((qty - refunded_qty) * fee_agorot), 0) AS service_fees,
+              COALESCE(SUM((qty - refunded_qty) * discount_agorot), 0) AS joker_discounts,
+              COALESCE(SUM(qty - refunded_qty), 0) AS tickets
+         FROM ticket_orders WHERE campaign_id = ? AND status = 'paid'`
+    )
+    .get(campaignId);
+  const rewards = db
+    .prepare("SELECT COALESCE(SUM(amount_agorot), 0) n FROM commissions WHERE campaign_id = ? AND kind IN ('sale','clawback') AND status != 'reversed'")
+    .get(campaignId).n;
+  const fees = db.prepare("SELECT COALESCE(SUM(fee_agorot), 0) n FROM orders WHERE campaign_id = ? AND cancelled = 0").get(campaignId).n;
+  // הנחת ג׳וקר כבר ירדה גם מהמחיר וגם מהתגמול, ולכן האמן מקבל בדיוק מה שהיה מקבל בלעדיה
+  return { ...t, rewards, fees, net: t.gross - rewards - fees };
+}
+
 export const payoutDetails = (user) => (user?.payout_details_enc ? decrypt(user.payout_details_enc) : null);
 
 export function maskDetails(d) {
@@ -120,7 +170,7 @@ export function decidePayout(db, admin, payoutId, outcome, reference = "") {
       const ref = text(reference, "אסמכתא להעברה", { max: 100 });
       db.prepare("UPDATE payouts SET status = 'paid', reference = ?, decided_at = ?, decided_by = ? WHERE id = ?").run(ref, now, admin.id, p.id);
       db.prepare("UPDATE commissions SET status = 'paid', paid_at = ?, updated_at = ? WHERE payout_id = ?").run(now, now, p.id);
-      notify(db, p.user_id, `העברנו לך ${money(p.amount_agorot)}`, "/me/money");
+      notify(db, p.user_id, `העברנו לך ${money(p.amount_agorot)}`, "/me/money", { email: true });
     } else {
       db.prepare("UPDATE payouts SET status = 'failed', reference = ?, decided_at = ?, decided_by = ? WHERE id = ?").run(String(reference).slice(0, 200), now, admin.id, p.id);
       db.prepare("UPDATE commissions SET payout_id = NULL, updated_at = ? WHERE payout_id = ?").run(now, p.id);
@@ -164,7 +214,7 @@ export function settle(db) {
       perUser.set(m.promoter_id, (perUser.get(m.promoter_id) ?? 0) + m.amount_agorot);
     }
     for (const [uid, amount] of perUser) {
-      if (amount > 0) notify(db, uid, `${money(amount)} עברו למצב "זמין לתשלום".`, "/me/money");
+      if (amount > 0) notify(db, uid, `${money(amount)} עברו למצב "זמין לתשלום".`, "/me/money", { email: true });
     }
     return { ended: ending.length, released: ready.length, content: settleContent(db), expired: expireHolds(db) };
   });

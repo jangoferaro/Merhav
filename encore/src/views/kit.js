@@ -130,6 +130,7 @@ export function inviteBox(inv) {
     <div>
       <p class="invite-who">${inv.kind === "friend" ? html`<b>${inv.name}</b> כבר קנה/תה כרטיס ומזמין/ה אותך` : html`<b>${inv.name}</b> מזמין/ה אותך`}</p>
       ${inv.note ? html`<p class="invite-note">“${inv.note}”</p>` : ""}
+      ${inv.discount ? html`<p class="early-note">${inv.name} נותן/ת לך ${money(inv.discount)} הנחה על כל כרטיס</p>` : ""}
       ${inv.kind === "joker" ? html`<small class="muted">${inv.name} מקבל/ת תגמול קטן מהאמן על כרטיס שנקנה דרכו/ה, בלי עלות נוספת לך.</small>` : ""}
     </div>
   </div>`;

@@ -325,7 +325,7 @@ export function placeOrder(db, artistUser, serviceId, input) {
     if (campaign) {
       db.prepare("UPDATE service_offers SET status = 'ordered', order_id = ?, updated_at = ? WHERE campaign_id = ? AND service_id = ? AND status = 'open'").run(orderId, now, campaign.id, s.id);
     }
-    notify(db, s.user_id, `הזמנה חדשה: ${s.title} מ${artistName}, ${money(split.creator)} בשבילך. מחכה לאישור שלך.`, `/orders/${orderId}`);
+    notify(db, s.user_id, `הזמנה חדשה: ${s.title} מ${artistName}, ${money(split.creator)} בשבילך. מחכה לאישור שלך.`, `/orders/${orderId}`, { email: true });
     return orderId;
   });
 }
@@ -414,7 +414,7 @@ export function submitDeliverable(db, user, orderId, { url, note, media }) {
     const link = media?.data?.length ? saveMedia(media).url : httpsUrl(url, "קישור לתוצר");
     move(db, o, "submitted", user.id, { submitted_at: o.submitted_at ?? clock.iso() });
     insert(db, "deliverables", { order_id: o.id, version, url: link, note: text(note, "הערה", { max: 500, required: false }), created_at: clock.iso() });
-    notify(db, o.artist_user_id, `התוצר של "${o.title}" מוכן לצפייה${version > 1 ? ` (גרסה ${version})` : ""}.`, `/orders/${o.id}`);
+    notify(db, o.artist_user_id, `התוצר של "${o.title}" מוכן לצפייה${version > 1 ? ` (גרסה ${version})` : ""}.`, `/orders/${o.id}`, { email: true });
   });
 }
 
@@ -507,7 +507,7 @@ export function offerService(db, user, campaignId, { service_id, message }) {
       campaign_id: c.id, service_id: s.id, creator_id: user.id, message: text(message, "הודעה לאמן", { max: 300, required: false }), created_at: now, updated_at: now,
     });
     const name = getProfile(db, user.id).display_name;
-    for (const uid of owners) notify(db, uid, `${name}, ג׳וקר/ית של "${c.title}", מציע/ה לך: ${s.title} ב-${money(s.price_agorot)}.`, `/artist/c/${c.id}#offers`);
+    for (const uid of owners) notify(db, uid, `${name}, ג׳וקר/ית של "${c.title}", מציע/ה לך: ${s.title} ב-${money(s.price_agorot)}.`, `/artist/c/${c.id}#offers`, { email: true });
     audit(db, user.id, "offer.created", "campaign", c.id, { service: s.id });
     return id;
   });

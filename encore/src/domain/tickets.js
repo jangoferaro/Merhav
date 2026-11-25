@@ -4,10 +4,10 @@
 import crypto from "node:crypto";
 import qrcode from "qrcode-generator";
 import { insert, tx } from "../db.js";
-import { clock, config, isEmail, normalizeEmail, randomToken, text, UserError } from "../util.js";
+import { clock, config, emailHash, isEmail, normalizeEmail, randomToken, text, UserError } from "../util.js";
 import { gateway } from "../payments/index.js";
 import { _setCancelHandler, getCampaign, parseEarly } from "./campaigns.js";
-import { ingestEvent } from "./ingest.js";
+import { decideAttribution, ingestEvent } from "./ingest.js";
 import { audit, notify } from "./identity.js";
 
 const SALE_STATUSES = ["active", "paused", "sold_out"];
@@ -48,6 +48,28 @@ export function setEarlyPrice(db, actor, c, input) {
   db.prepare("UPDATE campaigns SET early_price_agorot = ?, early_until = ?, early_qty = ?, updated_at = ? WHERE id = ?").run(e.early_price_agorot, e.early_until, e.early_qty, clock.iso(), c.id);
   audit(db, actor.id, "tickets.early_price", "campaign", c.id, e);
   return e;
+}
+
+// ---------- הנחה מהג׳וקר ----------
+
+/**
+ * הנחה לכרטיס שהג׳וקר בחר לתת מתוך התגמול שלו. ניתנת רק כשברור שהמכירה תזכה אותו
+ * (אותם כללי שיוך בדיוק), כדי שהאמן לא יממן הנחה שאף אחד לא "שילם" עליה.
+ */
+export function jokerDiscount(db, c, { clickToken, email, qty }) {
+  if (!clickToken) return 0;
+  const link = db.prepare("SELECT l.* FROM referral_clicks k JOIN referral_links l ON l.id = k.link_id WHERE k.token = ?").get(clickToken);
+  if (!link?.discount_agorot) return 0;
+  const att = decideAttribution(db, c, { ref: clickToken, buyerHash: emailHash(email), qty, orderedAt: clock.iso() });
+  if (att.reason !== "ok" || att.rewardedQty < qty) return 0;
+  return Math.min(link.discount_agorot, c.reward_agorot - 100);
+}
+
+/** ההנחה שמבקר יקבל, לתצוגה לפני שהשאיר מייל */
+export function discountPreview(db, c, clickToken) {
+  if (!clickToken || c.status !== "active") return 0;
+  const link = db.prepare("SELECT l.* FROM referral_clicks k JOIN referral_links l ON l.id = k.link_id WHERE k.token = ?").get(clickToken);
+  return link?.campaign_id === c.id ? Math.min(link.discount_agorot || 0, Math.max(0, c.reward_agorot - 100)) : 0;
 }
 
 // ---------- "בואו איתי" ----------
@@ -98,9 +120,10 @@ export function createOrder(db, campaignId, input, { clickToken = null, invitedB
     const fee = config.ticketFeeAgorot;
     const { price } = priceNow(db, c);
     const inviter = invitedBy ? orderByInvite(db, invitedBy) : null;
+    const discount = jokerDiscount(db, c, { clickToken, email, qty });
     const id = insert(db, "ticket_orders", {
       campaign_id: c.id, token: randomToken(18), buyer_name: text(input.name, "שם", { max: 80 }), buyer_email: email,
-      buyer_phone: phone, qty, unit_price_agorot: price, fee_agorot: fee, total_agorot: qty * (price + fee),
+      buyer_phone: phone, qty, unit_price_agorot: price, fee_agorot: fee, total_agorot: qty * (price - discount + fee), discount_agorot: discount,
       invited_by: inviter && inviter.campaign_id === c.id ? inviter.id : null,
       status: "pending", click_token: clickToken, marketing_consent: input.consent === "on" ? 1 : 0,
       gateway: gateway().name, created_at: clock.iso(), expires_at: minutes(config.holdMinutes),
@@ -161,7 +184,7 @@ export function confirmPayment(db, gatewayName, ref) {
       id: `paid:${order.id}`, type: "order.paid",
       data: {
         order_id: String(order.id), event_id: c.external_event_id, qty: order.qty, unit_price_agorot: order.unit_price_agorot,
-        buyer_email: order.buyer_email, ref: order.click_token, ordered_at: now,
+        buyer_email: order.buyer_email, ref: order.click_token, ordered_at: now, joker_discount_agorot: order.discount_agorot,
       },
     });
     if (order.marketing_consent) {
@@ -205,7 +228,7 @@ export function refundTickets(db, actor, orderId, qtyInput, reason = "") {
     const ids = db.prepare("SELECT id FROM tickets WHERE order_id = ? AND status != 'refunded' ORDER BY status = 'used', seq DESC LIMIT ?").all(order.id, qty);
     for (const { id } of ids) db.prepare("UPDATE tickets SET status = 'refunded' WHERE id = ?").run(id);
     insert(db, "ticket_refunds", {
-      order_id: order.id, qty, amount_agorot: qty * (order.unit_price_agorot + order.fee_agorot),
+      order_id: order.id, qty, amount_agorot: qty * (order.unit_price_agorot - order.discount_agorot + order.fee_agorot),
       reason: String(reason).slice(0, 200), actor_id: actor?.id ?? null, created_at: clock.iso(),
     });
     ingestEvent(db, "jocares", { id: `refund:${order.id}:${refunded}`, type: "order.refunded", data: { order_id: String(order.id), refunded_qty: refunded } });
@@ -310,7 +333,7 @@ export function ordersOfCampaign(db, campaignId) {
 export function salesSummary(db, c) {
   const inv = inventory(db, c);
   const gross = db
-    .prepare("SELECT COALESCE(SUM((qty - refunded_qty) * unit_price_agorot), 0) n FROM ticket_orders WHERE campaign_id = ? AND status = 'paid'")
+    .prepare("SELECT COALESCE(SUM((qty - refunded_qty) * (unit_price_agorot - discount_agorot)), 0) n FROM ticket_orders WHERE campaign_id = ? AND status = 'paid'")
     .get(c.id).n;
   return { ...inv, gross, ...doorStats(db, c.id) };
 }
@@ -338,9 +361,71 @@ export function buyersCsv(db, campaignId) {
     .all(campaignId);
   const head = ["מס הזמנה", "שם", "מייל", "טלפון", "כרטיסים", "הוחזרו", "סכום", "תאריך", "מאשר/ת עדכונים"];
   const lines = rows.map((o) =>
-    [o.id, o.buyer_name, o.buyer_email, o.buyer_phone, o.qty, o.refunded_qty, ((o.qty - o.refunded_qty) * (o.unit_price_agorot + o.fee_agorot)) / 100, o.paid_at, o.marketing_consent ? "כן" : "לא"].map(csvCell).join(",")
+    [o.id, o.buyer_name, o.buyer_email, o.buyer_phone, o.qty, o.refunded_qty, ((o.qty - o.refunded_qty) * (o.unit_price_agorot - o.discount_agorot + o.fee_agorot)) / 100, o.paid_at, o.marketing_consent ? "כן" : "לא"].map(csvCell).join(",")
   );
   return "﻿" + [head.join(","), ...lines].join("\r\n");
+}
+
+// ---------- העברת כרטיס בודד ----------
+
+/** קישור לכרטיס אחד בלבד, לשלוח לחבר. מי שמחזיק בו יכול להיכנס עם הכרטיס הזה, ורק איתו. */
+export function ticketShareToken(db, t) {
+  if (t.share_token) return t.share_token;
+  const token = randomToken(12);
+  db.prepare("UPDATE tickets SET share_token = ? WHERE id = ? AND share_token IS NULL").run(token, t.id);
+  return db.prepare("SELECT share_token FROM tickets WHERE id = ?").get(t.id).share_token;
+}
+export const ticketByShare = (db, token) =>
+  db.prepare("SELECT t.*, o.buyer_name, o.qty, o.status AS order_status FROM tickets t JOIN ticket_orders o ON o.id = t.order_id WHERE t.share_token = ?").get(String(token ?? ""));
+
+// ---------- תזכורות ----------
+
+/**
+ * "תזכירו לי": מייל אחד בלבד, למי שביקש במפורש. נשלח 3 ימים לפני ההופעה,
+ * או יום לפני שהמחיר המוקדם נגמר, מה שקודם. אפשר לבטל בקישור.
+ */
+export function addReminder(db, c, { email, consent, refCode = null }) {
+  const e = normalizeEmail(email);
+  if (!isEmail(e)) throw new UserError("המייל לא תקין");
+  if (consent !== "on") throw new UserError("צריך לאשר שנשלח תזכורת");
+  if (!["active", "paused", "sold_out"].includes(c.status) || c.starts_at <= clock.iso()) throw new UserError("ההופעה לא פתוחה");
+  db.prepare("INSERT OR IGNORE INTO show_reminders (campaign_id, email, token, ref_code, created_at) VALUES (?, ?, ?, ?, ?)")
+    .run(c.id, e, randomToken(16), refCode, clock.iso());
+}
+
+export function reminderDueAt(c) {
+  const show = new Date(c.starts_at).getTime() - 3 * 86400000;
+  const early = c.early_price_agorot && c.early_until ? new Date(c.early_until).getTime() - 86400000 : Infinity;
+  return new Date(Math.min(show, early)).toISOString();
+}
+
+/** תזכורות שהגיע זמנן. send(reminder, campaign) שולח בפועל; אם נכשל, ננסה בסבב הבא. */
+export async function processReminders(db, send) {
+  const rows = db
+    .prepare("SELECT r.* FROM show_reminders r JOIN campaigns c ON c.id = r.campaign_id WHERE r.sent_at IS NULL AND r.cancelled_at IS NULL AND c.status IN ('active','paused','sold_out') LIMIT 200")
+    .all();
+  let sent = 0;
+  for (const r of rows) {
+    const c = getCampaign(db, r.campaign_id);
+    if (reminderDueAt(c) > clock.iso() || c.starts_at <= clock.iso()) continue;
+    // כבר קנה? לא מטרידים
+    if (db.prepare("SELECT 1 FROM ticket_orders WHERE campaign_id = ? AND buyer_email = ? AND status = 'paid'").get(c.id, r.email)) {
+      db.prepare("UPDATE show_reminders SET sent_at = ? WHERE id = ?").run(clock.iso(), r.id);
+      continue;
+    }
+    try {
+      await send(r, c, priceNow(db, c));
+      db.prepare("UPDATE show_reminders SET sent_at = ? WHERE id = ?").run(clock.iso(), r.id);
+      sent++;
+    } catch (e) {
+      console.error("[reminder]", e.message);
+    }
+  }
+  return sent;
+}
+
+export function cancelReminder(db, token) {
+  return db.prepare("UPDATE show_reminders SET cancelled_at = ? WHERE token = ? AND cancelled_at IS NULL").run(clock.iso(), String(token ?? "")).changes;
 }
 
 // ---------- כרטיס ----------

@@ -474,6 +474,19 @@ CREATE TABLE IF NOT EXISTS service_offers (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS service_offers_open ON service_offers(campaign_id, creator_id) WHERE status = 'open';
 
+-- "תזכירו לי": תזכורת אחת במייל, רק למי שביקש במפורש
+CREATE TABLE IF NOT EXISTS show_reminders (
+  id          INTEGER PRIMARY KEY,
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id),
+  email       TEXT NOT NULL,
+  token       TEXT NOT NULL UNIQUE,
+  ref_code    TEXT,
+  created_at  TEXT NOT NULL,
+  sent_at     TEXT,
+  cancelled_at TEXT,
+  UNIQUE (campaign_id, email)
+);
+
 -- ספק תשלום מדומה (Sandbox): עמוד תשלום מתארח, כמו אצל ספקי סליקה אמיתיים
 CREATE TABLE IF NOT EXISTS pay_sandbox (
   ref           TEXT PRIMARY KEY,
@@ -525,6 +538,15 @@ function migrate(db) {
   add("campaign_assets", "kind", "TEXT NOT NULL DEFAULT 'image'");
   add("campaign_assets", "credit", "TEXT");
   add("campaign_assets", "service_order_id", "INTEGER");
+  // הנחה מהג׳וקר: חלק מהתגמול שלו עובר לחבר כהנחה (לכל כרטיס)
+  add("referral_links", "discount_agorot", "INTEGER NOT NULL DEFAULT 0");
+  add("ticket_orders", "discount_agorot", "INTEGER NOT NULL DEFAULT 0");
+  add("orders", "joker_discount_agorot", "INTEGER NOT NULL DEFAULT 0");
+  // העברת כרטיס בודד לחבר
+  add("tickets", "share_token", "TEXT");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS tickets_share ON tickets(share_token) WHERE share_token IS NOT NULL");
+  // פרטי האמן לקבלת הכסף ממכירות (מוצפן)
+  add("artists", "payout_details_enc", "TEXT");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ticket_orders_invite ON ticket_orders(invite_code) WHERE invite_code IS NOT NULL");
   const missing = db.prepare("SELECT id FROM referral_links WHERE coupon_code IS NULL").all();
   for (const { id } of missing) db.prepare("UPDATE referral_links SET coupon_code = ? WHERE id = ?").run(newCouponCode(db), id);

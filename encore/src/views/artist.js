@@ -311,3 +311,39 @@ export const formFromCampaign = (c) => ({
   artist_name: c.artist_name, title: c.title, starts_at: isoToIsraelLocal(c.starts_at), venue: c.venue, city: c.city,
   price: c.price_agorot / 100, reward: c.reward_agorot / 100,
 });
+
+// ---------- פרטים לקבלת הכסף ----------
+
+export function payoutPage(ctx, { artist, d, types }, opts) {
+  const v = d ?? {};
+  return layout(
+    ctx,
+    "פרטים לקבלת הכסף",
+    html`
+<section class="narrow">
+  <p><a href="/artist">→ האזור שלי</a></p>
+  <h1>פרטים לקבלת הכסף</h1>
+  <p class="lead">${artist.name}: לאן להעביר את הכסף ממכירת הכרטיסים.</p>
+  <p class="muted">הפרטים מוצפנים, ומשמשים רק להעברת הכסף ולרישום אצל חברת הסליקה. ${d ? "כבר מילאת. אפשר לעדכן." : ""}</p>
+  <form method="post" action="/artist/payout/${artist.id}" class="stack">
+    ${csrfField(ctx)}
+    <fieldset class="seg"><legend class="field">סוג עסק</legend>
+      ${Object.entries(types).map(([k, label]) => html`<label><input type="radio" name="type" value="${k}" ${v.type === k ? html`checked` : ""} required> ${label}</label>`)}
+    </fieldset>
+    <label class="field">שם מלא או שם העסק<input name="legal_name" required maxlength="100" value="${v.legal_name ?? ""}"></label>
+    <div class="row2">
+      <label class="field">ת״ז / מספר עוסק / ח״פ<input name="tax_id" required inputmode="numeric" dir="ltr" value="${v.tax_id ?? ""}"></label>
+      <label class="field">טלפון<input name="phone" required inputmode="tel" dir="ltr" value="${v.phone ?? ""}"></label>
+    </div>
+    <div class="row3">
+      <label class="field">בנק<input name="bank" required maxlength="30" value="${v.bank ?? ""}"></label>
+      <label class="field">סניף<input name="branch" required maxlength="10" inputmode="numeric" value="${v.branch ?? ""}"></label>
+      <label class="field">מספר חשבון<input name="account" required maxlength="20" inputmode="numeric" dir="ltr" value="${v.account ?? ""}"></label>
+    </div>
+    <label class="check"><input type="checkbox" name="confirm" required> החשבון רשום על שמי או על שם העסק שלי</label>
+    <button class="btn big block">שמירה</button>
+  </form>
+</section>`,
+    opts
+  );
+}

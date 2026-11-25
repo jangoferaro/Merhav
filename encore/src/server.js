@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDb } from "./db.js";
-import { clock, config, hmac, isEmail, normalizeEmail, safeEqual, UserError } from "./util.js";
+import { clock, config, hmac, isEmail, money, normalizeEmail, safeEqual, showDate, UserError } from "./util.js";
 import { cookie, isCrawler, makeCtx, rateLimit, readBody, Router, safeNext } from "./http.js";
 import * as ID from "./domain/identity.js";
 import * as C from "./domain/campaigns.js";
@@ -27,7 +27,7 @@ import * as T from "./domain/tickets.js";
 import * as TV from "./views/tickets.js";
 import { gateway } from "./payments/index.js";
 import { sandboxPay, sandboxPayment } from "./payments/sandbox.js";
-import { sendLoginCode, sendTickets } from "./mailer.js";
+import { sendLoginCode, sendMail, sendTickets } from "./mailer.js";
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png" };
@@ -116,7 +116,9 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   /** מי הזמין את המבקר: ג׳וקר (עם תגמול) או חבר שכבר קנה (בלי תגמול). ג׳וקר קודם. */
   const inviterFor = (ctx, c) => {
     const ref = refFor(ctx, c.id);
-    if (ref && ref.promoter_id !== ctx.user?.id) return { kind: "joker", name: ID.publicName({ name: ref.name }), note: ref.note, photo: ref.photo };
+    if (ref && ref.promoter_id !== ctx.user?.id) {
+      return { kind: "joker", name: ID.publicName({ name: ref.name }), note: ref.note, photo: ref.photo, discount: c.provider === "jocares" ? T.discountPreview(db, c, ref.token) : 0 };
+    }
     const inv = T.orderByInvite(db, ctx.cookies[`with_${c.id}`]);
     if (inv && inv.campaign_id === c.id) return { kind: "friend", name: T.firstName(inv.buyer_name) };
     return null;
@@ -234,6 +236,14 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     rateLimit(`offer:${ctx.user.id}`, 10, 3600_000);
     K.offerService(db, ctx.user, c.id, await ctx.form());
     ctx.redirect(`/s/${c.id}/share#offer`, "ההצעה נשלחה לאמן. אם יזמין, תקבל/י התראה.");
+  });
+
+  r.post("/s/:id/share/discount", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = campaignOr404(ctx.params.id);
+    const link = R.getOrCreateLink(db, ctx.user, c.id);
+    const n = R.setDiscount(db, ctx.user, link.id, (await ctx.form()).discount, c.reward_agorot);
+    ctx.redirect(`/s/${c.id}/share#discount`, n ? "ההנחה נשמרה. החברים יראו אותה בדף ההופעה ובקופה." : "בלי הנחה");
   });
 
   r.post("/s/:id/share/note", async (ctx) => {
@@ -399,7 +409,8 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
 
   const checkoutData = (ctx, c) => {
     const ref = refFor(ctx, c.id);
-    return { c, inv: T.inventory(db, c), price: T.priceNow(db, c), inviter: inviterFor(ctx, c), referrer: ref && ref.promoter_id !== ctx.user?.id ? ID.publicName({ name: ref.name }) : null };
+    const inviter = inviterFor(ctx, c);
+    return { c, inv: T.inventory(db, c), price: T.priceNow(db, c), inviter, discount: inviter?.discount ?? 0, referrer: ref && ref.promoter_id !== ctx.user?.id ? ID.publicName({ name: ref.name }) : null };
   };
   const jocaresCampaign = (id) => {
     const c = campaignOr404(id);
@@ -468,11 +479,36 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const order = T.orderByToken(db, ctx.params.token);
     if (!order || !["paid", "rejected"].includes(order.status)) throw new UserError("הכרטיסים לא נמצאו", 404);
     const c = C.getCampaign(db, order.campaign_id);
-    const tickets = T.ticketsOf(db, order.id).map((t) => ({ ...t, qr: T.qrSvg(t.code) }));
+    const tickets = T.ticketsOf(db, order.id).map((t) => ({
+      ...t, qr: T.qrSvg(t.code), shareUrl: order.qty > 1 && t.status === "valid" ? `${origin(ctx)}/t/${T.ticketShareToken(db, t)}` : null,
+    }));
     const invite = order.status === "paid" && T.salesOpen(c)
       ? { url: `${origin(ctx)}/i/${T.inviteCode(db, order)}`, count: T.invitedCount(db, order.id) }
       : null;
     ctx.send(TV.ticketsPage(ctx, { c, order, tickets, invite, fresh: ctx.query.new === "1", url: ticketsUrl(ctx, order) }, opts(ctx)));
+  });
+
+  // כרטיס בודד שהועבר לחבר
+  r.get("/t/:token", (ctx) => {
+    const t = T.ticketByShare(db, ctx.params.token);
+    if (!t || t.order_status !== "paid") throw new UserError("הכרטיס לא נמצא", 404);
+    const c = C.getCampaign(db, t.campaign_id);
+    ctx.send(TV.singleTicketPage(ctx, { c, t: { ...t, qr: T.qrSvg(t.code) } }, opts(ctx)));
+  });
+
+  // "תזכירו לי": בלי חשבון, רק מייל והסכמה מפורשת
+  r.post("/s/:id/remind", async (ctx) => {
+    const c = campaignOr404(ctx.params.id);
+    rateLimit(`remind:${ctx.ip}`, 10, 3600_000);
+    const ref = refFor(ctx, c.id);
+    const code = ref ? db.prepare("SELECT l.code FROM referral_clicks k JOIN referral_links l ON l.id = k.link_id WHERE k.token = ?").get(ref.token)?.code : null;
+    T.addReminder(db, c, { ...(await ctx.form()), refCode: code });
+    ctx.redirect(`/s/${c.id}`, "נזכיר לך במייל. אפשר לבטל בקישור שבמייל.");
+  });
+
+  r.get("/reminders/:token/cancel", (ctx) => {
+    T.cancelReminder(db, ctx.params.token);
+    ctx.send(P.errorPage(ctx, 200, "בוטל. לא נשלח לך תזכורות על ההופעה הזו.", opts(ctx)));
   });
 
   r.get("/tickets/:token/calendar.ics", (ctx) => {
@@ -591,7 +627,10 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
           c, r: C.campaignResults(db, c.id), top: C.topPromoters(db, c.id), publicUrl: `${origin(ctx)}/s/${c.id}`,
           lastImport: c.provider === "coupon" ? CP.lastImportAt(db, c.id) : null,
           sales: c.provider === "jocares"
-            ? { s: T.salesSummary(db, c), orders: T.ordersOfCampaign(db, c.id), doorUrl: `${origin(ctx)}/door/${T.doorToken(db, c.id)}`, open: T.salesOpen(c), price: T.priceNow(db, c) }
+            ? {
+                s: T.salesSummary(db, c), orders: T.ordersOfCampaign(db, c.id), doorUrl: `${origin(ctx)}/door/${T.doorToken(db, c.id)}`, open: T.salesOpen(c),
+                price: T.priceNow(db, c), statement: M.showStatement(db, c.id), payoutReady: !!M.artistPayout(db, c.artist_id),
+              }
             : null,
           assets: R.assetsOf(db, c.id),
           offers: K.offersFor(db, c.id),
@@ -599,6 +638,19 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
         opts(ctx)
       )
     );
+  });
+
+  r.get("/artist/payout/:artistId", (ctx) => {
+    if (!requireUser(ctx)) return;
+    if (!ID.canManageArtist(db, ctx.user, Number(ctx.params.artistId))) throw new UserError("לא נמצא", 404);
+    const artist = db.prepare("SELECT * FROM artists WHERE id = ?").get(Number(ctx.params.artistId));
+    ctx.send(A.payoutPage(ctx, { artist, d: M.artistPayout(db, artist.id), types: M.BUSINESS_TYPES }, opts(ctx)));
+  });
+
+  r.post("/artist/payout/:artistId", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    M.saveArtistPayout(db, ctx.user, ctx.params.artistId, await ctx.form());
+    ctx.redirect("/artist", "הפרטים נשמרו. הכסף מהמכירות יועבר לחשבון הזה.");
   });
 
   r.post("/artist/c/:id/capacity", async (ctx) => {
@@ -850,6 +902,17 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const o = opts(ctx);
     const q = (sql, ...a) => db.prepare(sql).all(...a);
     switch (tab) {
+      case "tickets":
+        return ctx.send(AD.adminTickets(ctx, {
+          totals: {
+            ...db.prepare("SELECT COALESCE(SUM(qty - refunded_qty),0) tickets, COALESCE(SUM((qty - refunded_qty) * (unit_price_agorot - discount_agorot + fee_agorot)),0) gross FROM ticket_orders WHERE status = 'paid'").get(),
+            failed: db.prepare("SELECT COUNT(*) n FROM ticket_refunds WHERE status = 'failed'").get().n,
+            pending: db.prepare("SELECT COUNT(*) n FROM ticket_refunds WHERE status = 'pending'").get().n,
+          },
+          refunds: T.pendingRefunds(db),
+          orders: q(`SELECT o.*, e.title FROM ticket_orders o JOIN campaigns c ON c.id = o.campaign_id JOIN events e ON e.id = c.event_id
+                      WHERE o.status != 'pending' ORDER BY o.id DESC LIMIT 200`),
+        }, o));
       case "payouts":
         return ctx.send(AD.adminPayouts(ctx, {
           rows: q(`SELECT p.*, u.name, u.email, u.payout_details_enc FROM payouts p JOIN users u ON u.id = p.user_id ORDER BY p.status = 'requested' DESC, p.id DESC LIMIT 200`)
@@ -906,6 +969,11 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
       requireAdmin(ctx);
       await fn(ctx, await ctx.form());
     });
+
+  adminPost("/admin/tickets/retry-refunds", async (ctx) => {
+    const n = await T.processRefunds(db);
+    ctx.redirect("/admin?tab=tickets", `בוצעו ${n} החזרים`);
+  });
 
   // ---------- קופונים (צוות) ----------
 
@@ -1024,7 +1092,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   // בוטים של תצוגה מקדימה עוברים לדפי הופעה ולתמונות, כדי שאפשר יהיה לבדוק שיתוף בוואטסאפ.
   const pilotPass = () => process.env.STAGING_PASSWORD;
   const pilotToken = () => hmac(pilotPass(), "pilot-access");
-  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health)$|^\/(static|media|webhooks|tickets|door)\//;
+  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health)$|^\/(static|media|webhooks|tickets|door|t|reminders)\//;
 
   function stagingGate(req, res, ctx) {
     if (!pilotPass()) return false;
@@ -1113,6 +1181,21 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       const r = M.settle(db);
       if (r.ended || r.released || r.content || r.expired) console.log(`[settle] ended=${r.ended} released=${r.released} content=${r.content} expired=${r.expired}`);
       T.processRefunds(db).then((n) => n && console.log(`[refunds] ${n}`), (e) => console.error("[refunds]", e));
+      const base = (process.env.PUBLIC_URL || `http://localhost:${port}`).replace(/\/$/, "");
+      T.processReminders(db, (rem, c, p) =>
+        sendMail({
+          to: rem.email,
+          subject: `תזכורת: ${c.artist_name} · ${c.title}`,
+          text: [
+            `ביקשת שנזכיר לך: ${c.artist_name} · ${c.title}`,
+            `${showDate(c.starts_at)} · ${c.venue}${c.city ? `, ${c.city}` : ""}`,
+            p.early ? `המחיר המוקדם (${money(p.price)}) נגמר בקרוב.` : "",
+            `כרטיסים: ${base}${rem.ref_code ? `/r/${rem.ref_code}` : `/s/${c.id}`}`,
+            "",
+            `לא רוצה תזכורות על ההופעה הזו? ${base}/reminders/${rem.token}/cancel`,
+          ].filter((l) => l !== null).join("\n"),
+        }).then((ok) => { if (!ok) console.log(`[dev] reminder for ${rem.email}: ${c.title}`); })
+      ).then((n) => n && console.log(`[reminders] ${n}`), (e) => console.error("[reminders]", e));
     } catch (e) {
       console.error("[settle]", e);
     }

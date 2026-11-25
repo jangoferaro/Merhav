@@ -75,6 +75,16 @@ export function setNote(db, user, linkId, value) {
   return note;
 }
 
+/** הג׳וקר מעביר חלק מהתגמול שלו לחברים כהנחה. נשאר לו לפחות ₪1 לכרטיס. */
+export function setDiscount(db, user, linkId, value, rewardAgorot) {
+  const n = Math.round(Number(String(value ?? "0").trim() || 0) * 100);
+  if (!Number.isInteger(n) || n < 0) throw new UserError("סכום ההנחה לא תקין");
+  if (n > rewardAgorot - 100) throw new UserError(`ההנחה יכולה להיות עד ${(rewardAgorot - 100) / 100} ₪, כדי שיישאר לך משהו`);
+  db.prepare("UPDATE referral_links SET discount_agorot = ? WHERE id = ? AND promoter_id = ?").run(n, linkId, user.id);
+  audit(db, user.id, "link.discount", "referral_link", linkId, { discount: n });
+  return n;
+}
+
 // ---------- ערכת שיתוף ----------
 
 export const assetsOf = (db, campaignId) => db.prepare("SELECT * FROM campaign_assets WHERE campaign_id = ? ORDER BY id").all(campaignId);

@@ -58,6 +58,8 @@ const sell = (promoter, cid, buys) => {
 sell(dani, ids[0], { clicks: 14, orders: [2, 1, 3] });
 // הזמנה אישית וערכת שיתוף
 R.setNote(db, dani, R.getOrCreateLink(db, dani, ids[0]).id, "הייתי בהופעה הקודמת שלה. בכיתי. בואו.");
+R.setDiscount(db, dani, R.getOrCreateLink(db, dani, ids[0]).id, "5", 2000);
+M.saveArtistPayout(db, noa, C.getCampaign(db, ids[0]).artist_id, { type: "patur", legal_name: "נועה ברק", tax_id: "123456782", phone: "0501234567", bank: "לאומי", branch: "800", account: "123456", confirm: "on" });
 for (const st of ["blur", "rings", "stripes"]) R.addAsset(db, noa, ids[0], { url: img(st) });
 // "בואו איתי": קונה ישיר הזמין שני חברים
 const host = purchase(ids[0], 1, null, "host@example.com");

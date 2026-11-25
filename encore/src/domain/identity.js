@@ -1,5 +1,6 @@
 // Identity & Access: כניסה עם קוד חד-פעמי למייל (בלי סיסמאות), סשנים, תפקידים.
 // אותו משתמש יכול להיות גם אמן וגם מקדם — התפקיד נגזר ממה שהוא עושה, לא מחשבון נפרד.
+import { sendMail } from "../mailer.js";
 import crypto from "node:crypto";
 import { insert, tx } from "../db.js";
 import { clock, addDays, config, emailHash, hmac, isEmail, normalizeEmail, randomToken, safeEqual, text, UserError } from "../util.js";
@@ -16,8 +17,20 @@ export function audit(db, actorId, action, entity, entityId, data = {}) {
   });
 }
 
-export function notify(db, userId, body, url = "") {
+/**
+ * התראה באתר. עם { email: true } גם במייל (לדברים שחשוב לדעת עליהם בזמן: מכירה, תשלום, הזמנה).
+ * המייל יוצא אחרי שהטרנזקציה הסתיימה, וכישלון בשליחה לא משפיע על כלום.
+ */
+export function notify(db, userId, body, url = "", { email = false } = {}) {
   insert(db, "notifications", { user_id: userId, body, url, created_at: clock.iso() });
+  if (!email) return;
+  const u = db.prepare("SELECT email FROM users WHERE id = ?").get(userId);
+  if (!u?.email || u.email.endsWith(".local")) return;
+  const base = (process.env.PUBLIC_URL || "").replace(/\/$/, "");
+  setImmediate(() =>
+    sendMail({ to: u.email, subject: body.length > 70 ? body.slice(0, 67) + "…" : body, text: `${body}\n\n${base}${url}\n\nJoCares` })
+      .catch((e) => console.error("[notify mail]", e.message))
+  );
 }
 
 /** שלב 1: מבקשים קוד. מחזיר את הקוד (השרת מחליט אם לשלוח במייל או להציג במצב פיתוח). */
