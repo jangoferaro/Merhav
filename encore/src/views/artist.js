@@ -1,5 +1,5 @@
 // אזור האמן: מסך בית ממוקד תוצאות, פתיחת קמפיין בשלושה צעדים, וניהול קמפיין.
-import { artistSales } from "./tickets.js";
+import { artistSales, earlyFields } from "./tickets.js";
 import { config, isoToIsraelLocal } from "../util.js";
 import { split, STATUS_LABEL, TRANSITIONS } from "../domain/campaigns.js";
 import { csrfField, empty, html, imageInput, layout, money, postButton, poster, showDate, stat, statusBadge } from "./kit.js";
@@ -103,6 +103,7 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
       <label class="field">כמה כרטיסים יש למכירה?
         <input name="capacity" type="number" min="1" max="20000" inputmode="numeric" value="${v.capacity ?? ""}" placeholder="למשל 150">
         <small class="hint">קופה מלאה בלי הגדרות: קונים אצלנו, מקבלים כרטיס עם קוד לסריקה, ואת/ה מקבל/ת קישור לסריקה בכניסה. ג׳וקרים מקבלים תגמול אוטומטית.</small></label>
+      <details${v.early_price ? html` open` : ""}><summary>מחיר מוקדם (לא חובה)</summary>${earlyFields(ctx, v, { form: false })}</details>
     </div>
     <div class="ticketing-opt" data-when="coupon">
       <label class="field">לינק לעמוד הכרטיסים שלך
@@ -197,7 +198,7 @@ const ACTION_CONFIRM = {
   cancelled: "לסמן שההופעה בוטלה? כל התגמולים של המקדמים יבוטלו. אי אפשר לחזור מזה.",
 };
 
-export function manageCampaign(ctx, { c, r, top, publicUrl, lastImport = null, sales = null }, opts) {
+export function manageCampaign(ctx, { c, r, top, publicUrl, lastImport = null, sales = null, assets = [] }, opts) {
   const s = split(c.price_agorot, c.reward_agorot);
   const actions = TRANSITIONS[c.status].filter((t) => t !== "sold_out");
   return layout(
@@ -228,6 +229,17 @@ ${c.provider === "coupon"
   ? html`<p class="note">הכרטיסים נמכרים באתר הכרטוס שלך, וכל ג׳וקר מקבל קוד אישי. אנחנו מגדירים את הקודים ומעדכנים את המכירות כאן. עדכון אחרון: ${lastImport ? showDate(lastImport) : "עוד לא"}.</p>`
   : ""}
 ${sales ? artistSales(ctx, { c, ...sales }) : ""}
+<section class="card" id="kit">
+  <h2>ערכת שיתוף לג׳וקרים</h2>
+  <p class="muted">תמונות מההופעות, מהחזרות או מהסטודיו. הג׳וקרים יכולים להוריד אותן ולשתף. כל ג׳וקר מקבל גם סטורי מוכן עם הקוד שלו.</p>
+  ${assets.length ? html`<div class="asset-grid">${assets.map((a) => html`<figure><img src="${a.image_url}" alt="" loading="lazy">${postButton(ctx, `/artist/c/${c.id}/assets/${a.id}/delete`, "מחיקה", { cls: "linklike", confirm: "למחוק את התמונה מהערכה?" })}</figure>`)}</div>` : ""}
+  <form method="post" action="/artist/c/${c.id}/assets" enctype="multipart/form-data" class="stack" data-busy="מעלים…">
+    ${csrfField(ctx)}
+    ${imageInput({ label: "הוספת תמונה" })}
+    <button class="btn ghost">הוספה לערכה</button>
+  </form>
+</section>
+
 <section class="card">
   <h2>הג׳וקרים המובילים</h2>
   ${top.length

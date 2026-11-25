@@ -6,7 +6,7 @@ import qrcode from "qrcode-generator";
 import { insert, tx } from "../db.js";
 import { clock, config, isEmail, normalizeEmail, randomToken, text, UserError } from "../util.js";
 import { gateway } from "../payments/index.js";
-import { _setCancelHandler, getCampaign } from "./campaigns.js";
+import { _setCancelHandler, getCampaign, parseEarly } from "./campaigns.js";
 import { ingestEvent } from "./ingest.js";
 import { audit, notify } from "./identity.js";
 
@@ -24,6 +24,56 @@ export function inventory(db, c) {
   return { capacity, sold, held, available: Math.max(0, capacity - sold - held) };
 }
 
+// ---------- מחיר מוקדם ----------
+
+/** כמה כרטיסים כבר נמכרו (או שמורים) במחיר המוקדם */
+function earlySold(db, c) {
+  return db
+    .prepare("SELECT COALESCE(SUM(qty), 0) n FROM ticket_orders WHERE campaign_id = ? AND unit_price_agorot = ? AND (status = 'paid' OR (status = 'pending' AND expires_at > ?))")
+    .get(c.id, c.early_price_agorot, clock.iso()).n;
+}
+
+/** המחיר עכשיו: מוקדם אם הוא עוד בתוקף (לפי תאריך ולפי כמות), אחרת רגיל */
+export function priceNow(db, c) {
+  const base = { price: c.price_agorot, early: false, left: null, until: null };
+  if (!c.early_price_agorot) return base;
+  if (c.early_until && c.early_until <= clock.iso()) return base;
+  const left = c.early_qty ? c.early_qty - earlySold(db, c) : null;
+  if (left !== null && left <= 0) return base;
+  return { price: c.early_price_agorot, early: true, left, until: c.early_until };
+}
+
+export function setEarlyPrice(db, actor, c, input) {
+  const e = parseEarly(input, c.price_agorot, c.reward_agorot);
+  db.prepare("UPDATE campaigns SET early_price_agorot = ?, early_until = ?, early_qty = ?, updated_at = ? WHERE id = ?").run(e.early_price_agorot, e.early_until, e.early_qty, clock.iso(), c.id);
+  audit(db, actor.id, "tickets.early_price", "campaign", c.id, e);
+  return e;
+}
+
+// ---------- "בואו איתי" ----------
+
+/** קוד הזמנה של קונה: קישור אישי לשלוח לחברים. נוצר בפעם הראשונה שצריך אותו. */
+export function inviteCode(db, order) {
+  if (order.invite_code) return order.invite_code;
+  for (let i = 0; i < 5; i++) {
+    const code = randomToken(6);
+    try {
+      db.prepare("UPDATE ticket_orders SET invite_code = ? WHERE id = ? AND invite_code IS NULL").run(code, order.id);
+      return ticketOrder(db, order.id).invite_code;
+    } catch {}
+  }
+  throw new Error("could not allocate invite code");
+}
+
+export const orderByInvite = (db, code) =>
+  db.prepare("SELECT * FROM ticket_orders WHERE invite_code = ? AND status = 'paid'").get(String(code ?? "").slice(0, 20));
+
+/** כמה חברים קנו בעקבות הקונה הזה */
+export const invitedCount = (db, orderId) =>
+  db.prepare("SELECT COALESCE(SUM(qty - refunded_qty), 0) n FROM ticket_orders WHERE invited_by = ? AND status = 'paid'").get(orderId).n;
+
+export const firstName = (name) => String(name ?? "").trim().split(/\s+/)[0] || "חבר/ה";
+
 export const orderByToken = (db, token) => db.prepare("SELECT * FROM ticket_orders WHERE token = ?").get(String(token ?? ""));
 export const ticketOrder = (db, id) => db.prepare("SELECT * FROM ticket_orders WHERE id = ?").get(Number(id));
 export const ticketsOf = (db, orderId) => db.prepare("SELECT * FROM tickets WHERE order_id = ? ORDER BY seq").all(orderId);
@@ -34,7 +84,7 @@ export const ticketsOf = (db, orderId) => db.prepare("SELECT * FROM tickets WHER
  * הזמנה ממתינה: הכרטיסים שמורים לקונה לרבע שעה בזמן שהוא משלם.
  * הבדיקה וההזמנה באותה טרנזקציה, כך ששני קונים לא יכולים לקחת את אותו כרטיס אחרון.
  */
-export function createOrder(db, campaignId, input, { clickToken = null } = {}) {
+export function createOrder(db, campaignId, input, { clickToken = null, invitedBy = null } = {}) {
   return tx(db, () => {
     const c = getCampaign(db, campaignId);
     if (!c || !salesOpen(c)) throw new UserError("המכירה להופעה הזו סגורה");
@@ -46,9 +96,12 @@ export function createOrder(db, campaignId, input, { clickToken = null } = {}) {
     if (!isEmail(email)) throw new UserError("המייל לא תקין. לשם נשלחים הכרטיסים.");
     const phone = String(input.phone ?? "").replace(/[^\d+]/g, "").slice(0, 20);
     const fee = config.ticketFeeAgorot;
+    const { price } = priceNow(db, c);
+    const inviter = invitedBy ? orderByInvite(db, invitedBy) : null;
     const id = insert(db, "ticket_orders", {
       campaign_id: c.id, token: randomToken(18), buyer_name: text(input.name, "שם", { max: 80 }), buyer_email: email,
-      buyer_phone: phone, qty, unit_price_agorot: c.price_agorot, fee_agorot: fee, total_agorot: qty * (c.price_agorot + fee),
+      buyer_phone: phone, qty, unit_price_agorot: price, fee_agorot: fee, total_agorot: qty * (price + fee),
+      invited_by: inviter && inviter.campaign_id === c.id ? inviter.id : null,
       status: "pending", click_token: clickToken, marketing_consent: input.consent === "on" ? 1 : 0,
       gateway: gateway().name, created_at: clock.iso(), expires_at: minutes(config.holdMinutes),
     });

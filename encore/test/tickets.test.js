@@ -227,7 +227,7 @@ test("HTTP: אמן פותח הופעה בקופה של JoCares → ג׳וקר מ
     await friend.get(refPath);
     assert.match(friend.last, /יעל/);
     r = await friend.get(`/s/${cid}/buy`);
-    assert.match(r.text, /הגעת דרך/);
+    assert.match(r.text, /<b>יעל<\/b> מזמין\/ה אותך/);
     assert.match(r.text, /לתשלום/);
     r = await friend.post(`/checkout/${cid}`, { qty: "2", name: "חבר טוב", email: "friend@z.com", phone: "050-1234567" });
     assert.match(r.text, /קופת ניסיון/);

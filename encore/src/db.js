@@ -451,6 +451,15 @@ CREATE TABLE IF NOT EXISTS ticket_refunds (
   done_at       TEXT
 );
 
+-- ערכת שיתוף: תמונות שהאמן מעלה לג׳וקרים
+CREATE TABLE IF NOT EXISTS campaign_assets (
+  id          INTEGER PRIMARY KEY,
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id),
+  image_url   TEXT NOT NULL,
+  created_by  INTEGER NOT NULL REFERENCES users(id),
+  created_at  TEXT NOT NULL
+);
+
 -- ספק תשלום מדומה (Sandbox): עמוד תשלום מתארח, כמו אצל ספקי סליקה אמיתיים
 CREATE TABLE IF NOT EXISTS pay_sandbox (
   ref           TEXT PRIMARY KEY,
@@ -489,6 +498,16 @@ function migrate(db) {
   // כרטוס של JoCares: קיבולת המקום וקישור סודי לסריקה בכניסה
   add("events", "capacity", "INTEGER");
   add("campaigns", "door_token", "TEXT");
+  // הזמנה אישית: משפט שהג׳וקר כותב לחברים
+  add("referral_links", "note", "TEXT");
+  // מחיר מוקדם: עד תאריך ו/או עד מספר כרטיסים
+  add("campaigns", "early_price_agorot", "INTEGER");
+  add("campaigns", "early_until", "TEXT");
+  add("campaigns", "early_qty", "INTEGER");
+  // "בואו איתי": קונה מזמין חברים (בלי תגמול), וסופרים כמה באו בעקבותיו
+  add("ticket_orders", "invite_code", "TEXT");
+  add("ticket_orders", "invited_by", "INTEGER");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ticket_orders_invite ON ticket_orders(invite_code) WHERE invite_code IS NOT NULL");
   const missing = db.prepare("SELECT id FROM referral_links WHERE coupon_code IS NULL").all();
   for (const { id } of missing) db.prepare("UPDATE referral_links SET coupon_code = ? WHERE id = ?").run(newCouponCode(db), id);
 }

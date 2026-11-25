@@ -95,7 +95,7 @@ test("מסע מלא: אמן מפרסם → מקדם משתף → חבר קונה
   // רוכש: לינק → דף הופעה עם גילוי נאות → קופת הספק → תשלום
   const buyer = new Browser();
   r = await buyer.get(link);
-  assert.match(r.text, /<b>דני<\/b> המליץ\/ה/);
+  assert.match(r.text, /<b>דני<\/b> מזמין\/ה אותך/);
   assert.doesNotMatch(r.text, /dani@encore/);
   r = await buyer.req(`/s/${cid}/buy`);
   assert.match(r.location, /^\/sim\/checkout\/simev_\w+\?ref=clk_/);
@@ -266,7 +266,7 @@ test("תצוגה מקדימה בוואטסאפ: תגיות OG עם תמונת ה
   assert.equal(db.prepare("SELECT COUNT(*) n FROM referral_clicks WHERE link_id = ?").get(c.link_id).n, before);
   const page = await (await fetch(base + r.headers.get("location"), { headers: bot })).text();
   assert.match(page, /<meta property="og:image" content="https:\/\/img\.example\/show\.jpg">/);
-  assert.match(page, /<meta property="og:title" content="נועה: ערב אקוסטי">/);
+  assert.match(page, /<meta property="og:title" content="[^"]+ מזמין\/ה אותך: נועה · ערב אקוסטי">/);
   assert.match(page, new RegExp(`<meta property="og:url" content="http://127\\.0\\.0\\.1:\\d+/s/${c.id}">`));
   const home = await (await fetch(base + "/")).text();
   assert.match(home, /og:image" content="http:\/\/127\.0\.0\.1:\d+\/static\/og\.png"/);

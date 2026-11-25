@@ -94,7 +94,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const link = R.getLinkByCode(db, ctx.params.code);
     if (!link) throw new UserError("הלינק לא קיים", 404);
     // בוט של תצוגה מקדימה (וואטסאפ וכו'): מקבל את דף ההופעה עם התמונה, בלי שזה ייספר כלחיצה
-    if (isCrawler(ctx.req)) return ctx.redirect(`/s/${link.campaign_id}`);
+    if (isCrawler(ctx.req)) return ctx.redirect(`/s/${link.campaign_id}?via=${encodeURIComponent(link.code)}`);
     const click = R.recordClick(db, link, ctx.vid, ctx.req.headers.referer);
     ctx.setCookie(cookie(`ref_${link.campaign_id}`, click.token, { maxAge: REF_COOKIE_DAYS * 86400 }));
     ctx.redirect(`/s/${link.campaign_id}`);
@@ -105,12 +105,43 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     if (!token) return null;
     const row = db
       .prepare(
-        `SELECT k.token, u.name, u.id AS promoter_id, l.campaign_id FROM referral_clicks k
-           JOIN referral_links l ON l.id = k.link_id JOIN users u ON u.id = l.promoter_id WHERE k.token = ?`
+        `SELECT k.token, u.name, u.id AS promoter_id, l.campaign_id, l.note, p.image_url AS photo FROM referral_clicks k
+           JOIN referral_links l ON l.id = k.link_id JOIN users u ON u.id = l.promoter_id
+           LEFT JOIN creator_profiles p ON p.user_id = u.id WHERE k.token = ?`
       )
       .get(token);
     return row && row.campaign_id === Number(campaignId) ? row : null;
   };
+
+  /** מי הזמין את המבקר: ג׳וקר (עם תגמול) או חבר שכבר קנה (בלי תגמול). ג׳וקר קודם. */
+  const inviterFor = (ctx, c) => {
+    const ref = refFor(ctx, c.id);
+    if (ref && ref.promoter_id !== ctx.user?.id) return { kind: "joker", name: ID.publicName({ name: ref.name }), note: ref.note, photo: ref.photo };
+    const inv = T.orderByInvite(db, ctx.cookies[`with_${c.id}`]);
+    if (inv && inv.campaign_id === c.id) return { kind: "friend", name: T.firstName(inv.buyer_name) };
+    return null;
+  };
+  /** לתצוגה המקדימה בוואטסאפ: מי מזמין (מהפרמטר, כי לבוטים אין עוגיות) */
+  const ogInviter = (ctx, c) => {
+    if (ctx.query.via) {
+      const l = R.getLinkByCode(db, ctx.query.via);
+      if (l && l.campaign_id === c.id) return ID.publicName(ID.getUser(db, l.promoter_id));
+    }
+    if (ctx.query.with) {
+      const o = T.orderByInvite(db, ctx.query.with);
+      if (o && o.campaign_id === c.id) return T.firstName(o.buyer_name);
+    }
+    return null;
+  };
+
+  // "בואו איתי": קונה שולח לחברים. אין תגמול, רק הזמנה אישית.
+  r.get("/i/:code", (ctx) => {
+    const o = T.orderByInvite(db, ctx.params.code);
+    if (!o) throw new UserError("הלינק לא קיים", 404);
+    if (isCrawler(ctx.req)) return ctx.redirect(`/s/${o.campaign_id}?with=${encodeURIComponent(o.invite_code)}`);
+    ctx.setCookie(cookie(`with_${o.campaign_id}`, o.invite_code, { maxAge: REF_COOKIE_DAYS * 86400 }));
+    ctx.redirect(`/s/${o.campaign_id}`);
+  });
 
   r.get("/s/:id", (ctx) => {
     const c = campaignOr404(ctx.params.id);
@@ -123,6 +154,9 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
         {
           c, link, stats: link ? R.linkStats(db, link.id) : null,
           referrer: ref && ref.promoter_id !== ctx.user?.id ? ID.publicName({ name: ref.name }) : null,
+          inviter: inviterFor(ctx, c),
+          ogInviter: ogInviter(ctx, c),
+          price: c.provider === "jocares" ? T.priceNow(db, c) : null,
           buyable: ["active", "paused", "sold_out"].includes(c.status) && c.starts_at > clock.iso(),
           left: c.provider === "jocares" ? T.inventory(db, c).available : null,
         },
@@ -180,7 +214,29 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const link = R.getOrCreateLink(db, ctx.user, c.id);
     const url = `${origin(ctx)}/r/${link.code}`;
     const code = c.provider === "coupon" ? link.coupon_code : null;
-    ctx.send(P.sharePage(ctx, { c, url, code, text: R.shareText(c, url, link), stats: R.linkStats(db, link.id), lastImport: code ? CP.lastImportAt(db, c.id) : null }, opts(ctx)));
+    ctx.send(
+      P.sharePage(ctx, {
+        c, url, code, link, text: R.shareText(c, url, link), stats: R.linkStats(db, link.id), lastImport: code ? CP.lastImportAt(db, c.id) : null,
+        assets: R.assetsOf(db, c.id), price: c.provider === "jocares" ? T.priceNow(db, c) : null,
+      }, opts(ctx))
+    );
+  });
+
+  r.post("/s/:id/share/note", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = campaignOr404(ctx.params.id);
+    const link = R.getOrCreateLink(db, ctx.user, c.id);
+    const note = R.setNote(db, ctx.user, link.id, (await ctx.form()).note);
+    ctx.redirect(`/s/${c.id}/share`, note ? "נשמר. מי שייכנס דרכך יראה את זה בדף ההופעה." : "המשפט נמחק");
+  });
+
+  // QR של הלינק האישי, לסטורי ולהדפסה
+  r.get("/s/:id/share/qr.svg", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = campaignOr404(ctx.params.id);
+    const link = R.getOrCreateLink(db, ctx.user, c.id);
+    ctx.res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "private, max-age=3600" });
+    ctx.res.end(T.qrSvg(`${origin(ctx)}/r/${link.code}`, { size: 600 }));
   });
 
   r.get("/me/sales", (ctx) => {
@@ -329,7 +385,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
 
   const checkoutData = (ctx, c) => {
     const ref = refFor(ctx, c.id);
-    return { c, inv: T.inventory(db, c), referrer: ref && ref.promoter_id !== ctx.user?.id ? ID.publicName({ name: ref.name }) : null };
+    return { c, inv: T.inventory(db, c), price: T.priceNow(db, c), inviter: inviterFor(ctx, c), referrer: ref && ref.promoter_id !== ctx.user?.id ? ID.publicName({ name: ref.name }) : null };
   };
   const jocaresCampaign = (id) => {
     const c = campaignOr404(id);
@@ -362,7 +418,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const f = await ctx.form();
     let order;
     try {
-      order = T.createOrder(db, c.id, f, { clickToken: refFor(ctx, c.id)?.token ?? null });
+      order = T.createOrder(db, c.id, f, { clickToken: refFor(ctx, c.id)?.token ?? null, invitedBy: ctx.cookies[`with_${c.id}`] ?? null });
     } catch (e) {
       if (!(e instanceof UserError)) throw e;
       return ctx.send(TV.checkoutPage(ctx, { ...checkoutData(ctx, c), v: f, error: e.message }, opts(ctx)), 400);
@@ -399,7 +455,10 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     if (!order || !["paid", "rejected"].includes(order.status)) throw new UserError("הכרטיסים לא נמצאו", 404);
     const c = C.getCampaign(db, order.campaign_id);
     const tickets = T.ticketsOf(db, order.id).map((t) => ({ ...t, qr: T.qrSvg(t.code) }));
-    ctx.send(TV.ticketsPage(ctx, { c, order, tickets, fresh: ctx.query.new === "1", url: ticketsUrl(ctx, order) }, opts(ctx)));
+    const invite = order.status === "paid" && T.salesOpen(c)
+      ? { url: `${origin(ctx)}/i/${T.inviteCode(db, order)}`, count: T.invitedCount(db, order.id) }
+      : null;
+    ctx.send(TV.ticketsPage(ctx, { c, order, tickets, invite, fresh: ctx.query.new === "1", url: ticketsUrl(ctx, order) }, opts(ctx)));
   });
 
   r.get("/tickets/:token/calendar.ics", (ctx) => {
@@ -518,8 +577,9 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
           c, r: C.campaignResults(db, c.id), top: C.topPromoters(db, c.id), publicUrl: `${origin(ctx)}/s/${c.id}`,
           lastImport: c.provider === "coupon" ? CP.lastImportAt(db, c.id) : null,
           sales: c.provider === "jocares"
-            ? { s: T.salesSummary(db, c), orders: T.ordersOfCampaign(db, c.id), doorUrl: `${origin(ctx)}/door/${T.doorToken(db, c.id)}`, open: T.salesOpen(c) }
+            ? { s: T.salesSummary(db, c), orders: T.ordersOfCampaign(db, c.id), doorUrl: `${origin(ctx)}/door/${T.doorToken(db, c.id)}`, open: T.salesOpen(c), price: T.priceNow(db, c) }
             : null,
+          assets: R.assetsOf(db, c.id),
         },
         opts(ctx)
       )
@@ -550,6 +610,29 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     ID.audit(db, ctx.user.id, "tickets.export", "campaign", c.id, {});
     ctx.res.writeHead(200, { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="jocares-buyers-${c.id}.csv"`, "cache-control": "no-store" });
     ctx.res.end(T.buyersCsv(db, c.id));
+  });
+
+  r.post("/artist/c/:id/early", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = managed(ctx, ctx.params.id);
+    const f = await ctx.form();
+    const e = T.setEarlyPrice(db, ctx.user, c, f.clear === "1" ? {} : f);
+    ctx.redirect(`/artist/c/${c.id}`, e.early_price_agorot ? "המחיר המוקדם נשמר" : "המחיר המוקדם בוטל");
+  });
+
+  r.post("/artist/c/:id/assets", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = managed(ctx, ctx.params.id);
+    const img = imageFromForm(await ctx.form(), { required: true });
+    R.addAsset(db, ctx.user, c.id, img);
+    ctx.redirect(`/artist/c/${c.id}#kit`, "התמונה נוספה לערכת השיתוף");
+  });
+
+  r.post("/artist/c/:id/assets/:aid/delete", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = managed(ctx, ctx.params.id);
+    R.removeAsset(db, ctx.user, c.id, ctx.params.aid);
+    ctx.redirect(`/artist/c/${c.id}#kit`, "נמחק");
   });
 
   r.post("/artist/c/:id/door/rotate", (ctx) => {
@@ -922,7 +1005,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     if (!pilotPass()) return false;
     const p = ctx.url.pathname;
     if (PUBLIC_PATHS.test(p)) return false;
-    if (isCrawler(req) && req.method === "GET" && /^\/(s|r)\//.test(p)) return false;
+    if (isCrawler(req) && req.method === "GET" && /^\/(s|r|i)\//.test(p)) return false;
     if (ctx.cookies.pilot && safeEqual(ctx.cookies.pilot, pilotToken())) return false;
     if (req.method !== "GET") {
       res.writeHead(403, { "content-type": "text/plain; charset=utf-8" });

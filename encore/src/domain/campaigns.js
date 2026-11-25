@@ -89,7 +89,27 @@ export function parseCampaignInput(input) {
       return source ? "coupon" : "sim";
     })(),
     capacity: input.ticketing === "jocares" ? parseCapacity(input.capacity) : null,
+    ...(input.ticketing === "jocares" ? parseEarly(input, price, reward) : { early_price_agorot: null, early_until: null, early_qty: null }),
   };
+}
+
+/**
+ * מחיר מוקדם (לא חובה): זול יותר מהמחיר הרגיל, עד תאריך ו/או עד מספר כרטיסים.
+ * התגמול לג׳וקר חייב להשאיר לאמן משהו גם במחיר המוקדם.
+ */
+export function parseEarly(input, priceAgorot, rewardAgorot) {
+  const none = { early_price_agorot: null, early_until: null, early_qty: null };
+  if (String(input.early_price ?? "").trim() === "") return none;
+  const early = shekelsToAgorot(input.early_price);
+  if (early === null || early < 100) throw new UserError("המחיר המוקדם לא תקין");
+  if (early >= priceAgorot) throw new UserError("המחיר המוקדם צריך להיות נמוך מהמחיר הרגיל");
+  if (split(early, rewardAgorot).artist < 0) throw new UserError("במחיר המוקדם התגמול לג׳וקר גבוה מדי: לא נשאר לך כלום מהכרטיס");
+  const until = String(input.early_until ?? "").trim() ? israelLocalToIso(input.early_until) : null;
+  if (String(input.early_until ?? "").trim() && !until) throw new UserError("תאריך הסיום של המחיר המוקדם לא תקין");
+  const qty = String(input.early_qty ?? "").trim() === "" ? null : Number(input.early_qty);
+  if (qty !== null && (!Number.isInteger(qty) || qty < 1 || qty > 20000)) throw new UserError("מספר הכרטיסים במחיר מוקדם לא תקין");
+  if (!until && !qty) throw new UserError("למחיר מוקדם צריך תאריך סיום, מספר כרטיסים, או את שניהם");
+  return { early_price_agorot: early, early_until: until, early_qty: qty };
 }
 
 export function parseCapacity(v) {
@@ -120,7 +140,8 @@ export function createCampaign(db, user, input, { publish = true } = {}) {
     const campaignId = insert(db, "campaigns", {
       event_id: eventId, artist_id: artist.id, created_by: user.id, status: "draft",
       price_agorot: c.price_agorot, promo_limit: c.promo_limit, provider: p.name, external_event_id: externalId,
-      share_text: c.share_text, created_at: now, updated_at: now,
+      share_text: c.share_text, early_price_agorot: c.early_price_agorot, early_until: c.early_until, early_qty: c.early_qty,
+      created_at: now, updated_at: now,
     });
     insert(db, "campaign_terms", {
       campaign_id: campaignId, version: 1, reward_agorot: c.reward_agorot, fee_bps: config.feeBps,
@@ -207,6 +228,7 @@ export function changeReward(db, user, campaignId, rewardInput) {
     const reward = shekelsToAgorot(rewardInput);
     if (reward === null) throw new UserError("התגמול לא תקין");
     validateReward(c.price_agorot, reward);
+    if (c.early_price_agorot && split(c.early_price_agorot, reward).artist < 0) throw new UserError("במחיר המוקדם התגמול הזה גבוה מדי. הורידו אותו או בטלו את המחיר המוקדם.");
     if (reward === c.reward_agorot) return c;
     insert(db, "campaign_terms", {
       campaign_id: c.id, version: c.terms_version + 1, reward_agorot: reward, fee_bps: config.feeBps,

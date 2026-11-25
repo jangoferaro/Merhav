@@ -227,3 +227,106 @@ document.addEventListener("click", async (e) => {
   try { again = sessionStorage.getItem("door-camera") === "1"; } catch {}
   if (again) setTimeout(start, 900);
 })();
+
+// ערכת שיתוף: סטורי 1080x1920 שנבנה בדפדפן מהתמונה של ההופעה והקוד של הג׳וקר
+(() => {
+  const cv = document.querySelector("[data-story]");
+  if (!cv) return;
+  const d = cv.dataset;
+  const g = cv.getContext("2d");
+  const W = 1080, H = 1920, PAD = 80;
+  const INK = "#151515", PAPER = "#EDECE4", ACID = "#DFFF45", RED = "#FF493D";
+  const load = (src, cors) =>
+    new Promise((ok) => {
+      if (!src) return ok(null);
+      const im = new Image();
+      if (cors) im.crossOrigin = "anonymous";
+      im.onload = () => ok(im);
+      im.onerror = () => ok(null);
+      im.src = src;
+    });
+  const wrap = (text, maxW, maxLines) => {
+    const words = text.split(/\s+/);
+    const lines = [];
+    let cur = "";
+    for (const w of words) {
+      const t = cur ? cur + " " + w : w;
+      if (g.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t;
+    }
+    if (cur) lines.push(cur);
+    if (lines.length > maxLines) { lines.length = maxLines; lines[maxLines - 1] += "…"; }
+    return lines;
+  };
+  const draw = async () => {
+    try { await Promise.all(["800 120px Heebo", "500 40px Assistant", "700 60px 'Space Grotesk'"].map((f) => document.fonts.load(f))); } catch {}
+    const sameOrigin = d.img.startsWith("/");
+    const [photo, qr] = await Promise.all([load(d.img, !sameOrigin), load(d.qr, false)]);
+    g.fillStyle = INK;
+    g.fillRect(0, 0, W, H);
+    const PH = 960;
+    if (photo) {
+      const s = Math.max(W / photo.width, PH / photo.height);
+      const w = photo.width * s, h = photo.height * s;
+      g.drawImage(photo, (W - w) / 2, (PH - h) / 2, w, h);
+      try {
+        const px = g.getImageData(0, 0, W, PH);
+        const a = px.data;
+        for (let i = 0; i < a.length; i += 4) {
+          const y = Math.min(255, (0.299 * a[i] + 0.587 * a[i + 1] + 0.114 * a[i + 2] - 128) * 1.08 + 128);
+          a[i] = a[i + 1] = a[i + 2] = y;
+        }
+        g.putImageData(px, 0, 0);
+      } catch {}
+    }
+    // חותמת Be Jo.
+    g.fillStyle = ACID;
+    g.beginPath(); g.arc(W - 190, 190, 120, 0, Math.PI * 2); g.fill();
+    g.fillStyle = INK; g.textAlign = "center"; g.textBaseline = "middle"; g.direction = "ltr";
+    g.font = "700 64px 'Space Grotesk', sans-serif";
+    g.fillText("Be Jo.", W - 190, 194);
+    // טקסט
+    g.fillStyle = PAPER; g.fillRect(0, PH, W, H - PH);
+    g.direction = "rtl"; g.textAlign = "right"; g.textBaseline = "alphabetic"; g.fillStyle = INK;
+    let y = PH + 100;
+    g.font = "500 44px Assistant, Heebo, sans-serif";
+    g.fillText(d.artist, W - PAD, y);
+    g.font = "800 104px Heebo, sans-serif";
+    for (const line of wrap(d.title, W - PAD * 2, 2)) { y += 118; g.fillText(line, W - PAD, y); }
+    g.font = "500 46px Assistant, Heebo, sans-serif";
+    y += 84; g.fillText(d.when, W - PAD, y);
+    y += 60; g.fillText(d.where, W - PAD, y);
+    if (d.price) {
+      g.font = "700 46px Heebo, sans-serif";
+      const tw = g.measureText(d.price).width;
+      y += 92;
+      g.fillStyle = ACID; g.fillRect(W - PAD - tw - 28, y - 52, tw + 56, 72);
+      g.fillStyle = INK; g.fillText(d.price, W - PAD, y);
+    }
+    // QR והכתובת
+    const Q = 220, qx = PAD, qy = 1580;
+    if (qr) g.drawImage(qr, qx, qy, Q, Q);
+    g.direction = "ltr"; g.textAlign = "left";
+    g.font = "500 34px 'IBM Plex Mono', monospace"; g.fillStyle = INK;
+    g.fillText(d.url, qx, qy + Q + 60);
+    g.direction = "rtl"; g.textAlign = "right";
+    g.font = "700 52px Heebo, sans-serif";
+    g.fillText("כרטיסים בלינק", W - PAD, qy + 60);
+    g.font = "700 44px 'Space Grotesk', sans-serif"; g.fillStyle = INK;
+    g.direction = "ltr"; g.textAlign = "right";
+    g.fillText("JoCares", W - PAD - 22, qy + Q);
+    g.fillStyle = RED; g.beginPath(); g.arc(W - PAD - 6, qy + Q - 8, 9, 0, Math.PI * 2); g.fill();
+
+    cv.toBlob((blob) => {
+      if (!blob) return;
+      const a = document.querySelector("[data-story-download]");
+      if (a) a.href = URL.createObjectURL(blob);
+      const file = new File([blob], "jocares-story.png", { type: "image/png" });
+      const btn = document.querySelector("[data-story-share]");
+      if (btn && navigator.canShare?.({ files: [file] })) {
+        btn.hidden = false;
+        btn.onclick = () => navigator.share({ files: [file] }).catch(() => {});
+      }
+    }, "image/png");
+  };
+  draw();
+})();

@@ -1,5 +1,5 @@
 import { config, shortDate } from "../util.js";
-import { csrfField, empty, html, layout, money, poster, showCard, showDate, stat, stamp, raw } from "./kit.js";
+import { csrfField, empty, html, inviteBox, layout, money, poster, priceTag, showCard, showDate, stat, stamp, raw } from "./kit.js";
 
 // ---------- כניסה למוצר: שתי אפשרויות בלבד (PRD §7) ----------
 
@@ -131,24 +131,22 @@ ${shows.length
 
 // ---------- דף הופעה: לרוכש ולמקדם ----------
 
-export function showPage(ctx, { c, referrer, link, stats, buyable, left = null }, opts) {
+export function showPage(ctx, { c, link, stats, buyable, left = null, inviter = null, ogInviter = null, price = null }, opts) {
   return layout(
     ctx,
     `${c.artist_name} · ${c.title}`,
     html`
+${inviter ? html`<div class="invite-top">${inviteBox(inviter)}</div>` : ""}
 <article class="show-page">
   <div class="show-media">${poster(c, "big")}${c.status === "active" ? stamp(money(c.reward_agorot), "למקדם על כרטיס") : ""}</div>
   <div class="show-main">
     <p class="eyebrow">${c.artist_name}</p>
     <h1>${c.title}</h1>
     <p class="meta big">${showDate(c.starts_at)}<br>${c.venue}${c.city ? `, ${c.city}` : ""}</p>
-    ${referrer
-      ? html`<p class="ref"><b>${referrer}</b> המליץ/ה לך על ההופעה. <small>(מקבל/ת עמלה קטנה אם תקנו דרך הקישור, בלי עלות נוספת לכם)</small></p>`
-      : ""}
     ${c.description ? html`<p class="desc">${c.description}</p>` : ""}
 
     <div class="buy-box">
-      <div><span class="muted">כרטיס</span> <b class="price">${money(c.price_agorot)}</b></div>
+      <div><span class="muted">כרטיס</span> ${priceTag(c, buyable ? price : null)}</div>
       ${buyable && left === 0
         ? html`<p class="muted">הכרטיסים אזלו.</p>`
         : buyable
@@ -174,8 +172,8 @@ export function showPage(ctx, { c, referrer, link, stats, buyable, left = null }
       description: `${c.artist_name} · ${c.title} · ${showDate(c.starts_at)} · ${c.venue}`,
       og: {
         type: "music.event",
-        title: `${c.artist_name}: ${c.title}`,
-        description: `${showDate(c.starts_at)} · ${c.venue}${c.city ? `, ${c.city}` : ""} · כרטיסים ${money(c.price_agorot)}`,
+        title: ogInviter ? `${ogInviter} מזמין/ה אותך: ${c.artist_name} · ${c.title}` : `${c.artist_name}: ${c.title}`,
+        description: `${showDate(c.starts_at)} · ${c.venue}${c.city ? `, ${c.city}` : ""} · כרטיסים ${money(price?.price ?? c.price_agorot)}`,
         image: c.image_url,
         url: `/s/${c.id}`,
       },
@@ -185,7 +183,7 @@ export function showPage(ctx, { c, referrer, link, stats, buyable, left = null }
 
 // ---------- ערכת שיתוף ----------
 
-export function sharePage(ctx, { c, url, text, stats, code = null, lastImport = null }, opts) {
+export function sharePage(ctx, { c, url, text, stats, code = null, lastImport = null, link = {}, assets = [], price = null }, opts) {
   const enc = encodeURIComponent;
   return layout(
     ctx,
@@ -214,6 +212,37 @@ export function sharePage(ctx, { c, url, text, stats, code = null, lastImport = 
     <textarea id="share-text" rows="7" data-share-url="${url}">${text}</textarea>
   </label>
   <p class="note">הגילוי הנאות בסוף ההודעה הוא חובה כשמרוויחים מהמלצה. השאירו אותו.</p>
+
+  <section class="card" id="note">
+    <h2>משפט אישי לחברים</h2>
+    <p class="muted">מי שנכנס דרך הלינק שלך יראה בדף ההופעה "${(ctx.user?.name || "").split(" ")[0] || "את/ה"} מזמין/ה אותך", ואת המשפט הזה. אנשים קונים בגלל חבר, לא בגלל פרסומת.</p>
+    <form method="post" action="/s/${c.id}/share/note" class="stack">
+      ${csrfField(ctx)}
+      <input name="note" maxlength="140" value="${link.note ?? ""}" placeholder="למשל: הייתי בהופעה הקודמת שלהם, מטורף. בואו!">
+      <button class="btn ghost">שמירה</button>
+    </form>
+  </section>
+
+  <section class="card kit" id="kit">
+    <h2>ערכת שיתוף</h2>
+    <p class="muted">סטורי מוכן עם הקוד שלך. מורידים ומעלים לאינסטגרם או לסטטוס בוואטסאפ, ומוסיפים מדבקת לינק.</p>
+    <div class="story-wrap"><canvas class="story" width="1080" height="1920" data-story
+      data-img="${c.image_url}" data-artist="${c.artist_name}" data-title="${c.title}"
+      data-when="${showDate(c.starts_at)}" data-where="${c.venue}${c.city ? `, ${c.city}` : ""}"
+      data-price="${price?.early ? `מחיר מוקדם ${money(price.price)}` : ""}"
+      data-url="${url.replace(/^https?:\/\//, "")}" data-qr="/s/${c.id}/share/qr.svg"
+      aria-label="תצוגה של הסטורי"></canvas></div>
+    <div class="row2">
+      <button type="button" class="btn" data-story-share hidden>שיתוף הסטורי</button>
+      <a class="btn ghost" data-story-download download="jocares-story-${c.id}.png" href="#">הורדה</a>
+    </div>
+    ${assets.length
+      ? html`<h3>תמונות מהאמן</h3>
+        <div class="asset-grid">${assets.map((a) => html`<a href="${a.image_url}" download target="_blank" rel="noopener"><img src="${a.image_url}" alt="" loading="lazy"></a>`)}</div>
+        <p class="note">לחיצה פותחת את התמונה בגודל מלא להורדה.</p>`
+      : ""}
+    <p class="note"><a href="/s/${c.id}/share/qr.svg" download="jocares-qr-${c.id}.svg">הורדת QR של הלינק שלך</a> (להדפסה או לשקופית בהופעה)</p>
+  </section>
 
   <div class="stats three">
     ${stat(stats.clicks, "נכנסו ללינק")}

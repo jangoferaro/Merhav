@@ -99,6 +99,30 @@ export function showCard(ctx, c) {
   </article>`;
 }
 
+/** הזמנה אישית: ג׳וקר (עם גילוי נאות על התגמול) או חבר שכבר קנה */
+export function inviteBox(inv) {
+  if (!inv) return "";
+  const face = inv.photo
+    ? html`<span class="avatar"><img src="${inv.photo}" alt="" referrerpolicy="no-referrer"></span>`
+    : html`<span class="avatar" aria-hidden="true">${inv.name[0]}</span>`;
+  return html`
+  <div class="invite">
+    ${face}
+    <div>
+      <p class="invite-who">${inv.kind === "friend" ? html`<b>${inv.name}</b> כבר קנה/תה כרטיס ומזמין/ה אותך` : html`<b>${inv.name}</b> מזמין/ה אותך`}</p>
+      ${inv.note ? html`<p class="invite-note">“${inv.note}”</p>` : ""}
+      ${inv.kind === "joker" ? html`<small class="muted">${inv.name} מקבל/ת תגמול קטן מהאמן על כרטיס שנקנה דרכו/ה, בלי עלות נוספת לך.</small>` : ""}
+    </div>
+  </div>`;
+}
+
+/** מחיר, כולל מחיר מוקדם אם הוא בתוקף */
+export function priceTag(c, p) {
+  if (!p?.early) return html`<b class="price">${money(c.price_agorot)}</b>`;
+  return html`<b class="price">${money(p.price)}</b> <s class="muted">${money(c.price_agorot)}</s>
+    <span class="early-note">מחיר מוקדם${p.until ? ` עד ${showDate(p.until)}` : ""}${p.left !== null ? ` · נשארו ${p.left} במחיר הזה` : ""}</span>`;
+}
+
 // ---------- מסגרת הדף ----------
 
 const BELL = raw(`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`);

@@ -1,6 +1,6 @@
 // Referral: לינקים אישיים ולחיצות. השיוך עצמו מוכרע רק כשמגיע אישור רכישה מהספק (ingest.js).
 import { insert, newCouponCode, tx } from "../db.js";
-import { clock, hmac, randomToken, shortCode, showDate, UserError } from "../util.js";
+import { clock, hmac, randomToken, shortCode, showDate, text, UserError } from "../util.js";
 import { getCampaign } from "./campaigns.js";
 import { audit } from "./identity.js";
 
@@ -64,4 +64,29 @@ export function shareText(campaign, url, link = null) {
     "",
     "(גילוי נאות: אני מקבל/ת עמלה על כרטיסים שנקנים דרך הקישור)",
   ].join("\n");
+}
+
+// ---------- הזמנה אישית ----------
+
+/** משפט אישי שהג׳וקר כותב לחברים. מופיע בדף ההופעה למי שנכנס דרכו. */
+export function setNote(db, user, linkId, value) {
+  const note = text(value, "המשפט האישי", { max: 140, required: false }).replace(/\s+/g, " ");
+  db.prepare("UPDATE referral_links SET note = ? WHERE id = ? AND promoter_id = ?").run(note || null, linkId, user.id);
+  return note;
+}
+
+// ---------- ערכת שיתוף ----------
+
+export const assetsOf = (db, campaignId) => db.prepare("SELECT * FROM campaign_assets WHERE campaign_id = ? ORDER BY id").all(campaignId);
+
+export function addAsset(db, user, campaignId, imageUrl) {
+  if (assetsOf(db, campaignId).length >= 12) throw new UserError("אפשר עד 12 תמונות. מחקו אחת כדי להוסיף.");
+  const id = insert(db, "campaign_assets", { campaign_id: campaignId, image_url: imageUrl, created_by: user.id, created_at: clock.iso() });
+  audit(db, user.id, "assets.add", "campaign", campaignId, { asset: id });
+  return id;
+}
+
+export function removeAsset(db, user, campaignId, assetId) {
+  db.prepare("DELETE FROM campaign_assets WHERE id = ? AND campaign_id = ?").run(Number(assetId), campaignId);
+  audit(db, user.id, "assets.remove", "campaign", campaignId, { asset: Number(assetId) });
 }

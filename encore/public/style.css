@@ -597,3 +597,20 @@ table.orders select { padding: 4px 6px; min-height: 0; }
   .sales .stats { grid-template-columns: 1fr 1fr; }
   .poster.mini { width: 84px; }
 }
+
+/* הזמנה אישית, מחיר מוקדם, ערכת שיתוף */
+.invite { display: flex; gap: 14px; align-items: flex-start; border-inline-start: 4px solid var(--jo-acid); background: var(--surface); padding: 14px 16px; margin: 16px 0; }
+.invite .avatar { width: 52px; height: 52px; flex: none; }
+.invite p { margin: 0 0 4px; }
+.invite-who { font-size: 1.1rem; }
+.invite-note { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; line-height: 1.3; }
+.early-note { display: block; margin-top: 4px; font-size: .9rem; background: var(--jo-acid); color: #151515; padding: 2px 8px; width: fit-content; }
+s.muted { font-family: var(--font-mono); }
+.row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 560px) { .row3 { grid-template-columns: 1fr; } }
+.kit .story-wrap { max-width: 300px; margin: 12px auto; border: 1px solid var(--ink); }
+.kit canvas.story { width: 100%; height: auto; display: block; }
+.asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin: 12px 0; }
+.asset-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; filter: grayscale(1) contrast(1.08); }
+.asset-grid figure { margin: 0; }
+.come-with .share-grid { grid-template-columns: 1fr 1fr; }

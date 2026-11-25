@@ -1,11 +1,11 @@
 // מסכי הקופה של JoCares: קנייה, תשלום, כרטיס, כניסה בדלת, ומכירות לאמן.
-import { config } from "../util.js";
+import { config, isoToIsraelLocal } from "../util.js";
 import { smsEnabled } from "../mailer.js";
-import { csrfField, html, layout, money, poster, postButton, raw, showDate, stat } from "./kit.js";
+import { csrfField, html, inviteBox, layout, money, poster, postButton, priceTag, raw, showDate, stat } from "./kit.js";
 
 const fmtCode = (code) => `${code.slice(0, 5)} ${code.slice(5)}`;
 
-export function checkoutPage(ctx, { c, inv, referrer, v = {}, error = "" }, opts) {
+export function checkoutPage(ctx, { c, inv, price, inviter = null, v = {}, error = "" }, opts) {
   const max = Math.min(config.maxTicketsPerOrder, inv.available);
   const fee = config.ticketFeeAgorot;
   const qty = Math.min(Number(v.qty) || 1, Math.max(max, 1));
@@ -22,7 +22,7 @@ export function checkoutPage(ctx, { c, inv, referrer, v = {}, error = "" }, opts
       <p class="meta">${showDate(c.starts_at)}<br>${c.venue}${c.city ? `, ${c.city}` : ""}</p>
     </div>
   </div>
-  ${referrer ? html`<p class="ref">הגעת דרך <b>${referrer}</b>. על כל כרטיס ${referrer} מקבל/ת תגמול מהאמן, בלי עלות נוספת לך.</p>` : ""}
+  ${inviteBox(inviter)}
   ${error ? html`<p class="flash bad">${error}</p>` : ""}
   ${max < 1
     ? html`<div class="card center"><h2>הכרטיסים אזלו</h2><p class="muted">${inv.held ? "חלק מהכרטיסים שמורים לאנשים שמשלמים עכשיו. אולי יתפנו בעוד כמה דקות." : "אין יותר כרטיסים להופעה הזו."}</p></div>`
@@ -31,13 +31,13 @@ export function checkoutPage(ctx, { c, inv, referrer, v = {}, error = "" }, opts
     ${csrfField(ctx)}
     <div class="qty-row">
       <label class="field">כמה כרטיסים?
-        <select name="qty" data-qty data-unit="${c.price_agorot + fee}">
+        <select name="qty" data-qty data-unit="${price.price + fee}">
           ${Array.from({ length: max }, (_, i) => i + 1).map((n) => html`<option value="${n}" ${n === qty ? html`selected` : ""}>${n}</option>`)}
         </select>
       </label>
-      <div class="total"><span class="muted">לתשלום</span><b data-total>${money(qty * (c.price_agorot + fee))}</b></div>
+      <div class="total"><span class="muted">לתשלום</span><b data-total>${money(qty * (price.price + fee))}</b></div>
     </div>
-    <p class="note">${money(c.price_agorot)} לכרטיס${fee ? ` + ${money(fee)} דמי שירות` : ". בלי דמי שירות"}.${inv.available <= 20 ? ` נשארו ${inv.available}.` : ""}</p>
+    <p class="note">${priceTag(c, price)} לכרטיס${fee ? ` + ${money(fee)} דמי שירות` : ". בלי דמי שירות"}.${inv.available <= 20 ? ` נשארו ${inv.available}.` : ""}</p>
     <label class="field">שם מלא<input name="name" required maxlength="80" autocomplete="name" value="${v.name ?? ""}"></label>
     <label class="field">מייל<input name="email" type="email" required autocomplete="email" dir="ltr" value="${v.email ?? ""}"><small class="hint">לכאן נשלחים הכרטיסים.</small></label>
     <label class="field">טלפון (לא חובה)<input name="phone" type="tel" autocomplete="tel" dir="ltr" maxlength="20" value="${v.phone ?? ""}"><small class="hint">${smsEnabled() ? "נשלח לשם גם את הכרטיסים ב-SMS. " : ""}ישמש רק אם תהיה הודעה על שינוי בהופעה.</small></label>
@@ -95,7 +95,7 @@ export function paymentPendingPage(ctx, { order }) {
   );
 }
 
-export function ticketsPage(ctx, { c, order, tickets, fresh, url }, opts) {
+export function ticketsPage(ctx, { c, order, tickets, fresh, url, invite = null }, opts) {
   const live = tickets.filter((t) => t.status !== "refunded");
   return layout(
     ctx,
@@ -127,12 +127,24 @@ export function ticketsPage(ctx, { c, order, tickets, fresh, url }, opts) {
   </div>
   <p class="note center">בכניסה מציגים את הקוד מהטלפון. כל כרטיס נסרק פעם אחת. ${live.length > 1 ? "אפשר להעביר כרטיס לחבר/ה: שלחו צילום מסך של אותו כרטיס בלבד." : ""}</p>`}
 </section>
+${invite
+  ? html`
+<section class="narrow card come-with">
+  <h2>בואו איתי</h2>
+  <p>שלחו לחברים. הם יראו שכבר קניתם ושאתם מזמינים אותם, ויקנו באותה קופה.</p>
+  ${invite.count ? html`<p class="flash good">${invite.count === 1 ? "חבר/ה אחד/ת כבר קנה/תה" : `${invite.count} חברים כבר קנו`} בעקבותיך.</p>` : ""}
+  <div class="share-grid">
+    <a class="share wa" href="https://wa.me/?text=${encodeURIComponent(`קניתי כרטיס ל${c.artist_name} · ${c.title}, ${showDate(c.starts_at)}. בואו איתי: ${invite.url}`)}" target="_blank" rel="noopener">WhatsApp</a>
+    <button type="button" class="share" data-copy="${invite.url}">העתקת הלינק</button>
+  </div>
+</section>`
+  : ""}
 ${order.status === "paid" && c.status === "active"
   ? html`
 <section class="narrow card promo-box">
   <span class="stamp" lang="en" dir="ltr"><b>Be Jo.</b></span>
-  <h2>חברים שלך יאהבו את זה?</h2>
-  <p>שתפו את ההופעה וקבלו <b class="money">${money(c.reward_agorot)}</b> על כל כרטיס שהם קונים דרככם.</p>
+  <h2>רוצה גם להרוויח מזה?</h2>
+  <p>הפכו לג׳וקרים של ההופעה: לינק אישי, ו-<b class="money">${money(c.reward_agorot)}</b> על כל כרטיס שנקנה דרככם.</p>
   <form method="post" action="/s/${c.id}/promote">${csrfField(ctx)}<button class="btn block">קבלו לינק אישי</button></form>
 </section>`
   : ""}`,
@@ -183,7 +195,7 @@ export function doorPage(ctx, { c, token, stats, last = null }) {
 
 // ---------- לאמן: מכירות ----------
 
-export function artistSales(ctx, { c, s, orders, doorUrl, open }) {
+export function artistSales(ctx, { c, s, orders, doorUrl, open, price }) {
   const pct = s.capacity ? Math.round((s.sold / s.capacity) * 100) : 0;
   return html`
 <section class="card sales">
@@ -206,6 +218,12 @@ export function artistSales(ctx, { c, s, orders, doorUrl, open }) {
     </div>
   </div>
 </section>
+
+<details class="card" ${c.early_price_agorot ? html`open` : ""}>
+  <summary>מחיר מוקדם ${price?.early ? html`<span class="badge st-active">פעיל · ${money(price.price)}</span>` : c.early_price_agorot ? html`<span class="badge">הסתיים</span>` : ""}</summary>
+  <p class="muted">כמה כרטיסים בזול עד תאריך או עד כמות שתבחרו. נותן לאנשים סיבה אמיתית לקנות עכשיו ולא "אחר כך".</p>
+  ${earlyFields(ctx, c)}
+</details>
 
 <section class="card">
   <h2>כניסה להופעה</h2>
@@ -237,4 +255,22 @@ export function artistSales(ctx, { c, s, orders, doorUrl, open }) {
       )}</tbody></table></div>`
     : html`<p class="muted">עוד אין הזמנות.</p>`}
 </details>`;
+}
+
+/** שדות המחיר המוקדם: בטופס פתיחת הופעה (בלי form), ובניהול ההופעה (עם form) */
+export function earlyFields(ctx, c, { form = true } = {}) {
+  const v = (k, fallback) => c[k] ?? fallback ?? "";
+  const fields = html`
+    <div class="row3">
+      <label class="field">מחיר מוקדם (₪)<input name="early_price" type="number" min="1" step="0.01" inputmode="decimal" value="${c.early_price_agorot ? c.early_price_agorot / 100 : v("early_price")}"></label>
+      <label class="field">עד מתי<input name="early_until" type="datetime-local" value="${c.early_until && c.early_until.includes("Z") ? isoToIsraelLocal(c.early_until) : v("early_until")}"></label>
+      <label class="field">עד כמה כרטיסים<input name="early_qty" type="number" min="1" inputmode="numeric" value="${v("early_qty")}"></label>
+    </div>
+    <p class="note">אפשר למלא תאריך, כמות, או את שניהם. מה שמגיע קודם סוגר את המחיר המוקדם.</p>`;
+  if (!form) return fields;
+  return html`
+  <form method="post" action="/artist/c/${c.id}/early" class="stack">
+    ${csrfField(ctx)}${fields}
+    <div class="row2"><button class="btn ghost">שמירה</button>${c.early_price_agorot ? html`<button class="linklike" name="clear" value="1">ביטול המחיר המוקדם</button>` : ""}</div>
+  </form>`;
 }
