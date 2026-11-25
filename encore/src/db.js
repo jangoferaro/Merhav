@@ -497,6 +497,49 @@ CREATE TABLE IF NOT EXISTS joker_profiles (
   updated_at       TEXT NOT NULL
 );
 
+-- חיבורים חיצוניים (OAuth רשמי בלבד, בלי סיסמאות). אסימונים מוצפנים ונשמרים רק בשרת.
+CREATE TABLE IF NOT EXISTS connected_accounts (
+  id            INTEGER PRIMARY KEY,
+  user_id       INTEGER NOT NULL REFERENCES users(id),
+  provider      TEXT NOT NULL,
+  status        TEXT NOT NULL,                 -- connected | expired | error
+  external_id   TEXT,
+  handle        TEXT NOT NULL DEFAULT '',
+  profile_url   TEXT NOT NULL DEFAULT '',
+  tokens_enc    TEXT,                          -- { access, refresh } מוצפן
+  expires_at    TEXT,
+  scopes        TEXT NOT NULL DEFAULT '',
+  consented_at  TEXT NOT NULL,
+  last_sync_at  TEXT,
+  last_error    TEXT,
+  fail_count    INTEGER NOT NULL DEFAULT 0,
+  note          TEXT,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  UNIQUE (user_id, provider)
+);
+-- מדידות של רשתות: כל מדד עם מקור ומועד. אין "צמיחה" בלי שתי מדידות אמיתיות.
+CREATE TABLE IF NOT EXISTS metric_snapshots (
+  id          INTEGER PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  provider    TEXT NOT NULL,
+  metric      TEXT NOT NULL,
+  value       INTEGER NOT NULL,
+  measured_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS metric_snapshots_user ON metric_snapshots(user_id, provider, metric, measured_at);
+-- טעם מוזיקלי מחיבור: אמנים וסגנונות (ממופים לסגנונות שלנו). היסטוריית האזנה גולמית לא נשמרת.
+CREATE TABLE IF NOT EXISTS music_signals (
+  id        INTEGER PRIMARY KEY,
+  user_id   INTEGER NOT NULL REFERENCES users(id),
+  provider  TEXT NOT NULL,
+  kind      TEXT NOT NULL,                     -- artist | genre
+  name      TEXT NOT NULL,
+  rank      INTEGER NOT NULL,
+  synced_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS music_signals_user ON music_signals(user_id, kind);
+
 -- אמן מזמין ג׳וקר: קידום (אפשר עם תגמול מוגדל), תוכן, או שיתוף פעולה מתמשך
 CREATE TABLE IF NOT EXISTS joker_invitations (
   id            INTEGER PRIMARY KEY,

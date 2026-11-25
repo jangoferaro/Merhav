@@ -8,6 +8,7 @@ import { validImageRef } from "../media.js";
 import { audit, getUser, notify, publicName } from "./identity.js";
 import { getCampaign, split } from "./campaigns.js";
 import { getOrCreateLink } from "./referrals.js";
+import { musicFromConnections, verifiedSocial } from "./connections.js";
 
 export const GENRES = ["אינדי", "פופ", "רוק", "אלטרנטיבי", "פולק", "ג'אז", "היפ הופ", "אלקטרוני", "ים תיכוני", "מזרחית", "פאנק", "מטאל", "R&B", "קלאסי", "סטנדאפ", "תיאטרון"];
 export const SKILLS = {
@@ -80,6 +81,13 @@ export function saveJoker(db, user, input) {
   return getJoker(db, user.id);
 }
 
+/** מוסיף לטעם הידני את הסגנונות שזוהו מחיבור (המשתמש בוחר, לא אוטומטית) */
+export function adoptGenres(db, user, genres) {
+  const j = ensureJoker(db, user);
+  const merged = csv([...list(j.genres), ...[].concat(genres ?? [])], GENRES);
+  db.prepare("UPDATE joker_profiles SET genres = ?, updated_at = ? WHERE user_id = ?").run(merged, clock.iso(), user.id);
+}
+
 /** פרופיל מינימלי אוטומטי, כדי שאפשר יהיה להזמין ולהתאים גם מי שלא מילא כלום */
 export function ensureJoker(db, user) {
   return getJoker(db, user.id) ?? saveJoker(db, user, { nickname: publicName(user) });
@@ -126,6 +134,26 @@ export function powers(db, userId) {
   return { ...sell, promoted, ...creative, byGenre };
 }
 
+/**
+ * הפרופיל כפי שההתאמה והתצוגה רואות אותו: טעם ידני + טעם מחיבורים,
+ * ועוקבים מאומתים מחיבור (עדיפות) או הצהרה עצמית.
+ */
+export function enrich(db, j) {
+  const music = musicFromConnections(db, j.user_id);
+  const v = verifiedSocial(db, j.user_id);
+  return {
+    ...j,
+    allGenres: [...new Set([...list(j.genres), ...music.genres])],
+    syncedGenres: music.genres, syncedArtists: music.artists, musicSources: music.sources,
+    followers: v ? v.value : j.social_followers,
+    followersVerified: !!v,
+    followersSource: v ? v.label : j.social_platform,
+    followersUrl: v ? v.profile_url : j.social_url,
+    followersAt: v ? v.measured_at : null,
+    verified: v,
+  };
+}
+
 // ---------- התאמה ----------
 
 const norm = (s) => String(s ?? "").trim().toLowerCase();
@@ -137,9 +165,10 @@ const sameCity = (a, b) => a && b && norm(a) === norm(b);
  * נתון חסר לא נחשב אפס: מי שלא הצהיר על עוקבים מקבל ציון ממוצע ברכיב החברתי.
  */
 export function matchScore(joker, campaign, p) {
-  const genres = list(joker.genres);
+  const genres = joker.allGenres ?? list(joker.genres);
   const taste = campaign.genre && genres.length ? (genres.includes(campaign.genre) ? 1 : 0.2) : 0.5;
-  const social = joker.social_followers == null ? 0.4 : Math.min(1, Math.log10(1 + joker.social_followers) / 5);
+  const f = joker.followers !== undefined ? joker.followers : joker.social_followers;
+  const social = f == null ? 0.4 : Math.min(1, Math.log10(1 + f) / 5);
   const selling = Math.min(1, Math.log10(1 + (p?.tickets ?? 0)) / 2);
   const geo = campaign.city && joker.city ? (sameCity(campaign.city, joker.city) ? 1 : 0) : 0.5;
   return 0.35 * taste + 0.25 * social + 0.25 * selling + 0.15 * geo;
@@ -147,7 +176,7 @@ export function matchScore(joker, campaign, p) {
 
 export function matchReasons(joker, campaign, p) {
   const out = [];
-  if (campaign.genre && list(joker.genres).includes(campaign.genre)) out.push(`אוהב/ת ${campaign.genre}`);
+  if (campaign.genre && (joker.allGenres ?? list(joker.genres)).includes(campaign.genre)) out.push(`אוהב/ת ${campaign.genre}${joker.syncedGenres?.includes(campaign.genre) && !list(joker.genres).includes(campaign.genre) ? ` (לפי ${joker.musicSources.join(", ")})` : ""}`);
   if (sameCity(campaign.city, joker.city)) out.push(`גר/ה ב${joker.city}`);
   if (p?.tickets) out.push(p.tickets === 1 ? "מכר/ה כרטיס אחד דרכנו" : `מכר/ה ${p.tickets} כרטיסים דרכנו`);
   const g = p?.byGenre?.find((x) => x.genre === campaign.genre);
@@ -163,7 +192,8 @@ export function jokersForCampaign(db, campaign, { limit = 12 } = {}) {
   const rows = db
     .prepare("SELECT j.* FROM joker_profiles j JOIN users u ON u.id = j.user_id WHERE j.invitations_on = 1 AND u.frozen_at IS NULL")
     .all()
-    .filter((j) => !owners.includes(j.user_id));
+    .filter((j) => !owners.includes(j.user_id))
+    .map((j) => enrich(db, j));
   const scored = rows.map((j) => {
     const p = powers(db, j.user_id);
     return { j, p, score: matchScore(j, campaign, p), reasons: matchReasons(j, campaign, p), isNew: !p.tickets };
@@ -180,7 +210,7 @@ export function jokersForCampaign(db, campaign, { limit = 12 } = {}) {
 
 /** הופעות לג׳וקר, עם הסבר קצר למה */
 export function showsForJoker(db, joker, shows, { limit = 4 } = {}) {
-  const genres = list(joker?.genres);
+  const genres = joker?.allGenres ?? list(joker?.genres);
   const ranked = shows.map((c) => {
     const why = [];
     if (c.genre && genres.includes(c.genre)) why.push(`כי בחרת ${c.genre}`);
@@ -250,19 +280,22 @@ export function decideInvitation(db, user, invitationId, accept) {
 }
 
 /** מה מותר להציג לאחרים (קלף ציבורי ותצוגת אמן). רווחים, פרטי תשלום ופרטי קשר לעולם לא. */
-export function publicView(j, p, { forArtist = false } = {}) {
+export function publicView(j0, p, { forArtist = false, db = null } = {}) {
+  const j = j0.allGenres || !db ? j0 : enrich(db, j0);
   const f = new Set(list(j.card_fields));
   const show = (k) => forArtist || f.has(k);
   return {
     public_id: j.public_id,
     nickname: j.nickname,
     image_url: j.image_url,
-    genres: show("genres") ? list(j.genres) : [],
+    genres: show("genres") ? (j.allGenres ?? list(j.genres)) : [],
     city: show("city") ? j.city : "",
     bio: show("bio") ? j.bio : "",
     tickets: f.has("tickets") || forArtist ? p.tickets : null,
     artists: f.has("artists") || forArtist ? p.artists : null,
-    social: (f.has("social") || forArtist) && j.social_followers != null ? { platform: j.social_platform, followers: j.social_followers, url: j.social_url } : null,
+    social: (f.has("social") || forArtist) && (j.followers ?? j.social_followers) != null
+      ? { platform: j.followersSource ?? j.social_platform, followers: j.followers ?? j.social_followers, url: j.followersUrl ?? j.social_url, verified: !!j.followersVerified, at: j.followersAt ?? null }
+      : null,
     skills: forArtist ? list(j.skills) : [],
   };
 }

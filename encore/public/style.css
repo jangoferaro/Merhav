@@ -676,3 +676,16 @@ details.remind { margin: 14px 0; }
 .joker-item details summary.btn { display: inline-flex; list-style: none; }
 .plain-list { margin: 8px 0 0; padding-inline-start: 1.1em; }
 @media (max-width: 560px) { .jh-stats b { font-size: 1.25rem; } }
+.conn { flex-wrap: wrap; gap: 10px; }
+.conn-main { display: grid; gap: 2px; min-width: 0; }
+.conn-actions { display: flex; gap: 10px; align-items: center; }
+.conn-actions .inline-form { display: inline; margin: 0; }
+.conn-status { font-size: .85rem; font-weight: 600; }
+.conn-status.st-connected { color: var(--ink); }
+.conn-status.st-connected::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #3a8a2a; margin-inline-end: 6px; }
+.conn-status.st-expired, .conn-status.st-error { color: var(--bad); }
+.admin-note { color: var(--bad); font-size: .8rem; }
+.badge.verified { border: 1px solid var(--ink); background: var(--jo-acid); color: #151515; padding: 1px 8px; font-weight: 600; }
+.synced { background: var(--surface); border: 1px solid var(--hair); padding: 12px 14px; }
+.synced p { margin: 0 0 4px; }
+#connections h3 { margin: 16px 0 0; }

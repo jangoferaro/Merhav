@@ -8,7 +8,7 @@ const face = (j, cls = "") =>
 const checks = (name, options, selected) =>
   html`<div class="tags-pick">${options.map(([v, label]) => html`<label class="tag-pick"><input type="checkbox" name="${name}" value="${v}" ${selected.includes(v) ? html`checked` : ""}><span>${label}</span></label>`)}</div>`;
 
-export function profilePage(ctx, { j, p, b, invitations, recs, cardUrl }, opts) {
+export function profilePage(ctx, { j, p, b, invitations, recs, cardUrl, connections = [] }, opts) {
   const genres = list(j.genres);
   const earned = b.pending + b.available + b.inTransit + b.paid;
   const open = invitations.filter((i) => i.status === "open");
@@ -71,8 +71,11 @@ ${recs.length
   <div class="powers">
     <div><h3>מכירות</h3><p><b>${p.tickets}</b> כרטיסים בתוקף · <b>${p.promoted}</b> הופעות שקידמת${p.refunded ? html` · ${p.refunded} הוחזרו` : ""}</p>
       ${p.byGenre.length ? html`<p class="meta">${p.byGenre.slice(0, 3).map((g) => `${g.genre}: ${g.tickets}`).join(" · ")}</p>` : html`<p class="meta">עוד אין מכירות. זה בסדר, גם ג׳וקרים חדשים מקבלים הזדמנויות.</p>`}</div>
-    <div><h3>רשת</h3>${j.social_followers != null
-      ? html`<p><b>${fmtK(j.social_followers)}</b> עוקבים ב-${j.social_platform || "רשת"} <span class="badge unverified">הצהרה עצמית</span></p>`
+    <div><h3>רשת</h3>${j.followers != null
+      ? html`<p><b>${fmtK(j.followers)}</b> עוקבים ב-${j.followersSource || "רשת"} ${j.followersVerified
+          ? html`<span class="badge verified">מאומת · ${showDate(j.followersAt)}</span>`
+          : html`<span class="badge unverified">הצהרה עצמית</span>`}</p>
+        ${j.verified?.all?.length > 1 ? html`<p class="meta">${j.verified.all.map((x) => `${x.label}: ${fmtK(x.value)}`).join(" · ")}</p>` : ""}`
       : html`<p class="meta">לא מילאת. נתון חסר לא נחשב אפס.</p>`}</div>
     <div><h3>יצירה</h3><p><b>${p.completed}</b> עבודות שהושלמו${p.completed ? html` · ${p.on_time} בזמן` : ""} · <b>${p.portfolio}</b> בתיק העבודות</p>
       <p class="meta"><a href="/creator">לפרופיל היוצר ולשירותים</a></p></div>
@@ -93,6 +96,11 @@ ${recs.length
     <fieldset><legend class="field">מה אני יכול/ה לעשות</legend>${checks("skills", Object.entries(SKILLS), list(j.skills))}</fieldset>
 
     <h3 id="music">הטעם המוזיקלי שלך</h3>
+    ${j.syncedGenres?.length || j.syncedArtists?.length
+      ? html`<div class="synced"><p>לפי ${j.musicSources.join(" ו-")}: ${j.syncedGenres.length ? html`<b>${j.syncedGenres.join(" · ")}</b>` : ""}</p>
+        ${j.syncedArtists.length ? html`<p class="meta">אמנים: ${j.syncedArtists.slice(0, 8).join(", ")}</p>` : ""}
+        <p class="note">הסגנונות האלה כבר משפיעים על ההופעות שמוצעות לך. אפשר גם לסמן אותם למטה, או לנתק את החיבור.</p></div>`
+      : ""}
     <p class="muted">לפי זה נציע לך הופעות, ואמנים ימצאו אותך. אפשר לשנות בכל רגע.</p>
     ${checks("genres", GENRES.map((g) => [g, g]), list(j.genres))}
     <label class="field">אמנים שאת/ה אוהב/ת (לא חובה, מופרד בפסיקים)<input name="fav_artists" maxlength="300" value="${list(j.fav_artists).join(", ")}"></label>
@@ -110,10 +118,33 @@ ${recs.length
 
 <section class="card" id="connections">
   <h2>חיבורים</h2>
-  <div class="conn"><span>Spotify</span><span class="badge">בקרוב</span></div>
-  <div class="conn"><span>Apple Music</span><span class="badge">בקרוב</span></div>
-  <div class="conn"><span>Instagram</span><span class="badge">בקרוב</span></div>
-  <p class="note">חיבורים אופציונליים, שיגיעו אחרי בדיקת התנאים של כל ספק. בינתיים בוחרים טעם ידנית ומצהירים על הרשת. אף פעם לא ניגשים לאנשי הקשר שלך.</p>
+  <p class="muted">לא חובה. חיבור מוסיף נתונים מאומתים במקום הצהרה עצמית, ומדייק את ההופעות שמוצעות לך. מתחברים דרך הספק עצמו, בלי סיסמה, ואפשר לנתק בכל רגע. ניתוק מוחק את מה שסונכרן.</p>
+  ${["music", "social"].map((kind) => html`
+  <h3>${kind === "music" ? "מוזיקה" : "רשתות"}</h3>
+  ${connections.filter((c) => c.kind === kind).map((c) => {
+    const a = c.account;
+    return html`<div class="conn">
+      <div class="conn-main">
+        <b>${c.label}</b>
+        ${a
+          ? html`<span class="conn-status st-${a.status}">${{ connected: "מחובר", expired: "ההרשאה פגה", error: "שגיאה" }[a.status]}</span>
+                 <small class="muted">${a.handle ? html`<span dir="ltr">${a.handle}</span> · ` : ""}${a.last_sync_at ? `עודכן ${showDate(a.last_sync_at)}` : "עוד לא סונכרן"}${a.note ? ` · ${a.note}` : ""}${c.growth ? ` · ${c.growth.delta >= 0 ? "+" : ""}${c.growth.delta} עוקבים ב-${c.growth.days} ימים` : ""}</small>`
+          : html`<small class="muted">${c.note}</small>`}
+        ${c.missing.length ? html`<small class="admin-note">לצוות: חסר ב-Railway: <span dir="ltr">${c.missing.join(", ")}</span></small>` : ""}
+      </div>
+      <div class="conn-actions">
+        ${a
+          ? html`${a.status === "expired"
+              ? html`<a class="btn small" href="/connect/${c.key}">התחברות מחדש</a>`
+              : postButton(ctx, `/connect/${c.key}/sync`, a.status === "error" ? "נסו שוב" : "עדכון", { cls: "btn ghost small" })}
+             ${postButton(ctx, `/connect/${c.key}/disconnect`, "ניתוק", { cls: "linklike", confirm: `לנתק את ${c.label}? הנתונים שסונכרנו יימחקו.` })}`
+          : c.ready
+            ? html`<a class="btn small" href="/connect/${c.key}">חיבור</a>`
+            : html`<span class="badge">בקרוב</span>`}
+      </div>
+    </div>`;
+  })}`)}
+  <p class="note">אף פעם לא ניגשים לאנשי הקשר שלך, לא מפרסמים בשמך, ולא מציגים לאמנים היסטוריית האזנה.</p>
 </section>
 
 <section class="card" id="card">
@@ -161,12 +192,13 @@ export function cardPage(ctx, { v, preview }, opts) {
     ${v.city ? html`<p class="jc-city" dir="rtl">${v.city}</p>` : ""}
     ${v.bio ? html`<p class="jc-bio" dir="rtl">${v.bio}</p>` : ""}
     <div class="jc-stats">
-      ${v.social ? html`<div><b>${fmtK(v.social.followers)}</b><span>Followers*</span></div>` : ""}
+      ${v.social ? html`<div><b>${fmtK(v.social.followers)}</b><span>${v.social.verified ? `${v.social.platform} followers` : "Followers*"}</span></div>` : ""}
       ${v.tickets !== null ? html`<div><b>${v.tickets}</b><span>Tickets sold</span></div>` : ""}
       ${v.artists !== null ? html`<div><b>${v.artists}</b><span>Artists</span></div>` : ""}
     </div>
     <p class="jc-be">Be Jo.</p>
-    ${v.social ? html`<small class="jc-foot">*Self-reported</small>` : ""}
+    ${v.social && !v.social.verified ? html`<small class="jc-foot">*Self-reported</small>` : ""}
+    ${v.social?.verified ? html`<small class="jc-foot">Verified via ${v.social.platform}</small>` : ""}
   </article>
   <p class="center"><a class="btn ghost" href="/shows">הופעות לקידום</a></p>
 </section>`,
@@ -190,7 +222,7 @@ ${rows.length
       <p class="meta">${[x.v.city, x.v.genres.slice(0, 3).join(" · ")].filter(Boolean).join(" · ")}</p>
     </div></div>
     <p class="why">${x.reasons.join(" · ")}</p>
-    ${x.v.social ? html`<p class="meta">${fmtK(x.v.social.followers)} עוקבים ב-${x.v.social.platform || "רשת"} <span class="badge unverified">הצהרה עצמית</span></p>` : ""}
+    ${x.v.social ? html`<p class="meta">${fmtK(x.v.social.followers)} עוקבים ב-${x.v.social.platform || "רשת"} ${x.v.social.verified ? html`<span class="badge verified">מאומת</span>` : html`<span class="badge unverified">הצהרה עצמית</span>`}</p>` : ""}
     ${x.v.skills.length ? html`<p class="meta">${x.v.skills.map((s) => SKILLS[s]).join(" · ")}</p>` : ""}
     ${x.promoting
       ? html`<p class="flash good">כבר מקדם/ת את ההופעה</p>`
@@ -209,5 +241,28 @@ ${rows.length
   </article>`)}</div>`
   : html`<p class="muted">עוד אין ג׳וקרים עם פרופיל. ברגע שיהיו, הם יופיעו כאן.</p>`}`,
     { ...opts, wide: true }
+  );
+}
+
+/** חיבור Apple Music: ההרשאה ניתנת בחלון של Apple, ורק האסימון חוזר אלינו */
+export function applePage(ctx, { developerToken }, opts) {
+  return layout(
+    ctx,
+    "חיבור Apple Music",
+    html`
+<section class="narrow card">
+  <h1>חיבור Apple Music</h1>
+  <p>נבקש מ-Apple הרשאה לקרוא את האמנים בספרייה שלך ומה שאת/ה שומע/ת לאחרונה, כדי להציע לך הופעות מתאימות. אמנים לא רואים את ההאזנות שלך. אפשר לנתק בכל רגע.</p>
+  <form method="post" action="/connect/apple/callback" class="stack" data-apple-form>
+    ${csrfField(ctx)}
+    <input type="hidden" name="music_user_token" data-apple-token>
+    <button type="button" class="btn big block" data-apple-connect data-dev-token="${developerToken}">התחברות עם Apple Music</button>
+    <p class="flash bad" data-apple-error hidden>Apple Music לא אישר את החיבור. צריך מנוי פעיל ל-Apple Music. אפשר לנסות שוב.</p>
+  </form>
+  <p class="center"><a href="/me/profile#connections">חזרה לפרופיל</a></p>
+</section>
+<script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" async></script>
+<script src="/static/apple-connect.js" defer></script>`,
+    opts
   );
 }

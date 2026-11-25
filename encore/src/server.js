@@ -24,6 +24,8 @@ import { imageFromForm, saveMedia, serveMedia } from "./media.js";
 import { finishGoogleLogin, googleEnabled, startGoogleLogin } from "./auth-google.js";
 import * as CP from "./domain/coupons.js";
 import * as J from "./domain/jokers.js";
+import * as CN from "./domain/connections.js";
+import { PROVIDERS, appleDeveloperToken, configured, missingEnv, providerOr404 } from "./connect/providers.js";
 import * as JV from "./views/jokers.js";
 import * as T from "./domain/tickets.js";
 import * as TV from "./views/tickets.js";
@@ -269,12 +271,17 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
 
   r.get("/me/profile", (ctx) => {
     if (!requireUser(ctx)) return;
-    const j = J.ensureJoker(db, ctx.user);
+    const j = J.enrich(db, J.ensureJoker(db, ctx.user));
+    const accounts = new Map(CN.accountsOf(db, ctx.user.id).map((a) => [a.provider, a]));
+    const connections = Object.entries(PROVIDERS).map(([key, p]) => ({
+      key, label: p.label, kind: p.kind, note: p.note, ready: configured(p), missing: ctx.user.is_admin ? missingEnv(p) : [],
+      account: accounts.get(key) ?? null, growth: accounts.get(key) ? CN.growth(db, ctx.user.id, key) : null,
+    }));
     const mine = new Set(db.prepare("SELECT campaign_id FROM referral_links WHERE promoter_id = ?").all(ctx.user.id).map((r) => r.campaign_id));
     const shows = C.marketplace(db, { userId: ctx.user.id }).filter((c) => !mine.has(c.id));
     ctx.send(JV.profilePage(ctx, {
       j, p: J.powers(db, ctx.user.id), b: M.balances(db, ctx.user.id), invitations: J.invitationsFor(db, ctx.user.id),
-      recs: J.showsForJoker(db, j, shows), cardUrl: `${origin(ctx)}/j/${j.public_id}`,
+      recs: J.showsForJoker(db, j, shows), cardUrl: `${origin(ctx)}/j/${j.public_id}`, connections,
     }, opts(ctx)));
   });
 
@@ -318,7 +325,78 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const j = J.jokerByPublicId(db, ctx.params.pid);
     const own = j && ctx.user?.id === j.user_id;
     if (!j || (!j.card_public && !own)) throw new UserError("הקלף לא נמצא", 404);
-    ctx.send(JV.cardPage(ctx, { v: J.publicView(j, J.powers(db, j.user_id)), preview: !j.card_public }, opts(ctx)));
+    ctx.send(JV.cardPage(ctx, { v: J.publicView(j, J.powers(db, j.user_id), { db }), preview: !j.card_public }, opts(ctx)));
+  });
+
+  // ---------- חיבורים חיצוניים ----------
+
+  const connectRedirect = (ctx, name) => `${origin(ctx)}/connect/${name}/callback`;
+
+  r.post("/me/profile/adopt", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    J.adoptGenres(db, ctx.user, (await ctx.form()).genres);
+    ctx.redirect("/me/profile#music", "נוסף לטעם שלך");
+  });
+
+  // Apple Music: ההרשאה ניתנת בדפדפן דרך MusicKit JS
+  r.get("/connect/apple", (ctx) => {
+    if (!requireUser(ctx)) return;
+    if (!configured(PROVIDERS.apple)) throw new UserError("Apple Music עוד לא הוגדר", 404);
+    ctx.send(JV.applePage(ctx, { developerToken: appleDeveloperToken() }, opts(ctx)), 200, {
+      "content-security-policy":
+        "default-src 'self'; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' https://js-cdn.music.apple.com; connect-src 'self' https://*.apple.com; frame-src https://*.apple.com; form-action 'self'; frame-ancestors 'none'",
+    });
+  });
+
+  r.post("/connect/apple/callback", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    rateLimit(`connect:${ctx.user.id}`, 20, 3600_000);
+    const res = await CN.connectApple(db, ctx.user, (await ctx.form()).music_user_token, fetchImpl);
+    ctx.redirect("/me/profile#connections", res.ok ? "Apple Music מחובר" : { ok: false, m: "התחברנו, אבל הסנכרון נכשל. אפשר לנסות שוב." });
+  });
+
+  r.get("/connect/:provider", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const p = providerOr404(ctx.params.provider);
+    if (p.clientSide) return ctx.redirect(`/connect/${ctx.params.provider}`);
+    rateLimit(`connect:${ctx.user.id}`, 20, 3600_000);
+    const { url, cookieValue } = CN.startConnect(ctx.user, ctx.params.provider, { redirectUri: connectRedirect(ctx, ctx.params.provider) });
+    ctx.res.writeHead(302, { location: url, "set-cookie": [cookie("cstate", cookieValue, { maxAge: 600 })] });
+    ctx.res.end();
+  });
+
+  r.get("/connect/:provider/callback", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const name = ctx.params.provider;
+    const p = providerOr404(name);
+    ctx.setCookie(cookie("cstate", "", { maxAge: 0 }));
+    let res;
+    try {
+      res = await CN.finishConnect(db, ctx.user, name, { query: ctx.query, cookieValue: ctx.cookies.cstate, redirectUri: connectRedirect(ctx, name), fetchImpl });
+    } catch (e) {
+      if (!(e instanceof UserError)) throw e;
+      return ctx.redirect("/me/profile#connections", { ok: false, m: e.message });
+    }
+    ctx.redirect("/me/profile#connections", res.ok
+      ? (res.account.note ? { ok: false, m: `${p.label} מחובר, אבל: ${res.account.note}` } : `${p.label} מחובר`)
+      : { ok: false, m: `${p.label} מחובר, אבל הסנכרון נכשל. אפשר לנסות שוב.` });
+  });
+
+  r.post("/connect/:provider/sync", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const name = ctx.params.provider;
+    providerOr404(name);
+    rateLimit(`sync:${ctx.user.id}`, 20, 3600_000);
+    const acc = CN.accountOf(db, ctx.user.id, name);
+    if (!acc) throw new UserError("החשבון לא מחובר");
+    const res = await CN.syncAccount(db, acc, fetchImpl);
+    ctx.redirect("/me/profile#connections", res.ok ? "עודכן" : { ok: false, m: res.status === "expired" ? "ההרשאה פגה. צריך להתחבר מחדש." : "הסנכרון נכשל. נסו שוב מאוחר יותר." });
+  });
+
+  r.post("/connect/:provider/disconnect", (ctx) => {
+    if (!requireUser(ctx)) return;
+    CN.disconnect(db, ctx.user, ctx.params.provider);
+    ctx.redirect("/me/profile#connections", "נותק. הנתונים שסונכרנו נמחקו.");
   });
 
   r.get("/me/sales", (ctx) => {
@@ -1254,6 +1332,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       const r = M.settle(db);
       if (r.ended || r.released || r.content || r.expired) console.log(`[settle] ended=${r.ended} released=${r.released} content=${r.content} expired=${r.expired}`);
       T.processRefunds(db).then((n) => n && console.log(`[refunds] ${n}`), (e) => console.error("[refunds]", e));
+      CN.syncDue(db).then((n) => n && console.log(`[connections] ${n}`), (e) => console.error("[connections]", e));
       const base = (process.env.PUBLIC_URL || `http://localhost:${port}`).replace(/\/$/, "");
       T.processReminders(db, (rem, c, p) =>
         sendMail({
