@@ -77,6 +77,8 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     )
   );
   r.get("/how", (ctx) => ctx.send(P.how(ctx, opts(ctx))));
+  r.get("/data-deletion", (ctx) => ctx.send(P.dataDeletion(ctx, opts(ctx))));
+
   r.get("/terms", (ctx) => ctx.send(P.terms(ctx, opts(ctx))));
   // מדריך הסגנון הוא כלי פנימי של הצוות: רק למנהלים
   r.get("/design", (ctx) => {
@@ -1243,7 +1245,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   // בוטים של תצוגה מקדימה עוברים לדפי הופעה ולתמונות, כדי שאפשר יהיה לבדוק שיתוף בוואטסאפ.
   const pilotPass = () => process.env.STAGING_PASSWORD;
   const pilotToken = () => hmac(pilotPass(), "pilot-access");
-  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health)$|^\/(static|media|webhooks|tickets|door|t|reminders|j)\//;
+  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health|data-deletion)$|^\/(static|media|webhooks|tickets|door|t|reminders|j)\//;
 
   function stagingGate(req, res, ctx) {
     if (!pilotPass()) return false;

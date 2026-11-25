@@ -120,6 +120,36 @@ export function terms(ctx, opts) {
   );
 }
 
+/** מחיקת מידע: דרישה של Meta, TikTok ו-Google לאפליקציות עם חיבור חשבון */
+export function dataDeletion(ctx, opts) {
+  return layout(
+    ctx,
+    "מחיקת מידע",
+    html`
+<section class="prose">
+  <h1>מחיקת מידע</h1>
+  <p lang="en" dir="ltr">Data deletion instructions for JoCares users (English below).</p>
+  <h2>ניתוק חשבון שחובר (Instagram, TikTok, YouTube, Facebook, Spotify, Apple Music)</h2>
+  <ol>
+    <li>נכנסים ל-JoCares ופותחים את "הפרופיל שלי".</li>
+    <li>בחלק "חיבורים" לוחצים "ניתוק" ליד החשבון.</li>
+    <li>מיד נמחקים: האסימונים, מספרי העוקבים שנמדדו, והאמנים והסגנונות שסונכרנו. נשאר רק רישום ביומן שהחיבור היה קיים.</li>
+  </ol>
+  <p>אפשר גם לבטל את ההרשאה אצל הספק עצמו (בהגדרות האפליקציות המחוברות שלו). בסנכרון הבא החיבור יסומן "ההרשאה פגה", ואפשר לנתק אותו.</p>
+  <h2>מחיקת החשבון כולו</h2>
+  <p>כותבים לנו מהמייל של החשבון ל-<span dir="ltr">${process.env.SUPPORT_EMAIL || "privacy@jocares.co.il"}</span> עם הכותרת "מחיקת חשבון". נמחק תוך 30 יום את הפרופיל, החיבורים והנתונים האישיים. רישומים כספיים (מכירות, תגמולים ותשלומים) נשמרים לפי חובה חוקית, בלי פרטים שאינם נדרשים.</p>
+  <hr>
+  <div lang="en" dir="ltr">
+    <h2>Disconnecting a connected account</h2>
+    <p>Sign in to JoCares, open "My profile", and press "Disconnect" next to the account in "Connections". Access tokens, follower measurements and synced artists and genres are deleted immediately. You can also remove JoCares from the provider's connected apps settings.</p>
+    <h2>Deleting your account</h2>
+    <p>Email ${process.env.SUPPORT_EMAIL || "privacy@jocares.co.il"} from your account email with the subject "Account deletion". We delete your profile, connections and personal data within 30 days. Financial records are kept only as required by law.</p>
+  </div>
+</section>`,
+    opts
+  );
+}
+
 // ---------- מרקטפלייס ----------
 
 export function marketplace(ctx, { shows, cities, city, when }, opts) {
