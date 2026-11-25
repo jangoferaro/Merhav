@@ -1,0 +1,14 @@
+{
+  "name": "JoCares Door",
+  "short_name": "Door",
+  "description": "סריקת כרטיסים בכניסה",
+  "start_url": "/door",
+  "scope": "/door/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#151515",
+  "theme_color": "#151515",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [{ "src": "/static/joker.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

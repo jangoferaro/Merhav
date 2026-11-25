@@ -29,13 +29,18 @@ import { PROVIDERS, appleDeveloperToken, configured, missingEnv, providerOr404 }
 import * as JV from "./views/jokers.js";
 import * as T from "./domain/tickets.js";
 import * as W from "./wallet.js";
+import * as DR from "./domain/door.js";
+import * as DV from "./views/door.js";
+import { createRequire } from "node:module";
 import * as TV from "./views/tickets.js";
 import { gateway } from "./payments/index.js";
 import { sandboxPay, sandboxPayment } from "./payments/sandbox.js";
 import { sendLoginCode, sendMail, sendTickets } from "./mailer.js";
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
-const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png" };
+const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json" };
+// ספריית סריקת QR (jsQR, Apache-2.0): מוגשת מהשרת שלנו, כי מותר לטעון סקריפטים רק מהאתר עצמו
+const JSQR = createRequire(import.meta.url).resolve("jsqr/dist/jsQR.js");
 const REF_COOKIE_DAYS = config.attributionDays;
 
 // מצב תפעולי לסוכן התחזוקה: רק ספירות ודגלים, בלי מידע אישי ובלי סכומים
@@ -769,16 +774,77 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     return c;
   };
 
-  r.get("/door/:token", (ctx) => {
-    const c = doorCampaign(ctx.params.token);
-    ctx.send(TV.doorPage(ctx, { c, token: ctx.params.token, stats: T.doorStats(db, c.id) }));
-  });
+  // ---------- אפליקציית הכניסה ----------
 
+  const doorApi = (base, resolve) => {
+    const guard = async (ctx) => {
+      // JSON מהאפליקציה: ה-csrf מגיע בכותרת, והגוף נקרא כאן
+      if (ctx.req.method === "POST") {
+        if (!ctx.cookies.vid || !safeEqual(String(ctx.req.headers["x-door-csrf"] ?? ""), ctx.csrf)) throw new UserError("פג תוקף. רעננו את הדף.", 403);
+        rateLimit(`door:${ctx.ip}`, 1200, 600_000);
+        try { ctx.body = JSON.parse((await readBody(ctx.req, 256 * 1024)) || "{}"); } catch { throw new UserError("בקשה לא תקינה", 400); }
+      }
+      return resolve(ctx);
+    };
+    const reply = (ctx, c, extra) => ctx.json({ ...extra, stats: DR.stats(db, c) });
+    const fail = (ctx, e) => {
+      if (!(e instanceof UserError)) throw e;
+      ctx.res.writeHead(e.status || 400, { "content-type": "application/json; charset=utf-8" });
+      ctx.res.end(JSON.stringify({ error: e.message }));
+    };
+    const wrap = (fn) => async (ctx) => { try { await fn(ctx); } catch (e) { fail(ctx, e); } };
+    r.get(`${base}/manifest`, wrap(async (ctx) => { const { c } = await guard(ctx); ctx.json({ ...DR.manifest(db, c), stats: DR.stats(db, c) }); }));
+    r.get(`${base}/search`, wrap(async (ctx) => { const { c } = await guard(ctx); ctx.json(DR.search(db, c, ctx.query.q)); }));
+    r.post(`${base}/check`, wrap(async (ctx) => { const { c, staff } = await guard(ctx); reply(ctx, c, DR.admit(db, c, { code: ctx.body.code, staff, device: ctx.body.device })); }), { noCsrf: true });
+    r.post(`${base}/checkid`, wrap(async (ctx) => { const { c, staff } = await guard(ctx); reply(ctx, c, DR.admit(db, c, { ticketId: ctx.body.id, staff, device: ctx.body.device })); }), { noCsrf: true });
+    r.post(`${base}/undo`, wrap(async (ctx) => { const { c, staff } = await guard(ctx); reply(ctx, c, DR.undo(db, c, ctx.body.id, { staff, device: ctx.body.device })); }), { noCsrf: true });
+    r.post(`${base}/sync`, wrap(async (ctx) => { const { c, staff } = await guard(ctx); reply(ctx, c, { results: DR.syncOffline(db, c, ctx.body.items, { staff, device: ctx.body.device }) }); }), { noCsrf: true });
+  };
+  doorApi("/door/api/e/:token", (ctx) => DR.resolveDoor(db, { eventToken: ctx.params.token }));
+  doorApi("/door/api/s/:staff/:cid", (ctx) => DR.resolveDoor(db, { staffToken: ctx.params.staff, campaignId: ctx.params.cid }));
+
+  // קישור של הופעה (כמו קודם): נפתח ישר לסורק
+  r.get("/door/:token", (ctx) => {
+    const { c } = DR.resolveDoor(db, { eventToken: ctx.params.token });
+    ctx.send(DV.scanner(ctx, { c, apiBase: `/door/api/e/${ctx.params.token}`, stats: DR.stats(db, c), fallbackAction: `/door/${ctx.params.token}` }));
+  });
+  // גיבוי בלי JavaScript: טופס רגיל
   r.post("/door/:token", async (ctx) => {
-    const c = doorCampaign(ctx.params.token);
+    const { c } = DR.resolveDoor(db, { eventToken: ctx.params.token });
     rateLimit(`door:${ctx.ip}`, 600, 600_000);
     const last = T.checkIn(db, c, (await ctx.form()).code);
     ctx.send(TV.doorPage(ctx, { c, token: ctx.params.token, stats: T.doorStats(db, c.id), last }), last.result === "ok" ? 200 : 409);
+  });
+
+  // איש צוות: כל ההופעות של המארגן
+  r.get("/door/s/:staff", (ctx) => {
+    const staff = DR.staffByToken(db, ctx.params.staff);
+    if (!staff) throw new UserError("הקישור לא בתוקף. בקשו קישור חדש מהמארגן.", 404);
+    const organizer = db.prepare("SELECT name FROM artists WHERE id = ?").get(staff.artist_id)?.name ?? "";
+    ctx.send(DV.staffHome(ctx, { staff, organizer, events: DR.eventsForStaff(db, staff), token: ctx.params.staff }));
+  });
+  r.get("/door/s/:staff/e/:cid", (ctx) => {
+    const { c, staff } = DR.resolveDoor(db, { staffToken: ctx.params.staff, campaignId: ctx.params.cid });
+    ctx.send(DV.scanner(ctx, { c, apiBase: `/door/api/s/${ctx.params.staff}/${c.id}`, staffName: staff.name, back: `/door/s/${ctx.params.staff}`, stats: DR.stats(db, c) }));
+  });
+
+  // המארגן מנהל את צוות הכניסה
+  r.get("/artist/door", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const orgs = ID.artistsOf(db, ctx.user.id).map((a) => ({ ...a, staff: DR.staffOf(db, a.id) }));
+    ctx.send(A.doorStaffPage(ctx, { orgs, origin: origin(ctx) }, opts(ctx)));
+  });
+  r.post("/artist/door/:aid/add", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    if (!ID.canManageArtist(db, ctx.user, Number(ctx.params.aid))) throw new UserError("לא נמצא", 404);
+    DR.addStaff(db, ctx.user, ctx.params.aid, (await ctx.form()).name);
+    ctx.redirect("/artist/door", "נוסף. שלחו לו/ה את הקישור.");
+  });
+  r.post("/artist/door/:aid/revoke/:sid", (ctx) => {
+    if (!requireUser(ctx)) return;
+    if (!ID.canManageArtist(db, ctx.user, Number(ctx.params.aid))) throw new UserError("לא נמצא", 404);
+    DR.revokeStaff(db, ctx.user, ctx.params.aid, ctx.params.sid);
+    ctx.redirect("/artist/door", "הגישה בוטלה. הקישור כבר לא עובד.");
   });
 
   // ---------- אמן ----------
@@ -1381,6 +1447,10 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     ctx.origin = origin(ctx);
     try {
       if (stagingGate(req, res, ctx)) return;
+      if (req.method === "GET" && ctx.url.pathname === "/static/jsqr.js") {
+        res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": config.isProd ? "public, max-age=86400" : "no-cache" });
+        return fs.createReadStream(JSQR).pipe(res);
+      }
       if (req.method === "GET" && ctx.url.pathname.startsWith("/static/")) {
         const file = path.join(STATIC, path.basename(ctx.url.pathname));
         const type = STATIC_TYPES[path.extname(file)];

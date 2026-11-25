@@ -24,7 +24,7 @@ export function artistHome(ctx, { list, totals, contentOrders = [] }, opts) {
     ctx,
     "ההופעות שלי",
     html`
-<div class="row-head"><h1>ההופעות שלי</h1><a class="btn" href="/grow">+ מטרה חדשה</a></div>
+<div class="row-head"><h1>ההופעות שלי</h1><a class="btn small ghost" href="/artist/door">צוות כניסה</a><a class="btn" href="/grow">+ מטרה חדשה</a></div>
 ${list.length
   ? html`
 <div class="stats">
@@ -355,6 +355,38 @@ export function payoutPage(ctx, { artist, d, types }, opts) {
     <label class="check"><input type="checkbox" name="confirm" required> החשבון רשום על שמי או על שם העסק שלי</label>
     <button class="btn big block">שמירה</button>
   </form>
+</section>`,
+    opts
+  );
+}
+
+// ---------- צוות כניסה ----------
+
+export function doorStaffPage(ctx, { orgs, origin }, opts) {
+  return layout(
+    ctx,
+    "צוות כניסה",
+    html`
+<section class="narrow">
+  <p><a href="/artist">→ ההופעות שלי</a></p>
+  <h1>צוות כניסה</h1>
+  <p class="lead">כל איש דלת מקבל קישור אישי. הוא נפתח באפליקציית הסריקה, רואה את כל ההופעות של הערב, ועובד גם בלי קליטה. בלי סיסמה ובלי חשבון.</p>
+  ${orgs.map((o) => html`<section class="card">
+    <h2>${o.name}</h2>
+    ${o.staff.length
+      ? html`<ul class="staff-list">${o.staff.map((s) => html`<li>
+          <b>${s.name}</b>
+          <div class="linkbox"><code dir="ltr">${origin}/door/s/${s.token}</code><button type="button" class="btn small" data-copy="${origin}/door/s/${s.token}">העתקה</button></div>
+          ${postButton(ctx, `/artist/door/${o.id}/revoke/${s.id}`, "ביטול גישה", { cls: "linklike", confirm: `לבטל את הגישה של ${s.name}? הקישור יפסיק לעבוד מיד.` })}
+        </li>`)}</ul>`
+      : html`<p class="muted">עוד אין צוות.</p>`}
+    <form method="post" action="/artist/door/${o.id}/add" class="inline">
+      ${csrfField(ctx)}
+      <label class="field">שם<input name="name" required maxlength="40" placeholder="למשל: יוסי מהדלת"></label>
+      <button class="btn">הוספה</button>
+    </form>
+  </section>`)}
+  <p class="note">בכל הופעה יש גם קישור כניסה משלה (במסך ההופעה), למי שעובד רק בה.</p>
 </section>`,
     opts
   );

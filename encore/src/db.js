@@ -555,6 +555,29 @@ CREATE TABLE IF NOT EXISTS joker_invitations (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS joker_invitations_open ON joker_invitations(campaign_id, joker_id) WHERE status = 'open';
 
+-- צוות כניסה: קישור אישי לכל איש דלת, לכל ההופעות של המארגן. אפשר לבטל.
+CREATE TABLE IF NOT EXISTS door_staff (
+  id          INTEGER PRIMARY KEY,
+  artist_id   INTEGER NOT NULL REFERENCES artists(id),
+  name        TEXT NOT NULL,
+  token       TEXT NOT NULL UNIQUE,
+  created_by  INTEGER NOT NULL REFERENCES users(id),
+  created_at  TEXT NOT NULL,
+  revoked_at  TEXT
+);
+-- יומן כניסות: מי סרק, מתי, מאיזה מכשיר, והאם בלי קליטה. כולל ביטולים
+CREATE TABLE IF NOT EXISTS door_checkins (
+  id          INTEGER PRIMARY KEY,
+  ticket_id   INTEGER NOT NULL REFERENCES tickets(id),
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id),
+  action      TEXT NOT NULL,                 -- in | undo
+  staff_id    INTEGER,
+  device      TEXT NOT NULL DEFAULT '',
+  offline     INTEGER NOT NULL DEFAULT 0,
+  at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS door_checkins_campaign ON door_checkins(campaign_id, at);
+
 -- "תזכירו לי": תזכורת אחת במייל, רק למי שביקש במפורש
 CREATE TABLE IF NOT EXISTS show_reminders (
   id          INTEGER PRIMARY KEY,

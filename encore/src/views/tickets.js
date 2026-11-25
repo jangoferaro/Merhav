@@ -243,7 +243,7 @@ ${statement
 
 <section class="card">
   <h2>כניסה להופעה</h2>
-  <p>פותחים את הקישור הזה בטלפון בכניסה וסורקים את הכרטיסים. אפשר לתת אותו למי שעומד בדלת, בלי חשבון.</p>
+  <p>פותחים את הקישור בטלפון בכניסה וסורקים. עובד גם בלי קליטה. לצוות קבוע שעובד בכל ההופעות: <a href="/artist/door">צוות כניסה</a>.</p>
   <div class="linkbox"><code dir="ltr">${doorUrl}</code><button type="button" class="btn small" data-copy="${doorUrl}">העתקה</button></div>
   ${postButton(ctx, `/artist/c/${c.id}/door/rotate`, "קישור חדש (הישן יפסיק לעבוד)", { cls: "linklike", confirm: "ליצור קישור חדש? הקישור הקודם יפסיק לעבוד מיד." })}
 </section>
