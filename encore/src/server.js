@@ -23,6 +23,8 @@ import { designPage } from "./views/design.js";
 import { imageFromForm, saveMedia, serveMedia } from "./media.js";
 import { finishGoogleLogin, googleEnabled, startGoogleLogin } from "./auth-google.js";
 import * as CP from "./domain/coupons.js";
+import * as J from "./domain/jokers.js";
+import * as JV from "./views/jokers.js";
 import * as T from "./domain/tickets.js";
 import * as TV from "./views/tickets.js";
 import { gateway } from "./payments/index.js";
@@ -261,6 +263,62 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const link = R.getOrCreateLink(db, ctx.user, c.id);
     ctx.res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "private, max-age=3600" });
     ctx.res.end(T.qrSvg(`${origin(ctx)}/r/${link.code}`, { size: 600 }));
+  });
+
+  // ---------- פרופיל ג׳וקר ----------
+
+  r.get("/me/profile", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const j = J.ensureJoker(db, ctx.user);
+    const mine = new Set(db.prepare("SELECT campaign_id FROM referral_links WHERE promoter_id = ?").all(ctx.user.id).map((r) => r.campaign_id));
+    const shows = C.marketplace(db, { userId: ctx.user.id }).filter((c) => !mine.has(c.id));
+    ctx.send(JV.profilePage(ctx, {
+      j, p: J.powers(db, ctx.user.id), b: M.balances(db, ctx.user.id), invitations: J.invitationsFor(db, ctx.user.id),
+      recs: J.showsForJoker(db, j, shows), cardUrl: `${origin(ctx)}/j/${j.public_id}`,
+    }, opts(ctx)));
+  });
+
+  r.post("/me/profile", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const f = await ctx.form();
+    const current = J.getJoker(db, ctx.user.id);
+    f.image_url = imageFromForm(f, { required: false }) || f.image_url || current?.image_url || "";
+    J.saveJoker(db, ctx.user, f);
+    ctx.redirect("/me/profile", "הפרופיל נשמר");
+  });
+
+  r.post("/me/profile/card", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const f = await ctx.form();
+    J.setCard(db, ctx.user, f);
+    ctx.redirect("/me/profile#card", f.publish === "1" ? "הקלף פורסם" : "הקלף הוסתר");
+  });
+
+  r.post("/me/profile/invitations", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const on = (await ctx.form()).on === "1";
+    J.setInvitationsOn(db, ctx.user, on);
+    ctx.redirect("/me/profile", on ? "אמנים יכולים להזמין אותך" : "ההזמנות כבויות");
+  });
+
+  r.post("/me/invitations/:id/accept", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = J.decideInvitation(db, ctx.user, ctx.params.id, true);
+    ctx.redirect(`/s/${c.id}/share`, "קיבלת את ההזמנה. הנה הלינק האישי שלך.");
+  });
+
+  r.post("/me/invitations/:id/decline", (ctx) => {
+    if (!requireUser(ctx)) return;
+    J.decideInvitation(db, ctx.user, ctx.params.id, false);
+    ctx.redirect("/me/profile", "עדכנו את האמן");
+  });
+
+  // הקלף הציבורי של ג׳וקר
+  r.get("/j/:pid", (ctx) => {
+    const j = J.jokerByPublicId(db, ctx.params.pid);
+    const own = j && ctx.user?.id === j.user_id;
+    if (!j || (!j.card_public && !own)) throw new UserError("הקלף לא נמצא", 404);
+    ctx.send(JV.cardPage(ctx, { v: J.publicView(j, J.powers(db, j.user_id)), preview: !j.card_public }, opts(ctx)));
   });
 
   r.get("/me/sales", (ctx) => {
@@ -651,6 +709,21 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     if (!requireUser(ctx)) return;
     M.saveArtistPayout(db, ctx.user, ctx.params.artistId, await ctx.form());
     ctx.redirect("/artist", "הפרטים נשמרו. הכסף מהמכירות יועבר לחשבון הזה.");
+  });
+
+  r.get("/artist/c/:id/jokers", (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = managed(ctx, ctx.params.id);
+    const rows = J.jokersForCampaign(db, c).map((x) => ({ ...x, v: J.publicView(x.j, x.p, { forArtist: true }) }));
+    ctx.send(JV.artistJokersPage(ctx, { c, rows }, opts(ctx)));
+  });
+
+  r.post("/artist/c/:id/invite", async (ctx) => {
+    if (!requireUser(ctx)) return;
+    const c = managed(ctx, ctx.params.id);
+    rateLimit(`invite:${ctx.user.id}`, 60, 3600_000);
+    J.inviteJoker(db, ctx.user, c.id, await ctx.form());
+    ctx.redirect(`/artist/c/${c.id}/jokers`, "ההזמנה נשלחה");
   });
 
   r.post("/artist/c/:id/capacity", async (ctx) => {
@@ -1092,13 +1165,13 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   // בוטים של תצוגה מקדימה עוברים לדפי הופעה ולתמונות, כדי שאפשר יהיה לבדוק שיתוף בוואטסאפ.
   const pilotPass = () => process.env.STAGING_PASSWORD;
   const pilotToken = () => hmac(pilotPass(), "pilot-access");
-  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health)$|^\/(static|media|webhooks|tickets|door|t|reminders)\//;
+  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health)$|^\/(static|media|webhooks|tickets|door|t|reminders|j)\//;
 
   function stagingGate(req, res, ctx) {
     if (!pilotPass()) return false;
     const p = ctx.url.pathname;
     if (PUBLIC_PATHS.test(p)) return false;
-    if (isCrawler(req) && req.method === "GET" && /^\/(s|r|i)\//.test(p)) return false;
+    if (isCrawler(req) && req.method === "GET" && /^\/(s|r|i|j)\//.test(p)) return false;
     if (ctx.cookies.pilot && safeEqual(ctx.cookies.pilot, pilotToken())) return false;
     if (req.method !== "GET") {
       res.writeHead(403, { "content-type": "text/plain; charset=utf-8" });

@@ -474,6 +474,44 @@ CREATE TABLE IF NOT EXISTS service_offers (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS service_offers_open ON service_offers(campaign_id, creator_id) WHERE status = 'open';
 
+-- ---------- פרופיל ג׳וקר ----------
+-- כל שדה מלבד השם הוא רשות. נתונים חיצוניים (רשת חברתית) מסומנים כהצהרה עצמית עד שיש חיבור רשמי.
+CREATE TABLE IF NOT EXISTS joker_profiles (
+  user_id          INTEGER PRIMARY KEY REFERENCES users(id),
+  public_id        TEXT NOT NULL UNIQUE,              -- JOKER 00248
+  nickname         TEXT NOT NULL,
+  image_url        TEXT NOT NULL DEFAULT '',
+  city             TEXT NOT NULL DEFAULT '',
+  languages        TEXT NOT NULL DEFAULT '',
+  bio              TEXT NOT NULL DEFAULT '',
+  genres           TEXT NOT NULL DEFAULT '',           -- טעם מוזיקלי, בחירה ידנית
+  fav_artists      TEXT NOT NULL DEFAULT '',
+  skills           TEXT NOT NULL DEFAULT '',           -- share,content,community,events,photo
+  social_platform  TEXT NOT NULL DEFAULT '',
+  social_url       TEXT NOT NULL DEFAULT '',
+  social_followers INTEGER,                            -- הצהרה עצמית, לא מאומת
+  invitations_on   INTEGER NOT NULL DEFAULT 1,
+  card_public      INTEGER NOT NULL DEFAULT 0,
+  card_fields      TEXT NOT NULL DEFAULT 'genres,city',  -- מה מוצג בקלף הציבורי
+  created_at       TEXT NOT NULL,
+  updated_at       TEXT NOT NULL
+);
+
+-- אמן מזמין ג׳וקר: קידום (אפשר עם תגמול מוגדל), תוכן, או שיתוף פעולה מתמשך
+CREATE TABLE IF NOT EXISTS joker_invitations (
+  id            INTEGER PRIMARY KEY,
+  campaign_id   INTEGER NOT NULL REFERENCES campaigns(id),
+  joker_id      INTEGER NOT NULL REFERENCES users(id),
+  artist_user_id INTEGER NOT NULL REFERENCES users(id),
+  kind          TEXT NOT NULL,                         -- promote | content | ongoing
+  bonus_agorot  INTEGER NOT NULL DEFAULT 0,
+  message       TEXT NOT NULL DEFAULT '',
+  status        TEXT NOT NULL DEFAULT 'open',          -- open | accepted | declined | withdrawn
+  created_at    TEXT NOT NULL,
+  decided_at    TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS joker_invitations_open ON joker_invitations(campaign_id, joker_id) WHERE status = 'open';
+
 -- "תזכירו לי": תזכורת אחת במייל, רק למי שביקש במפורש
 CREATE TABLE IF NOT EXISTS show_reminders (
   id          INTEGER PRIMARY KEY,
@@ -545,6 +583,9 @@ function migrate(db) {
   // העברת כרטיס בודד לחבר
   add("tickets", "share_token", "TEXT");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS tickets_share ON tickets(share_token) WHERE share_token IS NOT NULL");
+  // תגמול מוגדל לג׳וקר מסוים (מהזמנה ישירה של האמן), לכל כרטיס, מעל התגמול הרגיל
+  add("referral_links", "bonus_agorot", "INTEGER NOT NULL DEFAULT 0");
+  add("orders", "joker_bonus_agorot", "INTEGER NOT NULL DEFAULT 0");
   // פרטי האמן לקבלת הכסף ממכירות (מוצפן)
   add("artists", "payout_details_enc", "TEXT");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ticket_orders_invite ON ticket_orders(invite_code) WHERE invite_code IS NOT NULL");

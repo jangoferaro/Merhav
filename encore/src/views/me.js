@@ -9,7 +9,7 @@ const COMMISSION_LABEL = {
 
 const tabs = (ctx) => html`
 <nav class="tabs" aria-label="האזור שלי">
-  ${[["/me/sales", "המכירות שלי"], ["/me/money", "הכסף שלי"], ["/creator", "יצירת תוכן"], ["/me/notifications", "התראות"]].map(
+  ${[["/me/profile", "הפרופיל שלי"], ["/me/sales", "המכירות שלי"], ["/me/money", "הכסף שלי"], ["/creator", "יצירת תוכן"], ["/me/notifications", "התראות"]].map(
     ([h, l]) => html`<a href="${h}"${ctx.url.pathname === h ? html` aria-current="page"` : ""}>${l}</a>`
   )}
 </nav>`;

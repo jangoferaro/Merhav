@@ -6,6 +6,7 @@ import * as C from "./domain/campaigns.js";
 import * as R from "./domain/referrals.js";
 import * as M from "./domain/money.js";
 import * as T from "./domain/tickets.js";
+import * as J from "./domain/jokers.js";
 import { sandboxPay } from "./payments/sandbox.js";
 import * as K from "./domain/content.js";
 import { saveImage, mediaDir } from "./media.js";
@@ -121,6 +122,14 @@ K.placeOrder(db, band, K.servicesOf(db, yoni.id)[0].id, { artist_name: "הקרו
 K.saveProfile(db, dani, { display_name: "דני כהן", city: "תל אביב", genres: "אינדי", kinds: ["content"], bio: "בא לכל הופעה אינדי בתל אביב, ומספר עליה לחברים.", image_url: img("blur") });
 K.saveService(db, dani, { template: "recommend", price: "120" });
 K.offerService(db, dani, ids[0], { service_id: K.servicesOf(db, dani.id)[0].id, message: "הבאתי כבר 6 אנשים להופעה. סרטון שלי יביא עוד." });
+
+// פרופילי ג׳וקרים: דני מלא עם קלף ציבורי, מאיה בסיסית, תום חדש לגמרי
+J.saveJoker(db, dani, { nickname: "דני כהן", city: "תל אביב", genres: ["אינדי", "אלטרנטיבי", "פולק"], fav_artists: "נועה ברק, הקרוואן", skills: ["share", "events", "content"], bio: "בא לכל הופעה אינדי בתל אביב, ומספר עליה לחברים.", social_platform: "Instagram", social_url: "https://instagram.com/example", social_followers: "4820", image_url: K.getProfile(db, dani.id)?.image_url });
+J.setCard(db, dani, { publish: "1", fields: ["genres", "city", "tickets", "artists", "social"] });
+J.saveJoker(db, maya, { nickname: "מאיה", city: "תל אביב", genres: ["רוק", "אינדי"], skills: ["share", "community"] });
+J.saveJoker(db, tom, { nickname: "תום" });
+// הקרוואן מזמינים את מאיה לקדם את השקת האלבום, עם ₪10 נוספים לכרטיס
+J.inviteJoker(db, band, ids[1], { joker_id: maya.id, kind: "promote", bonus: "10", message: "ראינו שאת אוהבת רוק. נשמח שתהיי איתנו בהשקה." });
 
 console.log(`נוצר ${file}`);
 console.log("משתמשים לדוגמה (הקוד מוצג על המסך במצב פיתוח):");

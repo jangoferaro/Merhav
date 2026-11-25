@@ -261,7 +261,7 @@ ${offers.length
 </section>
 
 <section class="card">
-  <h2>הג׳וקרים המובילים</h2>
+  <div class="row-head"><h2>הג׳וקרים המובילים</h2>${["active", "paused"].includes(c.status) ? html`<a class="btn small" href="/artist/c/${c.id}/jokers">מציאת ג׳וקרים והזמנה</a>` : ""}</div>
   ${top.length
     ? html`<ol class="leaders">${top.map((p, i) => html`<li><span>${i + 1}</span><b>${(p.name || "מקדם/ת").split(" ")[0]}</b><span class="muted">${p.clicks} כניסות</span><b>${p.tickets} כרטיסים</b></li>`)}</ol>`
     : html`<p class="muted">עוד אין מקדמים. ${c.status === "active" ? "ההופעה כבר מופיעה במרקטפלייס." : ""}</p>`}
