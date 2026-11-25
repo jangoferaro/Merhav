@@ -23,7 +23,7 @@ export function designPage(ctx, opts) {
     "שפה עיצובית",
     html`
 <section class="hero">
-  <p class="eyebrow">jocares. · שפה עיצובית · גרסה 2</p>
+  <p class="eyebrow">JoCares. · שפה עיצובית · גרסה 2</p>
   <h1 class="display" dir="ltr" lang="en" style="text-align:right">Be Jo.</h1>
   <p class="lead">מותג תרבות עצמאי, אנושי, נועז ומינימליסטי. הממשק נקי ושקט, הצילום בשחור לבן, והחומצה מסמנת את מה שחשוב.</p>
   <p class="meta" dir="ltr" lang="en" style="text-align:right">Who cares? Jo cares. Because art deserves an audience.</p>

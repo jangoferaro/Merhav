@@ -5,7 +5,7 @@
    ========================================================================== */
 
 :root {
-  /* מותג Jocares. (brand/BRAND_KIT.md) */
+  /* מותג JoCares. (brand/BRAND_KIT.md) */
   --jo-ink: #151515;
   --jo-paper: #EDECE4;
   --jo-acid: #DFFF45;
@@ -542,7 +542,7 @@ tr.unread td:first-child { box-shadow: inset -3px 0 0 var(--jo-red); }
 .code-big { font: 500 clamp(2rem, 9vw, 3rem)/1 var(--font-mono); letter-spacing: .06em; background: var(--jo-acid); color: #151515; padding: 14px 18px; display: inline-block; direction: ltr; }
 
 /* ==========================================================================
-   הקופה של Jocares: קנייה, כרטיס, כניסה, מכירות
+   הקופה של JoCares: קנייה, כרטיס, כניסה, מכירות
    ========================================================================== */
 .ticketing-opt { margin-top: -6px; }
 .checkout-show { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 20px; }

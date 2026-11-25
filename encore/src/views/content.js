@@ -52,7 +52,7 @@ function creatorCard(c, goal) {
     <div><b>${s.title}</b><span class="meta">${days(s.delivery_days)} · ${KIND_LABEL[TEMPLATES[s.template].kind]}</span></div>
     <b class="price-tag">${money(s.price_agorot)}</b>
   </div>
-  <p class="meta">${c.stats.completed ? `${c.stats.completed} עבודות הושלמו · ${Math.round((c.stats.on_time / c.stats.completed) * 100)}% בזמן` : "חדש/ה ב-Jocares"}${c.services.length === 2 ? " · ועוד שירות אחד" : c.services.length > 2 ? ` · ועוד ${c.services.length - 1} שירותים` : ""}</p>
+  <p class="meta">${c.stats.completed ? `${c.stats.completed} עבודות הושלמו · ${Math.round((c.stats.on_time / c.stats.completed) * 100)}% בזמן` : "חדש/ה ב-JoCares"}${c.services.length === 2 ? " · ועוד שירות אחד" : c.services.length > 2 ? ` · ועוד ${c.services.length - 1} שירותים` : ""}</p>
   <a class="btn ghost block" href="/creators/${c.user_id}${goal ? `?goal=${goal}` : ""}">לפרופיל ולהזמנה</a>
 </article>`;
 }
@@ -169,7 +169,7 @@ export function orderNewPage(ctx, { s, creator, artistName, campaigns, goal }, o
       <ul class="facts">${lic.points.map((p) => html`<li>${p}</li>`)}</ul>
       <div class="total"><span>לתשלום</span><b>${money(split.price)}</b></div>
       <p class="note">הסכום נתפס בכרטיס ונגבה רק כשהעבודה מאושרת. אם היוצר לא מאשר תוך ${days(config.acceptWindowDays)} או מסרב, לא תחויבו.
-        היוצר מקבל ${money(split.creator)} ו-Jocares ${money(split.fee)}.</p>
+        היוצר מקבל ${money(split.creator)} ו-JoCares ${money(split.fee)}.</p>
     </div>
     <label class="check"><input type="checkbox" name="rights" required> יש לי זכות להעביר ליוצר את החומרים והמוזיקה לצורך העבודה</label>
     <p class="note">היוצר רשאי להביע דעה כנה. אנחנו לא מוכרים מחמאות.</p>
@@ -287,7 +287,7 @@ ${linkInfo
 <details class="card">
   <summary>התנאים שסוכמו</summary>
   <ul class="facts">
-    <li>מחיר: ${money(o.price_agorot)} · ליוצר ${money(o.creator_amount_agorot)} · Jocares ${money(o.fee_agorot)}</li>
+    <li>מחיר: ${money(o.price_agorot)} · ליוצר ${money(o.creator_amount_agorot)} · JoCares ${money(o.fee_agorot)}</li>
     <li>מה מקבלים: ${o.terms.deliverable}</li>
     <li>אספקה: ${days(o.terms.delivery_days)} מהאישור${o.accepted_at ? ` (עד ${showDate(o.due_at)})` : ""}</li>
     <li>תיקונים: ${o.terms.revisions} (נשארו ${o.revisions_left})</li>
@@ -421,7 +421,7 @@ function profileSetup(ctx, opts) {
   <h1>מרוויחים מיצירת תוכן לאמנים</h1>
   <p class="lead">לא צריך אלפי עוקבים. צריך לדעת לספר סיפור, לצלם, או להמליץ על מוזיקה שאוהבים.</p>
   <div class="card">${profileForm(ctx)}</div>
-  <p class="note">אחר כך בוחרים שירות מתבנית וקובעים מחיר. Jocares לוקחת ${config.contentFeeBps / 100}% רק מעבודות שהושלמו.</p>
+  <p class="note">אחר כך בוחרים שירות מתבנית וקובעים מחיר. JoCares לוקחת ${config.contentFeeBps / 100}% רק מעבודות שהושלמו.</p>
 </section>`,
     opts
   );
@@ -456,7 +456,7 @@ export function serviceForm(ctx, { s, template }, opts) {
   <form method="post" action="${s ? `/creator/services/${s.id}/edit` : "/creator/services/new"}" class="stack">${csrfField(ctx)}
     <input type="hidden" name="template" value="${v.template}">
     <label class="field big-field">מחיר (₪)<input name="price" type="number" min="10" step="1" required inputmode="numeric" value="${v.price_agorot ? v.price_agorot / 100 : ""}" data-service-price data-fee-bps="${config.contentFeeBps}" autofocus></label>
-    <p class="hint" data-service-net>Jocares לוקחת ${config.contentFeeBps / 100}% רק מעבודות שהושלמו.</p>
+    <p class="hint" data-service-net>JoCares לוקחת ${config.contentFeeBps / 100}% רק מעבודות שהושלמו.</p>
     <label class="field">שם השירות<input name="title" value="${v.title}" required maxlength="80"></label>
     <label class="field">מה האמן מקבל<textarea name="deliverable" rows="2" required maxlength="300">${v.deliverable}</textarea></label>
     <div class="row2">

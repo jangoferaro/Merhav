@@ -200,7 +200,7 @@ class Browser {
   }
 }
 
-test("HTTP: אמן פותח הופעה בקופה של Jocares → ג׳וקר משתף → חבר קונה ומשלם → כרטיס עם QR → סריקה בדלת", async () => {
+test("HTTP: אמן פותח הופעה בקופה של JoCares → ג׳וקר משתף → חבר קונה ומשלם → כרטיס עם QR → סריקה בדלת", async () => {
   resetRateLimits();
   const server = http.createServer(createApp(db));
   await new Promise((r) => server.listen(0, r));
@@ -209,7 +209,7 @@ test("HTTP: אמן פותח הופעה בקופה של Jocares → ג׳וקר מ
     const a = new Browser(base);
     await a.login("noa@x.com", "נועה");
     await a.get("/artist/new/details");
-    assert.match(a.last, /Jocares מוכרת/);
+    assert.match(a.last, /JoCares מוכרת/);
     const show = { ...SHOW, title: "השקה", capacity: "100" };
     let r = await a.post("/artist/new/preview", show);
     r = await a.post("/artist/new", { ...show, publish: "1" });

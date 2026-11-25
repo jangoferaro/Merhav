@@ -325,7 +325,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     ctx.redirect("/");
   });
 
-  // ---------- הקופה של Jocares ----------
+  // ---------- הקופה של JoCares ----------
 
   const checkoutData = (ctx, c) => {
     const ref = refFor(ctx, c.id);
@@ -333,7 +333,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   };
   const jocaresCampaign = (id) => {
     const c = campaignOr404(id);
-    if (c.provider !== "jocares") throw new UserError("ההופעה לא נמכרת דרך Jocares", 404);
+    if (c.provider !== "jocares") throw new UserError("ההופעה לא נמכרת דרך JoCares", 404);
     return c;
   };
   const ticketsUrl = (ctx, order) => `${origin(ctx)}/tickets/${order.token}`;
@@ -999,7 +999,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const db = openDb();
   const port = Number(process.env.PORT ?? 3000);
-  http.createServer(createApp(db)).listen(port, () => console.log(`Jocares רץ על http://localhost:${port}`));
+  http.createServer(createApp(db)).listen(port, () => console.log(`JoCares רץ על http://localhost:${port}`));
   const tick = () => {
     try {
       const r = M.settle(db);

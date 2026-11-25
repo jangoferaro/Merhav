@@ -33,7 +33,7 @@ ${list.length
   ${stat(money(totals.revenue), "הכנסות שנוצרו")}
   ${stat(totals.first_time, "קנו ממך לראשונה דרכנו", "", )}
 </div>
-<p class="note">"קנו לראשונה" = רוכשים שזו הרכישה הראשונה שלהם ממך דרך Jocares. ייתכן שהם כבר הכירו אותך מקודם.</p>
+<p class="note">"קנו לראשונה" = רוכשים שזו הרכישה הראשונה שלהם ממך דרך JoCares. ייתכן שהם כבר הכירו אותך מקודם.</p>
 <ul class="list cards">
   ${list.map(
     (c) => html`<li>
@@ -96,7 +96,7 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
   <form method="post" action="/artist/new/preview" class="stack" enctype="multipart/form-data" data-busy="מעלים…">
     ${csrfField(ctx)}
     <fieldset class="seg ticketing" data-ticketing><legend class="field">איך מוכרים את הכרטיסים?</legend>
-      <label><input type="radio" name="ticketing" value="jocares" ${!["coupon", "sim"].includes(v.ticketing) ? html`checked` : ""}> Jocares מוכרת (מומלץ)</label>
+      <label><input type="radio" name="ticketing" value="jocares" ${!["coupon", "sim"].includes(v.ticketing) ? html`checked` : ""}> JoCares מוכרת (מומלץ)</label>
       <label><input type="radio" name="ticketing" value="coupon" ${v.ticketing === "coupon" ? html`checked` : ""}> יש לי כבר קופה</label>
     </fieldset>
     <div class="ticketing-opt" data-when="jocares">
@@ -127,7 +127,7 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
       <p class="hint" data-suggest>טיפ: תגמול של כ-20% מהמחיר מושך יותר מקדמים.</p>
       <div class="split" data-split data-fee-bps="${config.feeBps}" aria-live="polite">
         <div><span>מקדם</span><b data-s="reward">—</b></div>
-        <div><span>Jocares (${config.feeBps / 100}%)</span><b data-s="fee">—</b></div>
+        <div><span>JoCares (${config.feeBps / 100}%)</span><b data-s="fee">—</b></div>
         <div class="you"><span>נשאר לכם</span><b data-s="artist">—</b></div>
       </div>
       <p class="note">משלמים רק על כרטיסים שנמכרו דרך מקדמים. על מכירות אחרות אין עמלה.</p>
@@ -169,7 +169,7 @@ export function previewPage(ctx, { c, form }, opts) {
   </article>
   <div class="split static">
     <div><span>מקדם</span><b>${money(s.reward)}</b></div>
-    <div><span>Jocares</span><b>${money(s.fee)}</b></div>
+    <div><span>JoCares</span><b>${money(s.fee)}</b></div>
     <div class="you"><span>נשאר לכם מכל כרטיס</span><b>${money(s.artist)}</b></div>
   </div>
   ${c.promo_limit ? html`<p class="muted center">עד ${c.promo_limit} כרטיסים דרך מקדמים.</p>` : ""}
@@ -240,7 +240,7 @@ ${["ended", "cancelled"].includes(c.status)
   : html`
 <section class="card">
   <h2>תגמול לכרטיס</h2>
-  <div class="split static"><div><span>מקדם</span><b>${money(s.reward)}</b></div><div><span>עמלת Jocares</span><b>${money(s.fee)}</b></div><div class="you"><span>נשאר לכם</span><b>${money(s.artist)}</b></div></div>
+  <div class="split static"><div><span>מקדם</span><b>${money(s.reward)}</b></div><div><span>עמלת JoCares</span><b>${money(s.fee)}</b></div><div class="you"><span>נשאר לכם</span><b>${money(s.artist)}</b></div></div>
   <form method="post" action="/artist/c/${c.id}/reward" class="inline">
     ${csrfField(ctx)}
     <input name="reward" type="number" min="1" step="1" value="${c.reward_agorot / 100}" inputmode="numeric" aria-label="תגמול חדש בשקלים">

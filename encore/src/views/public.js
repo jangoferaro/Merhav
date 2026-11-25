@@ -153,7 +153,7 @@ export function showPage(ctx, { c, referrer, link, stats, buyable, left = null }
         ? html`<p class="muted">הכרטיסים אזלו.</p>`
         : buyable
         ? html`<a class="btn big block" href="/s/${c.id}/buy">לרכישת כרטיסים</a>${left !== null && left <= 20 ? html`<p class="note">נשארו ${left} כרטיסים.</p>` : ""}`
-        : html`<p class="muted">${c.status === "cancelled" ? "ההופעה בוטלה." : "המכירה דרך Jocares סגורה כרגע."}</p>
+        : html`<p class="muted">${c.status === "cancelled" ? "ההופעה בוטלה." : "המכירה דרך JoCares סגורה כרגע."}</p>
                ${c.source_url ? html`<a class="btn ghost block" href="${c.source_url}" rel="noopener nofollow">לאתר ההופעה</a>` : ""}`}
     </div>
 
@@ -342,9 +342,9 @@ export function welcomeLanding(ctx, { shows, google }, opts) {
     "",
     html`
 <section class="lp-hero">
-  <p class="eyebrow" dir="ltr" lang="en">jocares. · Be Jo.</p>
+  <p class="eyebrow" dir="ltr" lang="en">JoCares. · Be Jo.</p>
   <h1 class="display">אמנות<br>צריכה קהל.</h1>
-  <p class="lead">Jocares מחברת בין אמנים לאנשים שאוהבים אותם. משתפים הופעה עם החברים, ומרוויחים מכל כרטיס שנמכר בזכותכם.</p>
+  <p class="lead">JoCares מחברת בין אמנים לאנשים שאוהבים אותם. משתפים הופעה עם החברים, ומרוויחים מכל כרטיס שנמכר בזכותכם.</p>
   <div class="lp-ctas">
     <a class="btn big acid" href="${join("/shows")}"><span lang="en" dir="ltr">Be Jo.</span> אני רוצה להצטרף</a>
     <a class="btn big ghost" href="${join("/grow")}">אני אמן/ית</a>
@@ -366,7 +366,7 @@ export function welcomeLanding(ctx, { shows, google }, opts) {
   <p class="muted">דוגמה: כרטיס ב-<span class="num">₪80</span></p>
   <div class="split static lp-split">
     <div><span>לג׳וקר שהביא את הקונה</span><b>₪20</b></div>
-    <div><span>Jocares</span><b>₪4</b></div>
+    <div><span>JoCares</span><b>₪4</b></div>
     <div class="you"><span>לאמן</span><b>₪56</b></div>
   </div>
   <p class="note">האמן קובע את התגמול. הסכום מוצג על כל הופעה לפני ששיתפתם משהו.</p>
@@ -421,13 +421,13 @@ export function pilotPage(ctx, { next }, opts) {
 <section class="narrow card">
   <p class="eyebrow">פיילוט סגור</p>
   <h1>כמעט בפנים</h1>
-  <p class="muted">Jocares נמצאת כרגע בפיילוט עם קבוצה קטנה של אמנים וג׳וקרים. הכניסו את קוד הגישה שקיבלתם.</p>
+  <p class="muted">JoCares נמצאת כרגע בפיילוט עם קבוצה קטנה של אמנים וג׳וקרים. הכניסו את קוד הגישה שקיבלתם.</p>
   <form method="post" action="/pilot" class="stack">
     ${csrfField(ctx)}<input type="hidden" name="next" value="${next}">
     <label class="field">קוד גישה<input name="code" required autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr" autofocus></label>
     <button class="btn big block">המשך</button>
   </form>
-  <p class="center note"><a href="/">מה זה Jocares?</a></p>
+  <p class="center note"><a href="/">מה זה JoCares?</a></p>
 </section>`,
     opts
   );

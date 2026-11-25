@@ -1,4 +1,4 @@
-// מסכי הקופה של Jocares: קנייה, תשלום, כרטיס, כניסה בדלת, ומכירות לאמן.
+// מסכי הקופה של JoCares: קנייה, תשלום, כרטיס, כניסה בדלת, ומכירות לאמן.
 import { config } from "../util.js";
 import { smsEnabled } from "../mailer.js";
 import { csrfField, html, layout, money, poster, postButton, raw, showDate, stat } from "./kit.js";

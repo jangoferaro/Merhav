@@ -24,7 +24,7 @@ export function ingestWebhook(db, providerName, raw, headers) {
   return ingestEvent(db, p.name, p.verifyWebhook(raw, headers));
 }
 
-/** אירוע שכבר אומת (או שנוצר בתוך המערכת, בקופה של Jocares). אותם כללי אידמפוטנטיות. */
+/** אירוע שכבר אומת (או שנוצר בתוך המערכת, בקופה של JoCares). אותם כללי אידמפוטנטיות. */
 export function ingestEvent(db, providerName, evt) {
   const p = provider(providerName);
   return tx(db, () => {

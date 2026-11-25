@@ -106,7 +106,7 @@ const BELL = raw(`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" st
 export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreator = false, wide = false, description = "", og = {}, noindex = false } = {}) {
   const abs = (u) => (/^https?:\/\//.test(u) ? u : `${ctx.origin ?? ""}${u}`);
   const desc = description || "אמנות צריכה קהל. בוחרים הופעה, משתפים, ומרוויחים מכל כרטיס שנמכר בזכותכם.";
-  const ogTitle = og.title || (title ? `${title} · jocares.` : "jocares. · אמנות צריכה קהל");
+  const ogTitle = og.title || (title ? `${title} · JoCares.` : "JoCares. · אמנות צריכה קהל");
   const u = ctx.user;
   const nav = [
     ["/shows", "הופעות"],
@@ -122,10 +122,10 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${title ? `${title} · jocares.` : "jocares. · אמנות צריכה קהל"}</title>
+<title>${title ? `${title} · JoCares.` : "JoCares. · אמנות צריכה קהל"}</title>
 <meta name="description" content="${desc}">${noindex ? html`
 <meta name="robots" content="noindex, nofollow">` : ""}
-<meta property="og:site_name" content="jocares.">
+<meta property="og:site_name" content="JoCares.">
 <meta property="og:type" content="${og.type || "website"}">
 <meta property="og:locale" content="he_IL">
 <meta property="og:title" content="${ogTitle}">
@@ -148,7 +148,7 @@ ${og.image ? "" : html`<meta property="og:image:width" content="1200"><meta prop
 ${config.isStaging ? html`<div class="staging-bar" role="note">סביבת בדיקה · הנתונים לדוגמה · אין כאן כסף אמיתי</div>` : ""}
 <header class="top">
   <div class="top-in">
-    <a href="/" class="logo" aria-label="Jocares, דף הבית">jocares<i aria-hidden="true">.</i></a>
+    <a href="/" class="logo" aria-label="JoCares, דף הבית">JoCares<i aria-hidden="true">.</i></a>
     <nav aria-label="ראשי">
       ${nav.map(([href, label]) => html`<a href="${href}"${(path === href || path.startsWith(href + "/")) ? raw(' aria-current="page"') : ""}>${label}</a>`)}
     </nav>
@@ -166,7 +166,7 @@ ${config.showLoginCodes && flash?.dev ? html`<div class="flash dev">${config.isS
 ${body}
 </main>
 <footer class="foot">
-  <p class="foot-big" dir="ltr">jocares.</p>
+  <p class="foot-big" dir="ltr">JoCares.</p>
   <p class="foot-tag" dir="ltr" lang="en">Who cares? Jo cares. Because art deserves an audience.</p>
   <nav aria-label="תחתון"><a href="/how">איך זה עובד</a><a href="/terms">תנאים ופרטיות</a></nav>
 </footer>

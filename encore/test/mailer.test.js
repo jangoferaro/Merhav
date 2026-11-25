@@ -13,12 +13,12 @@ const capture = () => {
 test("Brevo: מייל נשלח עם המפתח בכותרת והשולח מפורק לשם ומייל", async () => {
   delete process.env.RESEND_API_KEY;
   process.env.BREVO_API_KEY = "test-key";
-  process.env.MAIL_FROM = "Jocares <hello@jocares.co.il>";
+  process.env.MAIL_FROM = "JoCares <hello@jocares.co.il>";
   const { calls, f } = capture();
   assert.equal(await sendMail({ to: "a@b.com", subject: "s", text: "t" }, f), true);
   assert.equal(calls[0].url, "https://api.brevo.com/v3/smtp/email");
   assert.equal(calls[0].init.headers["api-key"], "test-key");
-  assert.deepEqual(JSON.parse(calls[0].init.body).sender, { name: "Jocares", email: "hello@jocares.co.il" });
+  assert.deepEqual(JSON.parse(calls[0].init.body).sender, { name: "JoCares", email: "hello@jocares.co.il" });
 });
 
 test("בלי ספק מייל לא שולחים כלום", async () => {

@@ -1,4 +1,4 @@
-// הקופה של Jocares: אנחנו ספק הכרטוס. הקונה קונה אצלנו, מקבל כרטיס עם QR, והמכירה נרשמת
+// הקופה של JoCares: אנחנו ספק הכרטוס. הקונה קונה אצלנו, מקבל כרטיס עם QR, והמכירה נרשמת
 // באותו מנוע שיוך ותגמולים כמו כל ספק אחר (tickets.js שולח אליו אירועים פנימיים).
 import { randomToken, UserError } from "../util.js";
 
@@ -15,6 +15,6 @@ export const jocaresProvider = {
 
   /** אירועים של הקופה נוצרים בתוך המערכת ולא מגיעים מבחוץ */
   verifyWebhook() {
-    throw new UserError("לקופה של Jocares אין webhooks חיצוניים", 404);
+    throw new UserError("לקופה של JoCares אין webhooks חיצוניים", 404);
   },
 };

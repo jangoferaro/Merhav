@@ -402,7 +402,7 @@ CREATE TABLE IF NOT EXISTS sim_orders (
   created_at    TEXT NOT NULL
 );
 
--- ---------- כרטוס של Jocares: הקופה שלנו ----------
+-- ---------- כרטוס של JoCares: הקופה שלנו ----------
 CREATE TABLE IF NOT EXISTS ticket_orders (
   id                INTEGER PRIMARY KEY,
   campaign_id       INTEGER NOT NULL REFERENCES campaigns(id),
@@ -486,7 +486,7 @@ function migrate(db) {
   add("referral_links", "coupon_code", "TEXT");
   add("referral_links", "coupon_registered_at", "TEXT");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS referral_links_coupon ON referral_links(coupon_code) WHERE coupon_code IS NOT NULL");
-  // כרטוס של Jocares: קיבולת המקום וקישור סודי לסריקה בכניסה
+  // כרטוס של JoCares: קיבולת המקום וקישור סודי לסריקה בכניסה
   add("events", "capacity", "INTEGER");
   add("campaigns", "door_token", "TEXT");
   const missing = db.prepare("SELECT id FROM referral_links WHERE coupon_code IS NULL").all();

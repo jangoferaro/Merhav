@@ -1,14 +1,14 @@
 // שליחת מייל ו-SMS. הספק נבחר לפי המפתח שמוגדר בסביבה:
-//   מייל: BREVO_API_KEY (Brevo) או RESEND_API_KEY (Resend). שולח: MAIL_FROM, למשל "Jocares <hello@jocares.co.il>"
+//   מייל: BREVO_API_KEY (Brevo) או RESEND_API_KEY (Resend). שולח: MAIL_FROM, למשל "JoCares <hello@jocares.co.il>"
 //   SMS:  TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + TWILIO_FROM (מספר או שם שולח, או MessagingServiceSid שמתחיל ב-MG)
 // בלי מפתח: בפיתוח ובבדיקות מודפס ליומן (וקוד הכניסה מוצג על המסך).
 import { config } from "./util.js";
 
-const fromHeader = () => process.env.MAIL_FROM || "Jocares <hello@jocares.example>";
+const fromHeader = () => process.env.MAIL_FROM || "JoCares <hello@jocares.example>";
 
 function parseFrom(v) {
   const m = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(v);
-  return m ? { name: m[1] || "Jocares", email: m[2] } : { name: "Jocares", email: v.trim() };
+  return m ? { name: m[1] || "JoCares", email: m[2] } : { name: "JoCares", email: v.trim() };
 }
 
 export const mailEnabled = () => !!(process.env.BREVO_API_KEY || process.env.RESEND_API_KEY);
@@ -64,7 +64,7 @@ export async function sendSms(phone, body, fetchImpl = fetch) {
 export async function sendLoginCode(addr, code) {
   const sent = await sendMail({
     to: addr,
-    subject: `הקוד שלך ל-Jocares: ${code}`,
+    subject: `הקוד שלך ל-JoCares: ${code}`,
     text: `הקוד שלך: ${code}\nהוא בתוקף ל-10 דקות. אם לא ביקשת אותו, אפשר להתעלם מההודעה.`,
   });
   if (sent) return { sent: true };

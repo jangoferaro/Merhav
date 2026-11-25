@@ -47,7 +47,7 @@
 ## טיפוגרפיה
 | שימוש | גופן | הערה |
 |---|---|---|
-| לוגו, כותרות לטיניות | Space Grotesk 700 | `jocares.`, letter-spacing ‎-0.06em |
+| לוגו, כותרות לטיניות | Space Grotesk 700 | `JoCares.` (C גדולה), letter-spacing ‎-0.06em |
 | כותרות בעברית | Heebo 800–900 | נבחר אוטומטית לתווים עבריים |
 | טקסט רץ | Assistant 400 / 600 | 17px |
 | מספרים, כסף, סטטיסטיקה | IBM Plex Mono | `tabular-nums` |

@@ -1,4 +1,4 @@
-// הקופה של Jocares: מכירת כרטיסים, תשלום, כרטיס עם QR, החזרים וכניסה בדלת.
+// הקופה של JoCares: מכירת כרטיסים, תשלום, כרטיס עם QR, החזרים וכניסה בדלת.
 // כל מכירה ששולמה נכנסת למנוע השיוך והתגמולים (ingest.js) בדיוק כמו מכירה מספק חיצוני,
 // כך שהג׳וקרים מקבלים תגמול בלי שאף אחד יעשה שום דבר ידני.
 import crypto from "node:crypto";
@@ -311,7 +311,7 @@ const icsDate = (iso) => iso.replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 export function ics(c, order, url) {
   const end = new Date(new Date(c.starts_at).getTime() + 3 * 3600000).toISOString();
   return [
-    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Jocares//Tickets//HE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//JoCares//Tickets//HE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
     "BEGIN:VEVENT",
     `UID:jocares-order-${order.id}@jocares`,
     `DTSTAMP:${icsDate(clock.iso())}`,
