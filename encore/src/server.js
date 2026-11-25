@@ -803,6 +803,41 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   doorApi("/door/api/e/:token", (ctx) => DR.resolveDoor(db, { eventToken: ctx.params.token }));
   doorApi("/door/api/s/:staff/:cid", (ctx) => DR.resolveDoor(db, { staffToken: ctx.params.staff, campaignId: ctx.params.cid }));
 
+  // ---------- API לאפליקציית הנייטיב ----------
+  // האפליקציה מזדהה עם המפתח האישי של איש הצוות בכותרת Authorization, בלי עוגיות, ולכן בלי csrf.
+  // מפתח שבוטל אצל המארגן מפסיק לעבוד מיד.
+  const appStaff = (ctx) => {
+    const m = /^Bearer\s+([A-Za-z0-9_-]{10,80})$/.exec(String(ctx.req.headers.authorization ?? ""));
+    const staff = m && DR.staffByToken(db, m[1]);
+    if (!staff) throw new UserError("הגישה בוטלה או שהקישור לא בתוקף. בקשו קישור חדש מהמארגן.", 401);
+    return staff;
+  };
+  const appApi = (method, path, fn) =>
+    r[method](path, async (ctx) => {
+      try {
+        rateLimit(`door-app:${ctx.ip}`, 1200, 600_000);
+        const staff = appStaff(ctx);
+        if (method === "post") {
+          try { ctx.body = JSON.parse((await readBody(ctx.req, 256 * 1024)) || "{}"); } catch { throw new UserError("בקשה לא תקינה", 400); }
+        }
+        const c = ctx.params.cid ? DR.resolveDoor(db, { staffToken: staff.token, campaignId: ctx.params.cid }).c : null;
+        const out = await fn(ctx, staff, c);
+        ctx.json(c && !Array.isArray(out) ? { ...out, stats: DR.stats(db, c) } : out);
+      } catch (e) {
+        if (!(e instanceof UserError)) throw e;
+        ctx.res.writeHead(e.status || 400, { "content-type": "application/json; charset=utf-8" });
+        ctx.res.end(JSON.stringify({ error: e.message }));
+      }
+    }, method === "post" ? { noCsrf: true } : undefined);
+  appApi("get", "/door/app/v1/me", (ctx, staff) => DR.appHome(db, staff));
+  appApi("get", "/door/app/v1/e/:cid/manifest", (ctx, staff, c) => DR.manifest(db, c));
+  appApi("get", "/door/app/v1/e/:cid/search", (ctx, staff, c) => DR.search(db, c, ctx.query.q));
+  appApi("post", "/door/app/v1/e/:cid/check", (ctx, staff, c) => DR.admit(db, c, { code: ctx.body.code, staff, device: ctx.body.device }));
+  appApi("post", "/door/app/v1/e/:cid/checkid", (ctx, staff, c) => DR.admit(db, c, { ticketId: ctx.body.id, staff, device: ctx.body.device }));
+  appApi("post", "/door/app/v1/e/:cid/undo", (ctx, staff, c) => DR.undo(db, c, ctx.body.id, { staff, device: ctx.body.device }));
+  appApi("post", "/door/app/v1/e/:cid/sync", (ctx, staff, c) => ({ results: DR.syncOffline(db, c, ctx.body.items, { staff, device: ctx.body.device }) }));
+  appApi("get", "/door/app/v1/e/:cid/stats", (ctx, staff, c) => ({ staff: DR.staffCounts(db, c) }));
+
   // קישור של הופעה (כמו קודם): נפתח ישר לסורק
   r.get("/door/:token", (ctx) => {
     const { c } = DR.resolveDoor(db, { eventToken: ctx.params.token });
@@ -831,7 +866,8 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   // המארגן מנהל את צוות הכניסה
   r.get("/artist/door", (ctx) => {
     if (!requireUser(ctx)) return;
-    const orgs = ID.artistsOf(db, ctx.user.id).map((a) => ({ ...a, staff: DR.staffOf(db, a.id) }));
+    // לכל איש צוות QR של הקישור האישי: סורקים אותו באפליקציה ומתחילים לעבוד
+    const orgs = ID.artistsOf(db, ctx.user.id).map((a) => ({ ...a, staff: DR.staffOf(db, a.id).map((s) => ({ ...s, qr: T.qrSvg(`${origin(ctx)}/door/s/${s.token}`, { size: 160 }) })) }));
     ctx.send(A.doorStaffPage(ctx, { orgs, origin: origin(ctx) }, opts(ctx)));
   });
   r.post("/artist/door/:aid/add", async (ctx) => {

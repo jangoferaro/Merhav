@@ -771,3 +771,6 @@ body.door-app { margin: 0; background: #151515; color: #EDECE4; font-family: var
 .da-empty { color: #B4B3AA; }
 .door-app :focus-visible { outline: 3px solid var(--jo-acid); outline-offset: 2px; }
 .staff-list { list-style: none; padding: 0; display: grid; gap: 14px; }
+.staff-qr summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.staff-qr .qr { background: #fff; width: 176px; padding: 8px; border-radius: 12px; }
+.staff-qr .qr svg { display: block; width: 160px; height: 160px; }

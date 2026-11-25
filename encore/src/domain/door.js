@@ -147,3 +147,30 @@ export function stats(db, c) {
   const last15 = db.prepare("SELECT COUNT(*) n FROM tickets WHERE campaign_id = ? AND status = 'used' AND used_at > ?").get(c.id, new Date(clock.now().getTime() - 15 * 60_000).toISOString()).n;
   return { ...s, last15 };
 }
+
+// ---------- לאפליקציית הנייטיב ----------
+
+/** מסך הבית של האפליקציה: מי אני, אצל מי, ואילו הופעות. רק מה שהמסך צריך */
+export function appHome(db, staff) {
+  const organizer = db.prepare("SELECT name, kind FROM artists WHERE id = ?").get(staff.artist_id) ?? {};
+  return {
+    staff: { name: staff.name },
+    organizer: { name: organizer.name ?? "", kind: organizer.kind ?? "artist" },
+    events: eventsForStaff(db, staff).map((c) => ({
+      id: c.id, artist: c.artist_name, title: c.title, venue: c.venue, starts_at: c.starts_at,
+      inside: c.stats.inside, total: c.stats.total,
+    })),
+  };
+}
+
+/** כמה נכנסו דרך כל איש צוות, וכמה נסרקו בלי קליטה. מספרים בלבד */
+export function staffCounts(db, c) {
+  return db
+    .prepare(
+      `SELECT COALESCE(s.name, 'קישור ההופעה') name, SUM(CASE WHEN d.action = 'in' THEN 1 ELSE -1 END) n
+         FROM door_checkins d LEFT JOIN door_staff s ON s.id = d.staff_id
+        WHERE d.campaign_id = ? GROUP BY d.staff_id ORDER BY n DESC`
+    )
+    .all(c.id)
+    .filter((r) => r.n > 0);
+}

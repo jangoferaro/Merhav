@@ -125,3 +125,54 @@ test("HTTP: איש צוות מהקישור האישי, סריקה דרך האפ�
     server.close();
   }
 });
+
+test("API לאפליקציית הנייטיב: מפתח אישי בכותרת, בלי עוגיות, וביטול גישה עובד מיד", async () => {
+  resetRateLimits();
+  const [t, t2] = buy(camp, { name: "דנה לוי", email: "d@y.com", qty: 2 });
+  const tok = DR.addStaff(db, org, camp.artist_id, "יוסי");
+  const otherShow = C.getCampaign(db, C.createCampaign(db, other, { ...SHOW, organizer_name: "אחר" }));
+  const server = http.createServer(createApp(db));
+  await new Promise((r) => server.listen(0, r));
+  const base = `http://127.0.0.1:${server.address().port}/door/app/v1`;
+  const call = async (path, { key = tok, body } = {}) => {
+    const res = await fetch(base + path, {
+      method: body ? "POST" : "GET",
+      headers: { authorization: `Bearer ${key}`, ...(body ? { "content-type": "application/json" } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { status: res.status, json: await res.json() };
+  };
+  try {
+    let r = await call("/me", { key: "x".repeat(24) });
+    assert.equal(r.status, 401);
+    r = await call("/me");
+    assert.equal(r.json.staff.name, "יוסי");
+    assert.equal(r.json.organizer.name, "הבארבי");
+    assert.deepEqual(r.json.events.map((e) => e.id), [camp.id]);
+    assert.equal(r.json.events[0].total, 2);
+    assert.equal((await call(`/e/${otherShow.id}/manifest`)).status, 404);
+
+    r = await call(`/e/${camp.id}/manifest`);
+    assert.equal(r.json.tickets.length, 2);
+    assert.ok(!JSON.stringify(r.json).includes(t.code), "הקודים עצמם לא נשלחים למכשיר");
+
+    r = await call(`/e/${camp.id}/check`, { body: { code: t.code, device: "ios-1" } });
+    assert.equal(r.json.result, "ok");
+    assert.equal(r.json.stats.inside, 1);
+    r = await call(`/e/${camp.id}/check`, { body: { code: t.code } });
+    assert.equal(r.json.result, "used");
+    r = await call(`/e/${camp.id}/search?q=${encodeURIComponent("דנה")}`);
+    assert.equal(r.json.length, 2);
+    r = await call(`/e/${camp.id}/sync`, { body: { items: [{ id: t2.id, at: "2026-12-01T09:59:00.000Z" }] } });
+    assert.deepEqual(r.json.results.map((x) => x.result), ["ok"]);
+    r = await call(`/e/${camp.id}/stats`);
+    assert.deepEqual(r.json.staff, [{ name: "יוסי", n: 2 }]);
+    r = await call(`/e/${camp.id}/undo`, { body: { id: t.id } });
+    assert.equal(r.json.result, "undone");
+
+    DR.revokeStaff(db, org, camp.artist_id, DR.staffByToken(db, tok).id);
+    assert.equal((await call("/me")).status, 401);
+  } finally {
+    server.close();
+  }
+});

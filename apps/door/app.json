@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "JoCares Door",
+    "slug": "jocares-door",
+    "scheme": "jocares-door",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#151515",
+    "splash": { "backgroundColor": "#151515", "resizeMode": "contain", "image": "./assets/splash-icon.png" },
+    "ios": {
+      "bundleIdentifier": "com.jocares.door",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.jocares.door",
+      "adaptiveIcon": {
+        "backgroundColor": "#151515",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      ["expo-camera", { "cameraPermission": "JoCares Door משתמשת במצלמה כדי לסרוק כרטיסים בכניסה.", "recordAudioAndroid": false }],
+      "expo-secure-store",
+      ["expo-audio", { "microphonePermission": false, "recordAudioAndroid": false, "enableBackgroundPlayback": false }],
+      "expo-font"
+    ]
+  }
+}

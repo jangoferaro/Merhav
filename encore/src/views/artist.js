@@ -2,7 +2,7 @@
 import { artistSales, earlyFields } from "./tickets.js";
 import { config, isoToIsraelLocal } from "../util.js";
 import { ORGANIZER_KINDS, split, STATUS_LABEL, TRANSITIONS } from "../domain/campaigns.js";
-import { csrfField, empty, html, imageInput, layout, mediaInput, mediaTile, money, postButton, poster, showDate, stat, statusBadge } from "./kit.js";
+import { csrfField, empty, html, raw, imageInput, layout, mediaInput, mediaTile, money, postButton, poster, showDate, stat, statusBadge } from "./kit.js";
 import { orderBadge } from "./content.js";
 
 function contentOrdersBlock(orders) {
@@ -370,12 +370,14 @@ export function doorStaffPage(ctx, { orgs, origin }, opts) {
 <section class="narrow">
   <p><a href="/artist">→ ההופעות שלי</a></p>
   <h1>צוות כניסה</h1>
-  <p class="lead">כל איש דלת מקבל קישור אישי. הוא נפתח באפליקציית הסריקה, רואה את כל ההופעות של הערב, ועובד גם בלי קליטה. בלי סיסמה ובלי חשבון.</p>
+  <p class="lead">כל איש דלת מקבל קישור אישי. הוא נפתח באפליקציה JoCares Door (או בדפדפן), רואה את כל ההופעות של הערב, ועובד גם בלי קליטה. בלי סיסמה ובלי חשבון.</p>
   ${orgs.map((o) => html`<section class="card">
     <h2>${o.name}</h2>
     ${o.staff.length
       ? html`<ul class="staff-list">${o.staff.map((s) => html`<li>
           <b>${s.name}</b>
+          <details class="staff-qr"><summary>QR לאפליקציית הסריקה</summary><div class="qr" role="img" aria-label="QR של הקישור של ${s.name}">${raw(s.qr)}</div>
+            <p class="muted">באפליקציה JoCares Door לוחצים על סריקת קוד הצטרפות ומכוונים לכאן. אפשר גם לשלוח את הקישור בהודעה.</p></details>
           <div class="linkbox"><code dir="ltr">${origin}/door/s/${s.token}</code><button type="button" class="btn small" data-copy="${origin}/door/s/${s.token}">העתקה</button></div>
           ${postButton(ctx, `/artist/door/${o.id}/revoke/${s.id}`, "ביטול גישה", { cls: "linklike", confirm: `לבטל את הגישה של ${s.name}? הקישור יפסיק לעבוד מיד.` })}
         </li>`)}</ul>`
