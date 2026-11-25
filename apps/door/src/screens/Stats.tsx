@@ -28,8 +28,9 @@ export default function Stats({ door, session, campaignId, artist, onBack }: { d
       <Header title="מצב הדלת" sub={`${artist} · ${door.online ? "מתעדכן בזמן אמת" : "בלי קליטה"}`} onBack={onBack} backLabel="חזרה לסריקה" />
       <View style={{ backgroundColor: C.card, borderRadius: 24, padding: 22, gap: 12 }} accessible accessibilityLabel={`${inside} בפנים מתוך ${total}`}>
         <Text style={[rtl, { fontFamily: F.body, fontSize: 15, color: C.muted }]}>בפנים</Text>
-        <Text style={[rtl, { fontFamily: F.brand, fontSize: 64, lineHeight: 70, color: C.paper }]}>
-          {inside}<Text style={{ fontSize: 28, color: C.faint }}> / {total}</Text>
+        {/* מספרים משמאל לימין, כמו בעיצוב: "4 / 12" */}
+        <Text style={{ alignSelf: "flex-end", writingDirection: "ltr", fontFamily: F.brand, fontSize: 64, lineHeight: 70, color: C.paper }}>
+          {`${inside}`}<Text style={{ fontSize: 28, color: C.faint }}>{` / ${total}`}</Text>
         </Text>
         <Bar value={total ? inside / total : 0} height={10} />
       </View>

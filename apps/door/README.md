@@ -16,6 +16,7 @@
 ```bash
 cd apps/door
 npm install
+export LANG=en_US.UTF-8     # בלי זה CocoaPods נופל על קידוד תווים
 npx expo run:ios            # בונה ומריץ בסימולטור (צריך Xcode)
 npx expo run:ios --device   # על אייפון מחובר
 ```

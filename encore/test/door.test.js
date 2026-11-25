@@ -161,6 +161,11 @@ test("API לאפליקציית הנייטיב: מפתח אישי בכותרת, �
     assert.equal(r.json.stats.inside, 1);
     r = await call(`/e/${camp.id}/check`, { body: { code: t.code } });
     assert.equal(r.json.result, "used");
+    const [foreign] = buy(otherShow, { name: "רון", email: "r@y.com", qty: 1 });
+    r = await call(`/e/${camp.id}/check`, { body: { code: foreign.code } });
+    assert.equal(r.json.result, "wrong_show");
+    assert.equal(r.json.other, "נועה · ערב", "הצוות רואה לאיזו הופעה הכרטיס, בלי פרטי הקונה");
+    assert.ok(!JSON.stringify(r.json).includes("רון"));
     r = await call(`/e/${camp.id}/search?q=${encodeURIComponent("דנה")}`);
     assert.equal(r.json.length, 2);
     r = await call(`/e/${camp.id}/sync`, { body: { items: [{ id: t2.id, at: "2026-12-01T09:59:00.000Z" }] } });

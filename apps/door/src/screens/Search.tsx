@@ -55,12 +55,12 @@ export default function Search({ door, onBack }: { door: Door; onBack: () => voi
                 <Text style={[rtl, { fontFamily: F.title, fontSize: 19, color: C.paper }]}>{r.name}</Text>
                 <Text style={[rtl, { fontFamily: F.body, fontSize: 14, color: C.muted }]}>{meta}</Text>
               </View>
-              {used ? <Text style={{ fontFamily: F.body, fontSize: 14, color: C.muted }}>נכנס/ה</Text> : <Button label="הכנסה" onPress={() => admit(r)} style={{ minHeight: 48 }} accessibilityLabel={`הכנסה של ${r.name}`} />}
+              {used ? <Text style={{ fontFamily: F.body, fontSize: 14, color: C.muted }}>{r.used_at ? `נכנס/ה ${new Date(r.used_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}` : "נכנס/ה"}</Text> : <Button label="הכנסה" onPress={() => admit(r)} style={{ minHeight: 48 }} accessibilityLabel={`הכנסה של ${r.name}`} />}
             </View>
           );
         }}
       />
-      <Text style={[rtl, { fontFamily: F.body, fontSize: 14, color: C.faint, paddingBottom: 12 }]}>כרטיסים שהוחזרו לא מופיעים בחיפוש.</Text>
+      <Text style={[rtl, { fontFamily: F.body, fontSize: 14, color: C.faint, paddingBottom: 12 }]}>כרטיס שמי מסומן. מכניסים רק אחרי בדיקת תעודה. כרטיסים שהוחזרו לא מופיעים בחיפוש.</Text>
     </View>
   );
 }

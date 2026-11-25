@@ -92,7 +92,11 @@ export function admit(db, c, { code = null, ticketId = null, staff = null, devic
     t = n ? db.prepare("SELECT t.*, o.buyer_name, o.qty FROM tickets t JOIN ticket_orders o ON o.id = t.order_id WHERE t.code = ?").get(n) : null;
   }
   if (!t) return { result: "unknown" };
-  if (t.campaign_id !== c.id) return { result: "wrong_show" };
+  if (t.campaign_id !== c.id) {
+    // אומרים לצוות לאיזו הופעה הכרטיס, כדי להפנות את האורח לתור הנכון. רק שם ההופעה, בלי פרטי הקונה
+    const o = getCampaign(db, t.campaign_id);
+    return { result: "wrong_show", other: o ? `${o.artist_name} · ${o.title}` : "" };
+  }
   if (t.status === "refunded") return { result: "refunded", ticket: view(t) };
   const when = at && at < clock.iso() ? at : clock.iso();
   const ok = db.prepare("UPDATE tickets SET status = 'used', used_at = ? WHERE id = ? AND status = 'valid'").run(when, t.id).changes;

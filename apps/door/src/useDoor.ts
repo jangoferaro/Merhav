@@ -10,6 +10,8 @@ import { feedback } from "./feedback";
 export type Shown = {
   kind: Result | "queued" | "idle";
   good: boolean;
+  /** ביטול כניסה: לא ירוק ולא אדום, כדי שלא ייראה כמו "להכניס" */
+  neutral: boolean;
   title: string;
   name: string;
   detail: string;
@@ -25,6 +27,7 @@ const DETAILS: Record<string, string> = {
   refunded: "הכסף הוחזר. הכרטיס לא בתוקף",
   unknown: "לא כרטיס של JoCares, או צילום פגום",
   wrong_show: "הכרטיס להופעה אחרת. הפנו לתור הנכון",
+  undone: "הכרטיס שוב בתוקף, ואפשר לסרוק אותו מחדש",
   queued: "נשמר במכשיר ויישלח כשהקליטה תחזור",
 };
 const time = (iso?: string | null) => (iso ? new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }) : "");
@@ -41,7 +44,8 @@ export function useDoor(session: Session, campaignId: number) {
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
   const [syncedAt, setSyncedAt] = useState<string>("");
-  const [shown, setShown] = useState<Shown>({ kind: "idle", good: true, title: "מוכנים לסריקה", name: "", detail: "מכוונים את המצלמה ל-QR שעל הכרטיס", at: 0 });
+  const [reachable, setReachable] = useState(true);
+  const [shown, setShown] = useState<Shown>({ kind: "idle", good: true, neutral: true, title: "מוכנים לסריקה", name: "", detail: "מכוונים את המצלמה ל-QR שעל הכרטיס", at: 0 });
   const [rejected, setRejected] = useState(0);
   const [conflicts, setConflicts] = useState(0);
 
@@ -50,6 +54,13 @@ export function useDoor(session: Session, campaignId: number) {
   const device = useRef("");
   const busy = useRef(false);
   const onlineRef = useRef(true);
+  // הרשת יכולה להיות מחוברת והשרת לא עונה (Wi-Fi של מקום בלי אינטרנט). אז עובדים כמו בלי קליטה
+  const reachableRef = useRef(true);
+  const markReachable = useCallback((v: boolean) => {
+    reachableRef.current = v;
+    setReachable(v);
+  }, []);
+  const chain = useRef<Promise<unknown>>(Promise.resolve());
 
   const persist = useCallback(() => {
     setJSON(`${key}:manifest`, [...tickets.current.values()]);
@@ -58,11 +69,15 @@ export function useDoor(session: Session, campaignId: number) {
   }, [key]);
 
   const show = useCallback((kind: Shown["kind"], ticket?: TicketView, detail = "") => {
-    const good = kind === "ok" || kind === "queued" || kind === "undone";
+    const neutral = kind === "undone";
+    const good = kind === "ok" || kind === "queued" || neutral;
     let d = detail || DETAILS[kind] || "";
-    if (!detail && ticket?.named && good && kind !== "undone") d = "כרטיס שמי: בדקו תעודה מזהה עם השם הזה";
+    if (!detail && (kind === "ok" || kind === "queued")) {
+      const type = ticket?.named ? "כרטיס שמי: בדקו תעודה מזהה עם השם הזה" : "כרטיס רגיל";
+      d = kind === "queued" ? `${type}. ${DETAILS.queued}` : type;
+    }
     if (!detail && kind === "used" && ticket?.used_at) d = `נסרק ב-${time(ticket.used_at)}`;
-    setShown({ kind, good, title: TITLES[kind] ?? kind, name: ticket ? `${ticket.name}${ticket.q ? ` · כרטיס ${ticket.q}` : ""}` : "", detail: d, ticket, at: Date.now() });
+    setShown({ kind, good, neutral, title: TITLES[kind] ?? kind, name: ticket ? `${ticket.name}${ticket.q ? ` · כרטיס ${ticket.q}` : ""}` : "", detail: d, ticket, at: Date.now() });
     if (!good) setRejected((n) => n + 1);
     feedback(good);
   }, []);
@@ -76,11 +91,13 @@ export function useDoor(session: Session, campaignId: number) {
       persist();
       setStats(m.stats);
       setSyncedAt(time(new Date().toISOString()));
+      markReachable(true);
       return true;
-    } catch {
+    } catch (e) {
+      if (!(e instanceof ApiError)) markReachable(false);
       return false;
     }
-  }, [session, campaignId, persist]);
+  }, [session, campaignId, persist, markReachable]);
 
   const flush = useCallback(async () => {
     if (!queue.current.length) return;
@@ -90,13 +107,18 @@ export function useDoor(session: Session, campaignId: number) {
       queue.current = queue.current.filter((q) => !items.includes(q));
       persist();
       setStats(r.stats);
+      markReachable(true);
+      // הכניסה שמוצגת נשלחה: מעדכנים את השורה שאמרה שהיא תישלח
+      setShown((s) => (s.kind === "queued" ? { ...s, detail: s.detail.replace(DETAILS.queued, "נשלח לשרת") } : s));
       const c = r.results.filter((x) => x.result === "conflict").length;
       if (c) {
         setConflicts((n) => n + c);
         show("used", undefined, `${c} כרטיסים שנסרקו בלי קליטה כבר נכנסו מדלת אחרת`);
       }
-    } catch {}
-  }, [session, campaignId, persist, show]);
+    } catch (e) {
+      if (!(e instanceof ApiError)) markReachable(false);
+    }
+  }, [session, campaignId, persist, show, markReachable]);
 
   // טעינה ראשונה: קודם מה שנשמר במכשיר, ואז מהשרת
   useEffect(() => {
@@ -117,9 +139,12 @@ export function useDoor(session: Session, campaignId: number) {
       setOnline(on);
       if (on) flush().then(loadManifest);
     });
+    let ticks = 0;
     const timer = setInterval(() => {
-      if (onlineRef.current) flush().then(loadManifest);
-    }, 30_000);
+      ticks++;
+      // כשהשרת לא ענה בודקים כל 10 שניות, אחרת כל 30
+      if (onlineRef.current && (!reachableRef.current || ticks % 3 === 0)) flush().then(loadManifest);
+    }, 10_000);
     return () => {
       alive = false;
       unsub();
@@ -154,35 +179,47 @@ export function useDoor(session: Session, campaignId: number) {
     (r: CheckReply) => {
       setStats(r.stats);
       if (r.result === "ok" && r.ticket) for (const t of tickets.current.values()) if (t.id === r.ticket.id) t.s = "used";
-      show(r.result, r.ticket);
+      show(r.result, r.ticket, r.result === "wrong_show" && r.other ? `הכרטיס ל: ${r.other}. הפנו לתור הנכון` : "");
     },
     [show]
   );
 
-  /** סריקה או הקלדה של קוד */
+  /**
+   * סריקה או הקלדה של קוד. הבדיקות רצות אחת אחרי השנייה ואף קוד לא נזרק,
+   * כי סורק חיצוני (Bluetooth או USB) יכול לשלוח כמה קודים ברצף מהיר.
+   */
   const check = useCallback(
-    async (raw: string) => {
+    (raw: string) => {
       const code = String(raw ?? "").trim();
-      if (busy.current || !normalize(code)) return;
-      busy.current = true;
-      try {
-        if (!onlineRef.current) return await admitOffline(code);
-        reply(await call<CheckReply>(session, `/e/${campaignId}/check`, { code, device: device.current }));
-      } catch (e) {
-        if (e instanceof ApiError) show("unknown", undefined, e.message);
-        else await admitOffline(code); // השרת לא ענה בזמן: ממשיכים לפי הרשימה
-      } finally {
-        busy.current = false;
-      }
+      if (!normalize(code)) return Promise.resolve();
+      const run = async () => {
+        busy.current = true;
+        try {
+          if (!onlineRef.current || !reachableRef.current) return await admitOffline(code);
+          reply(await call<CheckReply>(session, `/e/${campaignId}/check`, { code, device: device.current }, 3500));
+          markReachable(true);
+        } catch (e) {
+          if (e instanceof ApiError) show("unknown", undefined, e.message);
+          else {
+            markReachable(false);
+            await admitOffline(code); // השרת לא ענה בזמן: ממשיכים לפי הרשימה
+          }
+        } finally {
+          busy.current = false;
+        }
+      };
+      const next = chain.current.then(run, run);
+      chain.current = next;
+      return next;
     },
-    [session, campaignId, admitOffline, reply, show]
+    [session, campaignId, admitOffline, reply, show, markReachable]
   );
 
   /** הכנסה מתוך החיפוש */
   const admitById = useCallback(
     async (id: number) => {
       const local = [...tickets.current.values()].find((t) => t.id === id);
-      if (!onlineRef.current) return local ? admitLocal(local) : undefined;
+      if (!onlineRef.current || !reachableRef.current) return local ? admitLocal(local) : undefined;
       try {
         reply(await call<CheckReply>(session, `/e/${campaignId}/checkid`, { id, device: device.current }));
       } catch (e) {
@@ -210,7 +247,7 @@ export function useDoor(session: Session, campaignId: number) {
     async (q: string): Promise<SearchRow[]> => {
       const s = q.trim();
       if (s.length < 2) return [];
-      if (onlineRef.current) {
+      if (onlineRef.current && reachableRef.current) {
         try {
           return await call<SearchRow[]>(session, `/e/${campaignId}/search?q=${encodeURIComponent(s)}`);
         } catch {}
@@ -223,9 +260,9 @@ export function useDoor(session: Session, campaignId: number) {
     [session, campaignId]
   );
 
-  const reset = useCallback(() => setShown((s) => ({ ...s, kind: "idle", good: true, title: "מוכנים לסריקה", name: "", detail: "מכוונים את המצלמה ל-QR שעל הכרטיס", ticket: undefined })), []);
+  const reset = useCallback(() => setShown((s) => ({ ...s, kind: "idle", good: true, neutral: true, title: "מוכנים לסריקה", name: "", detail: "מכוונים את המצלמה ל-QR שעל הכרטיס", ticket: undefined })), []);
 
-  return { stats, online, pending, syncedAt, shown, rejected, conflicts, check, admitById, undo, search, reset, refresh: () => flush().then(loadManifest) };
+  return { stats, online: online && reachable, pending, syncedAt, shown, rejected, conflicts, check, admitById, undo, search, reset, refresh: () => flush().then(loadManifest) };
 }
 
 export type Door = ReturnType<typeof useDoor>;

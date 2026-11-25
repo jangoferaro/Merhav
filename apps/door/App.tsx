@@ -1,6 +1,6 @@
 // JoCares Door: אפליקציית הכניסה לצוות של מקומות, ליינים ואמנים.
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, I18nManager, View } from "react-native";
+import { ActivityIndicator, I18nManager, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
@@ -72,11 +72,12 @@ export default function App() {
     setEvent(null);
   }
 
-  function logout() {
-    Alert.alert("התנתקות", "המפתח האישי והרשימות יימחקו מהמכשיר. כדי לחזור צריך שוב את הקישור מהמארגן.", [
-      { text: "ביטול", style: "cancel" },
-      { text: "התנתקות", style: "destructive", onPress: async () => { await clearAll(); setSession(null); setHome(null); setEvent(null); } },
-    ]);
+  // אישור ההתנתקות מוצג במסך עצמו (מימין לשמאל), לא בחלון של המערכת
+  async function logout() {
+    await clearAll();
+    setSession(null);
+    setHome(null);
+    setEvent(null);
   }
 
   return (
