@@ -29,6 +29,7 @@
   --final: #6b3fb8; --final-ink: #ffffff;    /* passed the read-aloud test */
   --arch: #8b91a1; --arch-ink: #ffffff;      /* shelved */
   --unsure: #d9691f; --unsure-ink: #ffffff;  /* not sure it belongs in the book */
+  --scatter: #0f8a85; --scatter-ink: #ffffff; /* to be scattered through the book */
   --shadow: 0 1px 2px rgba(27,33,48,.06), 0 8px 24px rgba(27,33,48,.07);
   --font-book: "Frank Ruhl Libre", "David", "Times New Roman", serif;
   --font-ui: "Assistant", "Segoe UI", "Arial Hebrew", Arial, sans-serif;
@@ -39,7 +40,7 @@
     --desk: #12151c; --paper: #1b1f29; --ink: #e5e8ef; --muted: #9aa2b4; --line: #2f3545;
     --accent: #84a5ff; --accent-soft: #233056; --accent-ink: #0d1220;
     --ins: #6fd59a; --ins-bg: #173826; --del: #ff8f86; --del-bg: #45201d;
-    --warn: #f3c25b; --warn-bg: #3b2f12; --hl: #6b5a14; --refine: #e9bf3c; --refine-ink: #1f1800; --final: #b99cff; --final-ink: #1a1030; --arch: #4b5162; --arch-ink: #e5e8ef; --unsure: #f0965a; --unsure-ink: #2a1203;
+    --warn: #f3c25b; --warn-bg: #3b2f12; --hl: #6b5a14; --refine: #e9bf3c; --refine-ink: #1f1800; --final: #b99cff; --final-ink: #1a1030; --arch: #4b5162; --arch-ink: #e5e8ef; --unsure: #f0965a; --unsure-ink: #2a1203; --scatter: #4fd1c5; --scatter-ink: #062523;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
     color-scheme: dark;
   }
@@ -48,7 +49,7 @@
   --desk: #12151c; --paper: #1b1f29; --ink: #e5e8ef; --muted: #9aa2b4; --line: #2f3545;
   --accent: #84a5ff; --accent-soft: #233056; --accent-ink: #0d1220;
   --ins: #6fd59a; --ins-bg: #173826; --del: #ff8f86; --del-bg: #45201d;
-  --warn: #f3c25b; --warn-bg: #3b2f12; --hl: #6b5a14; --refine: #e9bf3c; --refine-ink: #1f1800; --final: #b99cff; --final-ink: #1a1030; --arch: #4b5162; --arch-ink: #e5e8ef; --unsure: #f0965a; --unsure-ink: #2a1203;
+  --warn: #f3c25b; --warn-bg: #3b2f12; --hl: #6b5a14; --refine: #e9bf3c; --refine-ink: #1f1800; --final: #b99cff; --final-ink: #1a1030; --arch: #4b5162; --arch-ink: #e5e8ef; --unsure: #f0965a; --unsure-ink: #2a1203; --scatter: #4fd1c5; --scatter-ink: #062523;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
   color-scheme: dark;
 }
@@ -131,6 +132,11 @@ label.check input { margin-top: .3em; }
 #markArchive.armed { background: var(--del); color: var(--paper); border-color: var(--del); }
 .chap-item.is-final { background: var(--final); color: var(--final-ink); }
 .chap-item.is-unsure { background: var(--unsure); color: var(--unsure-ink); }
+.chap-item.is-scatter { background: var(--scatter); color: var(--scatter-ink); }
+#markScatter { border-color: var(--scatter); }
+#markScatter.on { background: var(--scatter); color: var(--scatter-ink); }
+#chBarS { height: 100%; background: var(--scatter); transition: width .2s; }
+.chap-title.scatter .chap-name::after { content: " · ✱"; color: var(--scatter); font: 700 .9rem var(--font-ui); }
 #markUnsure { border-color: var(--unsure); }
 #markUnsure.on { background: var(--unsure); color: var(--unsure-ink); }
 #chBarU { height: 100%; background: var(--unsure); transition: width .2s; }
@@ -489,6 +495,7 @@ label.check input { margin-top: .3em; }
         <button class="btn" id="markDone">סימון הפרק כנבדק</button>
         <button class="btn" id="markFinal">עבר מבחן הקראה</button>
         <button class="btn" id="markUnsure">לא בטוח אם להוסיף</button>
+        <button class="btn" id="markScatter">לפזר בספר</button>
         <button class="btn" id="markArchive">גניזת הפרק</button>
         <button class="btn primary" id="footNext">לפרק הבא ←</button>
       </div>
@@ -545,8 +552,8 @@ label.check input { margin-top: .3em; }
   <div class="sheet chap-sheet" role="dialog" aria-label="פרקים">
     <div class="sheet-head"><div><div class="sheet-title">פרקים</div><div class="muted num" id="chProgress"></div></div><button class="btn small" data-chap-close>סגירה</button></div>
     <div class="chap-pct"><div class="pct-main"><span class="pct-big num" id="pctTouched">0%</span><span>מהספר עבר עריכה</span></div><div class="pct-side num" id="pctFinal"></div></div>
-    <div class="progress chap-progress"><div id="chBarF"></div><div id="chBar"></div><div id="chBarR"></div><div id="chBarU"></div></div>
-    <div class="chap-legend"><span><i style="background:var(--accent)"></i>עוד לא נבדק</span><span><i style="background:var(--refine)"></i>לדייק</span><span><i style="background:var(--ins)"></i>נבדק</span><span><i style="background:var(--final)"></i>עבר מבחן הקראה</span><span><i style="background:var(--unsure)"></i>לא בטוח אם להוסיף</span><span><i style="background:var(--arch)"></i>גנוז</span></div>
+    <div class="progress chap-progress"><div id="chBarF"></div><div id="chBar"></div><div id="chBarR"></div><div id="chBarS"></div><div id="chBarU"></div></div>
+    <div class="chap-legend"><span><i style="background:var(--accent)"></i>עוד לא נבדק</span><span><i style="background:var(--refine)"></i>לדייק</span><span><i style="background:var(--ins)"></i>נבדק</span><span><i style="background:var(--final)"></i>עבר מבחן הקראה</span><span><i style="background:var(--scatter)"></i>לפזר בספר</span><span><i style="background:var(--unsure)"></i>לא בטוח אם להוסיף</span><span><i style="background:var(--arch)"></i>גנוז</span></div>
     <div id="chList" class="menu-list"></div>
   </div>
 </div>
@@ -1229,12 +1236,12 @@ function renderChapter(k) {
 }
 const chapStartId = c => (S.full[c.start] || {}).id;
 /* chapter states, one at a time: refine (yellow) -> done (green) -> final (purple, passed the read-aloud test); archived (grey) is set aside */
-const STATUS_KEYS = ["archived", "unsure", "final", "done", "refine"];
+const STATUS_KEYS = ["archived", "unsure", "scatter", "final", "done", "refine"];
 const chapStatusById = id => { if (!S.book) return null; for (const k of STATUS_KEYS) if (S.book[k] && S.book[k].includes(id)) return k; return null; };
 const chapStatus = c => chapStatusById(chapStartId(c));
 const isDone = c => chapStatus(c) === "done";
 const isRefine = c => chapStatus(c) === "refine";
-const STATUS_TOAST = { done: "הפרק סומן כנבדק", refine: "הפרק סומן: לדייק", final: "★ הפרק עבר מבחן הקראה", archived: "הפרק נגנז. הוא לא ייכלל בייצוא.", unsure: "? הפרק סומן: לא בטוח אם להוסיף" };
+const STATUS_TOAST = { done: "הפרק סומן כנבדק", refine: "הפרק סומן: לדייק", final: "★ הפרק עבר מבחן הקראה", archived: "הפרק נגנז. הוא לא ייכלל בייצוא.", unsure: "? הפרק סומן: לא בטוח אם להוסיף", scatter: "✱ הפרק סומן: לפזר בספר" };
 function setChapterStatus(status) {
   const id = chapStartId(S.chapters[S.ci]);
   for (const k of STATUS_KEYS) S.book[k] = (S.book[k] || []).filter(x => x !== id);
@@ -1247,7 +1254,9 @@ function paintChapter() {
   $("#chNum").textContent = `${S.ci + 1}/${n}`;
   $("#chName").textContent = c.title;
   const st = chapStatus(c);
-  for (const k of ["done", "refine", "final", "archived", "unsure"]) $("#chTitle").classList.toggle(k, st === k);
+  for (const k of ["done", "refine", "final", "archived", "unsure", "scatter"]) $("#chTitle").classList.toggle(k, st === k);
+  $("#markScatter").classList.toggle("on", st === "scatter");
+  $("#markScatter").textContent = st === "scatter" ? "✱ לפזר בספר" : "לפזר בספר";
   $("#markUnsure").classList.toggle("on", st === "unsure");
   $("#markUnsure").textContent = st === "unsure" ? "? לא בטוח אם להוסיף" : "לא בטוח אם להוסיף";
   $("#markRefine").classList.toggle("on", st === "refine");
@@ -1285,19 +1294,20 @@ function goToPara(id) {
 function openChapters() {
   const full = fullParas();
   const list = $("#chList"), n = S.chapters.length;
+  let sca = 0, wSca = 0;
   let done = 0, refine = 0, fin = 0, arch = 0, uns = 0, wAll = 0, wTouched = 0, wFin = 0, wDone = 0, wRef = 0, wUns = 0;
   list.innerHTML = S.chapters.map((c, k) => {
     let edited = false;
     for (let i = c.start; i < c.end && !edited; i++) { const b = S.baseline.get(full[i].id); edited = b === undefined || b !== pText(full[i]); }
     const st = chapStatus(c), d = st === "done", r = st === "refine";
-    if (d) done++; if (r) refine++; if (st === "final") fin++; if (st === "archived") arch++; if (st === "unsure") uns++;
+    if (d) done++; if (r) refine++; if (st === "final") fin++; if (st === "archived") arch++; if (st === "unsure") uns++; if (st === "scatter") sca++;
     let w = 0; for (let i = c.start; i < c.end; i++) w += countWords(pText(full[i]));   // progress is weighted by words
-    if (st !== "archived") { wAll += w; if (st) wTouched += w; if (st === "final") wFin += w; if (st === "done") wDone += w; if (st === "refine") wRef += w; if (st === "unsure") wUns += w; }
-    const icon = { done: "✓", refine: "✎", final: "★", archived: "⊘", unsure: "?" }[st] || (k + 1);
+    if (st !== "archived") { wAll += w; if (st) wTouched += w; if (st === "final") wFin += w; if (st === "done") wDone += w; if (st === "refine") wRef += w; if (st === "unsure") wUns += w; if (st === "scatter") wSca += w; }
+    const icon = { done: "✓", refine: "✎", final: "★", archived: "⊘", unsure: "?", scatter: "✱" }[st] || (k + 1);
     return `<button class="chap-item${st ? " is-" + st : ""}${k === S.ci ? " cur" : ""}" data-k="${k}"><span class="n num">${icon}</span><span class="ct">${esc(c.title)}</span><span class="cm num">${k === S.ci ? "פתוח עכשיו<br>" : ""}${edited ? "נערך · " : ""}עמ׳ ${full[c.start].pg || "—"}</span></button>`;
   }).join("");
   const live = Math.max(1, n - arch);
-  $("#chProgress").textContent = `${fin === 1 ? "אחד עבר הקראה" : fin + " עברו הקראה"} · ${done === 1 ? "אחד נבדק" : done + " נבדקו"} · ${refine} לדייק · ${n - arch - fin - done - refine - uns} עוד לא נבדקו` + (uns ? ` · ${uns} בספק` : "") + (arch ? ` · ${arch === 1 ? "גנוז אחד" : arch + " גנוזים"}` : "");
+  $("#chProgress").textContent = `${fin === 1 ? "אחד עבר הקראה" : fin + " עברו הקראה"} · ${done === 1 ? "אחד נבדק" : done + " נבדקו"} · ${refine} לדייק · ${n - arch - fin - done - refine - uns - sca} עוד לא נבדקו` + (sca ? ` · ${sca} לפזר` : "") + (uns ? ` · ${uns} בספק` : "") + (arch ? ` · ${arch === 1 ? "גנוז אחד" : arch + " גנוזים"}` : "");
   const W = Math.max(1, wAll), pct = x => Math.round(x / W * 100);
   $("#pctTouched").textContent = pct(wTouched) + "%";
   $("#pctFinal").innerHTML = `<b>${pct(wFin)}%</b> סופי (עבר הקראה) · ${wTouched.toLocaleString("he-IL")} מתוך ${wAll.toLocaleString("he-IL")} מילים`;
@@ -1305,6 +1315,7 @@ function openChapters() {
   $("#chBar").style.width = (wDone / W * 100) + "%";
   $("#chBarR").style.width = (wRef / W * 100) + "%";
   $("#chBarU").style.width = (wUns / W * 100) + "%";
+  $("#chBarS").style.width = (wSca / W * 100) + "%";
   $$("[data-k]", list).forEach(b => b.onclick = () => goChapter(+b.dataset.k));
   $("#chapSheet").hidden = false;
   const cur = $(".chap-item.cur", list); if (cur) cur.scrollIntoView({ block: "center" });
@@ -1326,6 +1337,7 @@ $("#chNext").onclick = () => goChapter(S.ci + 1);
 $("#footNext").onclick = () => goChapter(S.ci + 1);
 $("#markDone").onclick = () => setChapterStatus(isDone(S.chapters[S.ci]) ? null : "done");
 $("#markRefine").onclick = () => setChapterStatus(isRefine(S.chapters[S.ci]) ? null : "refine");
+$("#markScatter").onclick = () => setChapterStatus(chapStatus(S.chapters[S.ci]) === "scatter" ? null : "scatter");
 $("#markUnsure").onclick = () => setChapterStatus(chapStatus(S.chapters[S.ci]) === "unsure" ? null : "unsure");
 $("#markFinal").onclick = () => setChapterStatus(chapStatus(S.chapters[S.ci]) === "final" ? null : "final");
 $("#markArchive").onclick = () => {
@@ -2323,7 +2335,7 @@ const Cloud = {
         if (this.sent.get(key) !== json) { await this.col().doc(key).set({ kind: "chunk", book: book.id, i, paras: chunks[i] }); this.sent.set(key, json); }
       }
       const prevN = this.chunkN.get(book.id);
-      await this.col().doc("book_" + book.id).set({ kind: "book", id: book.id, title: book.title, created: book.created, updated: book.updated, pages: book.pages || 0, chunks: chunks.length, lastPos: book.lastPos || null, done: book.done || [], refine: book.refine || [], final: book.final || [], archived: book.archived || [], unsure: book.unsure || [], images: book.images || {} });
+      await this.col().doc("book_" + book.id).set({ kind: "book", id: book.id, title: book.title, created: book.created, updated: book.updated, pages: book.pages || 0, chunks: chunks.length, lastPos: book.lastPos || null, done: book.done || [], refine: book.refine || [], final: book.final || [], archived: book.archived || [], unsure: book.unsure || [], scatter: book.scatter || [], images: book.images || {} });
       if (prevN && prevN > chunks.length) for (let i = chunks.length; i < prevN; i++) { await this.col().doc(`c_${book.id}_${i}`).delete(); this.sent.delete(`c_${book.id}_${i}`); }
       this.chunkN.set(book.id, chunks.length);
       book.cloudBase = book.updated;
@@ -2380,7 +2392,7 @@ const Cloud = {
     S.book.title = meta.title; $("#bookTitle").value = meta.title;
     if (Array.isArray(meta.done)) S.book.done = meta.done.slice();
     if (Array.isArray(meta.refine)) S.book.refine = meta.refine.slice();
-    for (const k of ["final", "archived", "unsure"]) if (Array.isArray(meta[k])) S.book[k] = meta[k].slice();
+    for (const k of ["final", "archived", "unsure", "scatter"]) if (Array.isArray(meta[k])) S.book[k] = meta[k].slice();
     if (meta.images) S.book.images = JSON.parse(JSON.stringify(meta.images));
     renderEditor(paras, S.book.lastPos || meta.lastPos || undefined);
     S.book.paras = paras; S.book.updated = meta.updated; S.book.cloudBase = meta.updated;
@@ -2484,7 +2496,7 @@ const Cloud = {
         S.book.cloudBase = meta.updated; S.book.updated = meta.updated;
         if (Array.isArray(meta.done)) S.book.done = meta.done.slice();
         if (Array.isArray(meta.refine)) S.book.refine = meta.refine.slice();
-    for (const k of ["final", "archived", "unsure"]) if (Array.isArray(meta[k])) S.book[k] = meta[k].slice();
+    for (const k of ["final", "archived", "unsure", "scatter"]) if (Array.isArray(meta[k])) S.book[k] = meta[k].slice();
         if (meta.images) S.book.images = JSON.parse(JSON.stringify(meta.images));
         paintChapter(); try { await putBook(); } catch (e) {}
         return;
@@ -2540,7 +2552,7 @@ async function maybeMergeAdditions() {
     const res = mergeAdditionsInto(fullParas(), ADD);
     // move chapter marks and illustrations whose chapter now starts elsewhere
     const rm = res.remap, mv = x => rm[x] !== undefined ? rm[x] : x;   // applied all at once, so chains cannot collide
-    for (const k of ["done", "refine", "final", "archived", "unsure"]) if (S.book[k]) S.book[k] = S.book[k].map(mv);
+    for (const k of ["done", "refine", "final", "archived", "unsure", "scatter"]) if (S.book[k]) S.book[k] = S.book[k].map(mv);
     if (S.book.images) {
       const blobs = {};
       for (const from of Object.keys(rm)) if (S.book.images[from]) { try { blobs[from] = await DB.get("pdfs", `img:${S.book.id}:${from}`); } catch (e) {} }
