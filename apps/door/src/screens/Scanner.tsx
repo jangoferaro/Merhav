@@ -17,6 +17,7 @@ export default function Scanner({ door, event, staffName, onBack, onSearch, onSt
   const [typing, setTyping] = useState(false);
   const input = useRef<React.ComponentRef<typeof TextInput>>(null);
   const typed = useRef("");
+  const lastSent = useRef("");
   const [now, setNow] = useState(Date.now());
   const [active, setActive] = useState(true);
   const last = useRef({ data: "", at: 0 });
@@ -50,9 +51,21 @@ export default function Scanner({ door, event, staffName, onBack, onSearch, onSt
   const fg = quiet ? C.paper : C.ink;
   // הקוד נלקח מהאירוע עצמו ולא מה-state, כי סורק חיצוני מקליד ושולח בבת אחת
   const submit = (text?: string) => {
-    const v = (text ?? typed.current).trim();
+    const full = (text ?? typed.current).trim();
+    // רשת ביטחון: אם השדה עוד החזיק את מה שנשלח קודם, הקוד החדש נדבק אחריו. מורידים את מה שכבר נשלח
+    const prev = lastSent.current;
+    const v = prev && full.length > prev.length && full.startsWith(prev) ? full.slice(prev.length) : full;
+    lastSent.current = full;
     typed.current = "";
     input.current?.clear();
+    // ב-iOS ניקוי בתוך אירוע השליחה לא תמיד נשמר, ולכן מנקים שוב מיד אחריו.
+    // אחרת הקוד הבא מתחבר לקודם, וזה בדיוק מה שקורה עם סורק חיצוני
+    setTimeout(() => {
+      if (!typed.current.trim() || typed.current.trim() === v || typed.current.trim().endsWith(v)) {
+        input.current?.clear();
+        typed.current = "";
+      }
+    }, 0);
     if (v) door.check(v);
   };
 
