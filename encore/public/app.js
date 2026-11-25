@@ -171,7 +171,8 @@ document.addEventListener("click", async (e) => {
     document.querySelectorAll(".ticketing-opt").forEach((el) => {
       const on = el.dataset.when === v;
       el.hidden = !on;
-      el.querySelectorAll("input").forEach((i) => (i.required = on));
+      // רק שדה החובה של כל אפשרות (כמות כרטיסים / לינק). המחיר המוקדם תמיד רשות.
+      el.querySelectorAll("input[data-req]").forEach((i) => (i.required = on));
     });
   };
   box.addEventListener("change", sync);

@@ -513,7 +513,7 @@ main:has(.lp-hero) { max-width: var(--max-wide); }
 .lp-steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 0; }
 @media (min-width: 760px) { .lp-steps { grid-template-columns: repeat(3, 1fr); } .lp-steps li + li { border-inline-start: 1px solid var(--hair); padding-inline-start: 20px; } }
 .lp-steps li { padding: 14px 0 18px; border-bottom: 1px solid var(--hair); }
-.lp-steps b { font: 500 2.6rem/1 var(--font-mono); letter-spacing: -.05em; color: var(--jo-red); display: block; margin-bottom: 10px; }
+.lp-steps b { font: 500 2.6rem/1 var(--font-mono); letter-spacing: -.05em; color: var(--bad); display: block; margin-bottom: 10px; }
 .lp-steps h3 { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; }
 .lp-steps p { color: var(--ink-2); margin: 0; }
 .lp-split { max-width: 640px; }

@@ -211,7 +211,8 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   // ---------- מקדם ----------
 
   r.post("/s/:id/promote", (ctx) => {
-    if (!requireUser(ctx)) return;
+    // מי שעוד לא מחובר: אחרי ההרשמה הוא חוזר ישר ללינק שלו להופעה הזאת
+    if (!ctx.user) return ctx.redirect(`/login?next=${encodeURIComponent(`/s/${Number(ctx.params.id)}/share`)}`);
     R.getOrCreateLink(db, ctx.user, ctx.params.id);
     ctx.redirect(`/s/${ctx.params.id}/share`);
   });

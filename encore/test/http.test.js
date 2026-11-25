@@ -85,7 +85,7 @@ test("מסע מלא: אמן מפרסם → מקדם משתף → חבר קונה
   assert.match(promoter.last, /ערב אקוסטי/);
   assert.match(promoter.last, /₪20/);
   r = await promoter.post(`/s/${cid}/promote`, {}, { follow: false });
-  assert.match(r.location, /^\/login\?next=/); // צריך להתחבר רק עכשיו
+  assert.match(r.location, /^\/login\?next=%2Fs%2F\d+%2Fshare$/); // צריך להתחבר רק עכשיו, ואחרי ההרשמה חוזרים ישר ללינק
   await promoter.login("dani@encore.test", "דני כהן");
   r = await promoter.get(`/s/${cid}/share`);
   const link = r.text.match(/\/r\/([a-z0-9]{7})/)[0];

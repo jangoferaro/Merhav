@@ -101,13 +101,13 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
     </fieldset>
     <div class="ticketing-opt" data-when="jocares">
       <label class="field">כמה כרטיסים יש למכירה?
-        <input name="capacity" type="number" min="1" max="20000" inputmode="numeric" value="${v.capacity ?? ""}" placeholder="למשל 150">
+        <input name="capacity" type="number" min="1" max="20000" inputmode="numeric" value="${v.capacity ?? ""}" placeholder="למשל 150" data-req>
         <small class="hint">קופה מלאה בלי הגדרות: קונים אצלנו, מקבלים כרטיס עם קוד לסריקה, ואת/ה מקבל/ת קישור לסריקה בכניסה. ג׳וקרים מקבלים תגמול אוטומטית.</small></label>
       <details${v.early_price ? html` open` : ""}><summary>מחיר מוקדם (לא חובה)</summary>${earlyFields(ctx, v, { form: false })}</details>
     </div>
     <div class="ticketing-opt" data-when="coupon">
       <label class="field">לינק לעמוד הכרטיסים שלך
-        <input name="source_url" type="url" dir="ltr" value="${v.source_url ?? ""}" placeholder="https://">
+        <input name="source_url" type="url" dir="ltr" value="${v.source_url ?? ""}" placeholder="https://" data-req>
         <small class="hint">כשהמקום או מערכת אחרת מוכרים. כל ג׳וקר מקבל קוד אישי, ואנחנו מעדכנים את המכירות. את/ה לא צריך/ה לעשות כלום.</small></label>
     </div>
     ${field("artist_name", "שם האמן / הלהקה", "required maxlength=120")}

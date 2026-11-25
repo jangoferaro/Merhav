@@ -482,7 +482,7 @@ export function welcomeLanding(ctx, { shows, google }, opts) {
   <h1 class="display">אמנות<br>צריכה קהל.</h1>
   <p class="lead">JoCares מחברת בין אמנים לאנשים שאוהבים אותם. משתפים הופעה עם החברים, ומרוויחים מכל כרטיס שנמכר בזכותכם.</p>
   <div class="lp-ctas">
-    <a class="btn big acid" href="${join("/shows")}"><span lang="en" dir="ltr">Be Jo.</span> אני רוצה להצטרף</a>
+    <a class="btn big acid" href="/shows"><span lang="en" dir="ltr">Be Jo.</span> אני רוצה להצטרף</a>
     <a class="btn big ghost" href="${join("/grow")}">אני אמן/ית</a>
   </div>
   <p class="note">כבר יש לך חשבון? <a href="${join("/shows")}">כניסה</a>${google ? " · אפשר גם עם Google" : ""}</p>
@@ -511,7 +511,7 @@ export function welcomeLanding(ctx, { shows, google }, opts) {
 <section class="lp-section">
   <h2 class="lp-h">למי זה</h2>
   <div class="choices lp-aud">
-    <a class="choice promoter" href="${join("/shows")}">
+    <a class="choice promoter" href="/shows">
       <span class="choice-tag" lang="en" dir="ltr">Be Jo.</span>
       <b>לכל מי שאכפת לו</b>
       <small>מרוויחים מהמלצה על מוזיקה שאתם אוהבים. בלי השקעה, בלי יעדים, בלי ניסיון.</small>
@@ -531,7 +531,7 @@ export function welcomeLanding(ctx, { shows, google }, opts) {
 
 ${shows.length
   ? html`<section class="lp-section">
-      <div class="row-head"><h2 class="lp-h">קורה עכשיו</h2><a href="${join("/shows")}">לכל ההופעות ←</a></div>
+      <div class="row-head"><h2 class="lp-h">קורה עכשיו</h2><a href="/shows">לכל ההופעות ←</a></div>
       <div class="grid-shows">${shows.map((c) => showCard(ctx, c))}</div>
     </section>`
   : ""}
@@ -543,7 +543,7 @@ ${shows.length
 
 <section class="lp-final">
   <p class="lp-final-big" lang="en" dir="ltr">Who cares?<br>Jo cares.</p>
-  <a class="btn big" href="${join("/shows")}">מצטרפים עכשיו</a>
+  <a class="btn big" href="/shows">מצטרפים עכשיו</a>
 </section>`,
     opts
   );
