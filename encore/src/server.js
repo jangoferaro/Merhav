@@ -345,7 +345,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   /** אחרי תשלום: הכרטיסים למייל. כישלון בשליחה לא מפיל את ההזמנה (הם גם על המסך). */
   const deliverTickets = (ctx, order) => {
     const c = C.getCampaign(db, order.campaign_id);
-    sendTickets(order.buyer_email, { name: order.buyer_name, show: `${c.artist_name} · ${c.title}`, url: ticketsUrl(ctx, order), qty: order.qty }).catch((e) =>
+    sendTickets(order.buyer_email, { name: order.buyer_name, show: `${c.artist_name} · ${c.title}`, url: ticketsUrl(ctx, order), qty: order.qty, phone: order.buyer_phone }).catch((e) =>
       console.error("[tickets mail]", e.message)
     );
   };

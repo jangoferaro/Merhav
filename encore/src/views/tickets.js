@@ -1,5 +1,6 @@
 // מסכי הקופה של Jocares: קנייה, תשלום, כרטיס, כניסה בדלת, ומכירות לאמן.
 import { config } from "../util.js";
+import { smsEnabled } from "../mailer.js";
 import { csrfField, html, layout, money, poster, postButton, raw, showDate, stat } from "./kit.js";
 
 const fmtCode = (code) => `${code.slice(0, 5)} ${code.slice(5)}`;
@@ -39,7 +40,7 @@ export function checkoutPage(ctx, { c, inv, referrer, v = {}, error = "" }, opts
     <p class="note">${money(c.price_agorot)} לכרטיס${fee ? ` + ${money(fee)} דמי שירות` : ". בלי דמי שירות"}.${inv.available <= 20 ? ` נשארו ${inv.available}.` : ""}</p>
     <label class="field">שם מלא<input name="name" required maxlength="80" autocomplete="name" value="${v.name ?? ""}"></label>
     <label class="field">מייל<input name="email" type="email" required autocomplete="email" dir="ltr" value="${v.email ?? ""}"><small class="hint">לכאן נשלחים הכרטיסים.</small></label>
-    <label class="field">טלפון (לא חובה)<input name="phone" type="tel" autocomplete="tel" dir="ltr" maxlength="20" value="${v.phone ?? ""}"><small class="hint">רק אם ${c.artist_name} יצטרכו להודיע על שינוי בהופעה.</small></label>
+    <label class="field">טלפון (לא חובה)<input name="phone" type="tel" autocomplete="tel" dir="ltr" maxlength="20" value="${v.phone ?? ""}"><small class="hint">${smsEnabled() ? "נשלח לשם גם את הכרטיסים ב-SMS. " : ""}ישמש רק אם תהיה הודעה על שינוי בהופעה.</small></label>
     <label class="check"><input type="checkbox" name="consent" ${v.consent === "on" ? html`checked` : ""}> אשמח ש${c.artist_name} יעדכנו אותי במייל על הופעות הבאות. אפשר לבטל בכל רגע.</label>
     <button class="btn big block acid">לתשלום</button>
     <p class="note center">התשלום בעמוד מאובטח של חברת הסליקה. פרטי הכרטיס לא עוברים דרכנו. <a href="/terms">תנאים</a></p>
