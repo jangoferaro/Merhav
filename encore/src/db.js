@@ -629,6 +629,9 @@ function migrate(db) {
   // תגמול מוגדל לג׳וקר מסוים (מהזמנה ישירה של האמן), לכל כרטיס, מעל התגמול הרגיל
   add("referral_links", "bonus_agorot", "INTEGER NOT NULL DEFAULT 0");
   add("orders", "joker_bonus_agorot", "INTEGER NOT NULL DEFAULT 0");
+  // מארגן: אמן, מקום או הפקה. מקום מוכר הופעות של אמנים אחרים, ולכן לכל הופעה יש "מי מופיע"
+  add("artists", "kind", "TEXT NOT NULL DEFAULT 'artist'");
+  add("events", "performer", "TEXT NOT NULL DEFAULT ''");
   // פרטי האמן לקבלת הכסף ממכירות (מוצפן)
   add("artists", "payout_details_enc", "TEXT");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ticket_orders_invite ON ticket_orders(invite_code) WHERE invite_code IS NOT NULL");

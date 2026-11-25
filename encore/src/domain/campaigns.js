@@ -67,7 +67,12 @@ export function parseCampaignInput(input) {
   const source = String(input.source_url ?? "").trim();
   if (source && !/^https?:\/\/\S+$/.test(source)) throw new UserError("הלינק להופעה לא תקין");
   return {
-    artist_name: text(input.artist_name, "שם האמן"),
+    // מי מופיע (מוצג לקהל ולג׳וקרים). כשמקום או הפקה מוכרים, המארגן הוא מי שמוכר ומקבל את הכסף
+    artist_name: text(input.artist_name, "מי מופיע"),
+    organizer_kind: ORGANIZER_KINDS[input.organizer_kind] ? input.organizer_kind : "artist",
+    organizer_name: ORGANIZER_KINDS[input.organizer_kind] && input.organizer_kind !== "artist"
+      ? text(input.organizer_name, input.organizer_kind === "venue" ? "שם המקום" : "שם ההפקה")
+      : text(input.artist_name, "מי מופיע"),
     title: text(input.title, "שם ההופעה"),
     venue: text(input.venue, "מקום"),
     city: text(input.city, "עיר", { max: 40, required: false }),
@@ -112,6 +117,8 @@ export function parseEarly(input, priceAgorot, rewardAgorot) {
   return { early_price_agorot: early, early_until: until, early_qty: qty };
 }
 
+export const ORGANIZER_KINDS = { artist: "אמן או להקה", venue: "מקום הופעות", production: "הפקה או ליין" };
+
 export function parseCapacity(v) {
   const n = Number(String(v ?? "").trim());
   if (!Number.isInteger(n) || n < 1 || n > 20000) throw new UserError("כמה כרטיסים יש למכירה? מספר בין 1 ל-20,000");
@@ -125,15 +132,16 @@ export function createCampaign(db, user, input, { publish = true } = {}) {
     // אמן: משתמשים באמן קיים של המשתמש עם אותו שם, אחרת יוצרים
     let artist = db
       .prepare("SELECT a.* FROM artists a JOIN artist_members m ON m.artist_id = a.id WHERE m.user_id = ? AND a.name = ?")
-      .get(user.id, c.artist_name);
+      .get(user.id, c.organizer_name);
     if (!artist) {
-      const id = insert(db, "artists", { name: c.artist_name, created_at: now });
+      const id = insert(db, "artists", { name: c.organizer_name, kind: c.organizer_kind, created_at: now });
       insert(db, "artist_members", { artist_id: id, user_id: user.id, role: "owner" });
-      artist = { id, name: c.artist_name };
+      artist = { id, name: c.organizer_name };
     }
     const eventId = insert(db, "events", {
       artist_id: artist.id, title: c.title, description: c.description, venue: c.venue, city: c.city,
-      genre: c.genre, starts_at: c.starts_at, image_url: c.image_url, source_url: c.source_url, capacity: c.capacity, created_at: now,
+      genre: c.genre, starts_at: c.starts_at, image_url: c.image_url, source_url: c.source_url, capacity: c.capacity,
+      performer: c.artist_name !== artist.name ? c.artist_name : "", created_at: now,
     });
     const p = provider(c.ticketing);
     const externalId = p.registerEvent(db, { title: c.title, price_agorot: c.price_agorot });
@@ -157,7 +165,7 @@ export function createCampaign(db, user, input, { publish = true } = {}) {
 
 const CAMPAIGN_SELECT = `
   SELECT c.*, e.title, e.description, e.venue, e.city, e.genre, e.starts_at, e.image_url, e.source_url, e.capacity,
-         a.name AS artist_name,
+         COALESCE(NULLIF(e.performer, ''), a.name) AS artist_name, a.name AS organizer_name, a.kind AS organizer_kind,
          t.id AS terms_id, t.version AS terms_version, t.reward_agorot, t.fee_bps
     FROM campaigns c
     JOIN events e ON e.id = c.event_id

@@ -1,7 +1,7 @@
 // אזור האמן: מסך בית ממוקד תוצאות, פתיחת קמפיין בשלושה צעדים, וניהול קמפיין.
 import { artistSales, earlyFields } from "./tickets.js";
 import { config, isoToIsraelLocal } from "../util.js";
-import { split, STATUS_LABEL, TRANSITIONS } from "../domain/campaigns.js";
+import { ORGANIZER_KINDS, split, STATUS_LABEL, TRANSITIONS } from "../domain/campaigns.js";
 import { csrfField, empty, html, imageInput, layout, mediaInput, mediaTile, money, postButton, poster, showDate, stat, statusBadge } from "./kit.js";
 import { orderBadge } from "./content.js";
 
@@ -24,7 +24,7 @@ export function artistHome(ctx, { list, totals, contentOrders = [] }, opts) {
     ctx,
     "ההופעות שלי",
     html`
-<div class="row-head"><h1>האזור שלי כאמן</h1><a class="btn" href="/grow">+ מטרה חדשה</a></div>
+<div class="row-head"><h1>ההופעות שלי</h1><a class="btn" href="/grow">+ מטרה חדשה</a></div>
 ${list.length
   ? html`
 <div class="stats">
@@ -110,7 +110,14 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
         <input name="source_url" type="url" dir="ltr" value="${v.source_url ?? ""}" placeholder="https://" data-req>
         <small class="hint">כשהמקום או מערכת אחרת מוכרים. כל ג׳וקר מקבל קוד אישי, ואנחנו מעדכנים את המכירות. את/ה לא צריך/ה לעשות כלום.</small></label>
     </div>
-    ${field("artist_name", "שם האמן / הלהקה", "required maxlength=120")}
+    <fieldset class="seg" data-organizer><legend class="field">מי מוכר את הכרטיסים?</legend>
+      ${Object.entries(ORGANIZER_KINDS).map(([k, label]) => html`<label><input type="radio" name="organizer_kind" value="${k}" ${(v.organizer_kind || "artist") === k ? html`checked` : ""}> ${k === "artist" ? "אני האמן/ית" : label}</label>`)}
+    </fieldset>
+    <div class="organizer-opt" data-org-when="venue production">
+      <label class="field">שם המקום או ההפקה<input name="organizer_name" maxlength="120" value="${v.organizer_name ?? ""}" data-req-org>
+        <small class="hint">הכסף מהמכירות מגיע לחשבון של המקום או ההפקה. אפשר לפתוח כאן הופעות של כמה אמנים.</small></label>
+    </div>
+    ${field("artist_name", "מי מופיע (אמן או להקה)", "required maxlength=120")}
     ${field("title", "שם ההופעה", "required maxlength=120")}
     <div class="field${found.includes("image_url") ? " found" : ""}">תמונה של ההופעה${found.includes("image_url") ? html` <small>נמצאה בעמוד ההופעה</small>` : ""}
       ${imageInput({ current: v.image_url ?? "", label: "העלאת תמונה מהטלפון או מהמחשב" })}</div>
@@ -207,7 +214,7 @@ export function manageCampaign(ctx, { c, r, top, publicUrl, lastImport = null, s
     html`
 <p><a href="/artist">→ כל ההופעות</a></p>
 <div class="row-head">
-  <div><p class="eyebrow">${c.artist_name}</p><h1>${c.title} ${statusBadge(c.status)}</h1>
+  <div><p class="eyebrow">${c.artist_name}${c.organizer_name && c.organizer_name !== c.artist_name ? ` · ${c.organizer_name}` : ""}</p><h1>${c.title} ${statusBadge(c.status)}</h1>
   <p class="meta">${showDate(c.starts_at)} · ${c.venue}${c.city ? `, ${c.city}` : ""}</p></div>
 </div>
 
@@ -308,6 +315,7 @@ ${actions.length
 }
 
 export const formFromCampaign = (c) => ({
+  organizer_kind: c.organizer_kind, organizer_name: c.organizer_name,
   artist_name: c.artist_name, title: c.title, starts_at: isoToIsraelLocal(c.starts_at), venue: c.venue, city: c.city,
   price: c.price_agorot / 100, reward: c.reward_agorot / 100,
 });

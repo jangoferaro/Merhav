@@ -29,7 +29,7 @@ export const availableFrom = (startsAt) => addDays(startsAt, config.holdDaysAfte
 export function salesByShow(db, userId) {
   return db
     .prepare(
-      `SELECT c.id AS campaign_id, c.status AS campaign_status, e.title, e.starts_at, a.name AS artist_name, l.code,
+      `SELECT c.id AS campaign_id, c.status AS campaign_status, e.title, e.starts_at, COALESCE(NULLIF(e.performer, ''), a.name) AS artist_name, l.code,
               (SELECT COUNT(DISTINCT visitor_hash) FROM referral_clicks k WHERE k.link_id = l.id) AS clicks,
               COALESCE((SELECT SUM(MIN(o.rewarded_qty, o.qty - o.refunded_qty)) FROM orders o WHERE o.link_id = l.id AND o.cancelled = 0), 0) AS tickets,
               COALESCE((SELECT SUM(amount_agorot) FROM commissions m WHERE m.campaign_id = c.id AND m.promoter_id = l.promoter_id AND m.status != 'reversed'), 0) AS earned,

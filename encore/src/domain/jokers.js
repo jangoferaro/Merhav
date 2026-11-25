@@ -257,7 +257,7 @@ export function inviteJoker(db, artistUser, campaignId, { joker_id, kind, bonus,
 
 export const invitationsFor = (db, userId) =>
   db.prepare(
-    `SELECT i.*, e.title, e.starts_at, e.city, a.name AS artist_name, t.reward_agorot, c.status AS campaign_status
+    `SELECT i.*, e.title, e.starts_at, e.city, COALESCE(NULLIF(e.performer, ''), a.name) AS artist_name, t.reward_agorot, c.status AS campaign_status
        FROM joker_invitations i JOIN campaigns c ON c.id = i.campaign_id JOIN events e ON e.id = c.event_id JOIN artists a ON a.id = c.artist_id
        JOIN campaign_terms t ON t.campaign_id = c.id AND t.version = (SELECT MAX(version) FROM campaign_terms WHERE campaign_id = c.id)
       WHERE i.joker_id = ? ORDER BY i.status = 'open' DESC, i.id DESC LIMIT 50`

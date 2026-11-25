@@ -274,7 +274,7 @@ export const lastImportAt = (db, campaignId) =>
 export function couponQueue(db) {
   return db
     .prepare(
-      `SELECT c.id AS campaign_id, e.title, a.name AS artist_name, e.source_url, e.starts_at, c.status,
+      `SELECT c.id AS campaign_id, e.title, COALESCE(NULLIF(e.performer, ''), a.name) AS artist_name, e.source_url, e.starts_at, c.status,
               (SELECT COUNT(*) FROM referral_links l WHERE l.campaign_id = c.id) AS codes,
               (SELECT COUNT(*) FROM referral_links l WHERE l.campaign_id = c.id AND l.coupon_registered_at IS NULL) AS pending,
               (SELECT MAX(applied_at) FROM sales_imports s WHERE s.campaign_id = c.id AND s.status = 'applied') AS last_import

@@ -156,7 +156,7 @@ export function layout(ctx, title, body, { unread = 0, isArtist = false, isCreat
     ["/shows", "הופעות"],
     ["/creators", "יוצרים"],
     u && isCreator && ["/creator", "יצירה"],
-    u && isArtist && ["/artist", "האמן"],
+    u && isArtist && ["/artist", "ההופעות שלי"],
     u?.is_admin && ["/admin", "ניהול"],
   ].filter(Boolean);
   const path = ctx.url.pathname;

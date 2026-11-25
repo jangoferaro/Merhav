@@ -382,3 +382,19 @@ document.addEventListener("click", async (e) => {
   document.querySelectorAll('input[name="story-variant"]').forEach((r) => r.addEventListener("change", () => render(r.value)));
   render("photo");
 })();
+
+// פתיחת הופעה: שם המקום או ההפקה רק כשמי שמוכר הוא לא האמן
+(() => {
+  const box = document.querySelector("[data-organizer]");
+  if (!box) return;
+  const sync = () => {
+    const v = box.querySelector("input:checked")?.value || "artist";
+    document.querySelectorAll(".organizer-opt").forEach((el) => {
+      const on = el.dataset.orgWhen.split(" ").includes(v);
+      el.hidden = !on;
+      el.querySelectorAll("[data-req-org]").forEach((i) => (i.required = on));
+    });
+  };
+  box.addEventListener("change", sync);
+  sync();
+})();

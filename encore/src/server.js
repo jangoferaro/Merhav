@@ -755,7 +755,12 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     ctx.send(A.newStep1(ctx, opts(ctx)));
   });
 
-  const defaultsFor = (ctx) => ({ artist_name: ID.artistsOf(db, ctx.user.id)[0]?.name ?? "" });
+  // ברירת מחדל לטופס: מקום או הפקה ממלאים את השם שלהם, אמן ממלא את שמו כ"מי מופיע"
+  const defaultsFor = (ctx) => {
+    const a = ID.artistsOf(db, ctx.user.id)[0];
+    if (!a) return {};
+    return a.kind && a.kind !== "artist" ? { organizer_kind: a.kind, organizer_name: a.name, venue: a.kind === "venue" ? a.name : "" } : { artist_name: a.name };
+  };
 
   r.post("/artist/new/extract", async (ctx) => {
     if (!requireUser(ctx)) return;
