@@ -398,3 +398,22 @@ document.addEventListener("click", async (e) => {
   box.addEventListener("change", sync);
   sync();
 })();
+
+// כרטיסים שמיים: שדה שם לכל כרטיס לפי הכמות שנבחרה
+(() => {
+  const sel = document.querySelector("[data-qty]");
+  const box = document.querySelector("[data-holders]");
+  if (!sel || !box) return;
+  const sync = () => {
+    const n = Number(sel.value);
+    box.querySelectorAll("[data-holder]").forEach((el) => {
+      const i = Number(el.dataset.holder);
+      el.hidden = i > n;
+      const input = el.querySelector("input");
+      input.required = i > 1 && i <= n;
+      if (i > n) input.value = "";
+    });
+  };
+  sel.addEventListener("change", sync);
+  sync();
+})();

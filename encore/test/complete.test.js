@@ -133,8 +133,8 @@ test("HTTP: הנחה בקופה, העברת כרטיס, תזכורת, סיכום
     assert.match(r.text, /העברת הכרטיס הזה/);
     const single = r.text.match(/\/t\/[\w-]+/)[0];
     const one = await req(single);
-    assert.equal((one.text.match(/class="ticket /g) ?? []).length, 1);
-    assert.match(one.text, /כרטיס מרוני/);
+    assert.equal((one.text.match(/class="tkt st-/g) ?? []).length, 1);
+    assert.match(one.text, /<dt>מאת<\/dt><dd>רוני<\/dd>/);
 
     // אמן: סיכום כספי ובקשה למלא פרטי תשלום
     const a = {};

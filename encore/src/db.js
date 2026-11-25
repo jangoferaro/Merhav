@@ -632,6 +632,10 @@ function migrate(db) {
   // מארגן: אמן, מקום או הפקה. מקום מוכר הופעות של אמנים אחרים, ולכן לכל הופעה יש "מי מופיע"
   add("artists", "kind", "TEXT NOT NULL DEFAULT 'artist'");
   add("events", "performer", "TEXT NOT NULL DEFAULT ''");
+  // סוג כרטיס: פתוח (אפשר להעביר) או שמי (בכניסה בודקים תעודה, אי אפשר להעביר)
+  add("campaigns", "ticket_mode", "TEXT NOT NULL DEFAULT 'open'");
+  add("tickets", "holder_name", "TEXT NOT NULL DEFAULT ''");
+  add("ticket_orders", "holders", "TEXT");
   // פרטי האמן לקבלת הכסף ממכירות (מוצפן)
   add("artists", "payout_details_enc", "TEXT");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ticket_orders_invite ON ticket_orders(invite_code) WHERE invite_code IS NOT NULL");

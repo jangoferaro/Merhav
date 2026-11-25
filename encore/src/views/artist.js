@@ -103,6 +103,10 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
       <label class="field">כמה כרטיסים יש למכירה?
         <input name="capacity" type="number" min="1" max="20000" inputmode="numeric" value="${v.capacity ?? ""}" placeholder="למשל 150" data-req>
         <small class="hint">קופה מלאה בלי הגדרות: קונים אצלנו, מקבלים כרטיס עם קוד לסריקה, ואת/ה מקבל/ת קישור לסריקה בכניסה. ג׳וקרים מקבלים תגמול אוטומטית.</small></label>
+      <fieldset class="seg"><legend class="field">סוג הכרטיס</legend>
+        <label><input type="radio" name="ticket_mode" value="open" ${v.ticket_mode !== "named" ? html`checked` : ""}> רגיל: QR, אפשר להעביר לחבר</label>
+        <label><input type="radio" name="ticket_mode" value="named" ${v.ticket_mode === "named" ? html`checked` : ""}> שמי: שם על כל כרטיס, תעודה בכניסה, אי אפשר להעביר</label>
+      </fieldset>
       <details${v.early_price ? html` open` : ""}><summary>מחיר מוקדם (לא חובה)</summary>${earlyFields(ctx, v, { form: false })}</details>
     </div>
     <div class="ticketing-opt" data-when="coupon">

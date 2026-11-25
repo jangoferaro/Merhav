@@ -94,6 +94,7 @@ export function parseCampaignInput(input) {
       return source ? "coupon" : "sim";
     })(),
     capacity: input.ticketing === "jocares" ? parseCapacity(input.capacity) : null,
+    ticket_mode: input.ticket_mode === "named" ? "named" : "open",
     ...(input.ticketing === "jocares" ? parseEarly(input, price, reward) : { early_price_agorot: null, early_until: null, early_qty: null }),
   };
 }
@@ -148,7 +149,7 @@ export function createCampaign(db, user, input, { publish = true } = {}) {
     const campaignId = insert(db, "campaigns", {
       event_id: eventId, artist_id: artist.id, created_by: user.id, status: "draft",
       price_agorot: c.price_agorot, promo_limit: c.promo_limit, provider: p.name, external_event_id: externalId,
-      share_text: c.share_text, early_price_agorot: c.early_price_agorot, early_until: c.early_until, early_qty: c.early_qty,
+      share_text: c.share_text, ticket_mode: c.ticket_mode, early_price_agorot: c.early_price_agorot, early_until: c.early_until, early_qty: c.early_qty,
       created_at: now, updated_at: now,
     });
     insert(db, "campaign_terms", {

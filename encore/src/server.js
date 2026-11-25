@@ -28,6 +28,7 @@ import * as CN from "./domain/connections.js";
 import { PROVIDERS, appleDeveloperToken, configured, missingEnv, providerOr404 } from "./connect/providers.js";
 import * as JV from "./views/jokers.js";
 import * as T from "./domain/tickets.js";
+import * as W from "./wallet.js";
 import * as TV from "./views/tickets.js";
 import { gateway } from "./payments/index.js";
 import { sandboxPay, sandboxPayment } from "./payments/sandbox.js";
@@ -668,7 +669,8 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     if (!order || !["paid", "rejected"].includes(order.status)) throw new UserError("הכרטיסים לא נמצאו", 404);
     const c = C.getCampaign(db, order.campaign_id);
     const tickets = T.ticketsOf(db, order.id).map((t) => ({
-      ...t, qr: T.qrSvg(t.code), shareUrl: order.qty > 1 && t.status === "valid" ? `${origin(ctx)}/t/${T.ticketShareToken(db, t)}` : null,
+      ...t, qr: T.qrSvg(t.code), wallet: W.walletEnabled(),
+      shareUrl: c.ticket_mode !== "named" && order.qty > 1 && t.status === "valid" ? `${origin(ctx)}/t/${T.ticketShareToken(db, t)}` : null,
     }));
     const invite = order.status === "paid" && T.salesOpen(c)
       ? { url: `${origin(ctx)}/i/${T.inviteCode(db, order)}`, count: T.invitedCount(db, order.id) }
@@ -681,7 +683,8 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const t = T.ticketByShare(db, ctx.params.token);
     if (!t || t.order_status !== "paid") throw new UserError("הכרטיס לא נמצא", 404);
     const c = C.getCampaign(db, t.campaign_id);
-    ctx.send(TV.singleTicketPage(ctx, { c, t: { ...t, qr: T.qrSvg(t.code) } }, opts(ctx)));
+    if (c.ticket_mode === "named") throw new UserError("כרטיס שמי לא ניתן להעברה", 404);
+    ctx.send(TV.singleTicketPage(ctx, { c, t: { ...t, qr: T.qrSvg(t.code), wallet: W.walletEnabled() } }, opts(ctx)));
   });
 
   // "תזכירו לי": בלי חשבון, רק מייל והסכמה מפורשת
@@ -698,6 +701,41 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     T.cancelReminder(db, ctx.params.token);
     ctx.send(P.errorPage(ctx, 200, "בוטל. לא נשלח לך תזכורות על ההופעה הזו.", opts(ctx)));
   });
+
+  // ---------- Wallet ----------
+  const walletTicket = (ctx, t, c, order) => {
+    if (!t || t.status !== "valid") throw new UserError("הכרטיס לא בתוקף", 404);
+    const named = c.ticket_mode === "named" && !!t.holder_name;
+    return { holder: named ? t.holder_name : order?.buyer_name ?? "", named, url: order ? ticketsUrl(ctx, order) : "", origin: origin(ctx) };
+  };
+  const sendPass = (ctx, c, t, o) => {
+    if (!W.walletEnabled().apple) throw new UserError("Apple Wallet עוד לא הוגדר", 404);
+    ctx.res.writeHead(200, { "content-type": "application/vnd.apple.pkpass", "content-disposition": `attachment; filename="jocares-${t.code}.pkpass"`, "cache-control": "no-store" });
+    ctx.res.end(W.applePass(c, t, o));
+  };
+  const goGoogle = (ctx, c, t, o) => {
+    if (!W.walletEnabled().google) throw new UserError("Google Wallet עוד לא הוגדר", 404);
+    ctx.res.writeHead(302, { location: W.googleSaveUrl(c, t, o) });
+    ctx.res.end();
+  };
+  const orderTicket = (ctx) => {
+    const order = T.orderByToken(db, ctx.params.token);
+    if (!order || order.status !== "paid") throw new UserError("הכרטיס לא נמצא", 404);
+    const t = T.ticketsOf(db, order.id).find((x) => x.seq === Number(ctx.params.seq));
+    const c = C.getCampaign(db, order.campaign_id);
+    return { c, t, o: walletTicket(ctx, t, c, order) };
+  };
+  const sharedTicket = (ctx) => {
+    const t = T.ticketByShare(db, ctx.params.token);
+    if (!t || t.order_status !== "paid") throw new UserError("הכרטיס לא נמצא", 404);
+    const c = C.getCampaign(db, t.campaign_id);
+    if (c.ticket_mode === "named") throw new UserError("כרטיס שמי לא ניתן להעברה", 404);
+    return { c, t, o: { ...walletTicket(ctx, t, c, null), holder: "" } };
+  };
+  r.get("/tickets/:token/wallet/:seq/apple.pkpass", (ctx) => { const { c, t, o } = orderTicket(ctx); sendPass(ctx, c, t, o); });
+  r.get("/tickets/:token/wallet/:seq/google", (ctx) => { const { c, t, o } = orderTicket(ctx); goGoogle(ctx, c, t, o); });
+  r.get("/t/:token/wallet/apple.pkpass", (ctx) => { const { c, t, o } = sharedTicket(ctx); sendPass(ctx, c, t, o); });
+  r.get("/t/:token/wallet/google", (ctx) => { const { c, t, o } = sharedTicket(ctx); goGoogle(ctx, c, t, o); });
 
   r.get("/tickets/:token/calendar.ics", (ctx) => {
     const order = T.orderByToken(db, ctx.params.token);

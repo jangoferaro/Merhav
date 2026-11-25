@@ -121,10 +121,15 @@ export function createOrder(db, campaignId, input, { clickToken = null, invitedB
     const { price } = priceNow(db, c);
     const inviter = invitedBy ? orderByInvite(db, invitedBy) : null;
     const discount = jokerDiscount(db, c, { clickToken, email, qty });
+    // כרטיס שמי: שם לכל כרטיס, כמו בתעודה. נבדק בכניסה, ולכן אי אפשר להעביר
+    const holders = c.ticket_mode === "named"
+      ? Array.from({ length: qty }, (_, i) => text(String(input[`holder_${i + 1}`] ?? "").trim() || (i === 0 ? input.name : ""), `שם על כרטיס ${i + 1}`, { max: 60 }))
+      : [];
     const id = insert(db, "ticket_orders", {
       campaign_id: c.id, token: randomToken(18), buyer_name: text(input.name, "שם", { max: 80 }), buyer_email: email,
       buyer_phone: phone, qty, unit_price_agorot: price, fee_agorot: fee, total_agorot: qty * (price - discount + fee), discount_agorot: discount,
       invited_by: inviter && inviter.campaign_id === c.id ? inviter.id : null,
+      holders: holders.length ? JSON.stringify(holders) : null,
       status: "pending", click_token: clickToken, marketing_consent: input.consent === "on" ? 1 : 0,
       gateway: gateway().name, created_at: clock.iso(), expires_at: minutes(config.holdMinutes),
     });
@@ -176,8 +181,9 @@ export function confirmPayment(db, gatewayName, ref) {
       }
     }
     db.prepare("UPDATE ticket_orders SET status = 'paid', paid_at = ? WHERE id = ?").run(now, order.id);
+    const holders = order.holders ? JSON.parse(order.holders) : [];
     for (let i = 1; i <= order.qty; i++) {
-      insert(db, "tickets", { order_id: order.id, campaign_id: c.id, code: newTicketCode(db), seq: i });
+      insert(db, "tickets", { order_id: order.id, campaign_id: c.id, code: newTicketCode(db), seq: i, holder_name: holders[i - 1] ?? "" });
     }
     // המכירה נכנסת למנוע השיוך והתגמולים, כמו כל ספק אחר
     ingestEvent(db, "jocares", {

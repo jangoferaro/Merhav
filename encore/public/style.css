@@ -689,3 +689,39 @@ details.remind { margin: 14px 0; }
 .synced { background: var(--surface); border: 1px solid var(--hair); padding: 12px 14px; }
 .synced p { margin: 0 0 4px; }
 #connections h3 { margin: 16px 0 0; }
+
+/* הכרטיס: כמו כרטיס אמיתי, עם ספח */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tkt { background: var(--jo-paper); color: #151515; border: 1px solid #151515; display: grid; position: relative; max-width: 420px; margin: 0 auto; box-shadow: 6px 6px 0 #151515; }
+.tkt-top { position: relative; aspect-ratio: 16 / 9; background: #151515; overflow: hidden; }
+.tkt-top img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1) contrast(1.1); display: block; }
+.tkt-badge { position: absolute; inset-block-start: 12px; inset-inline-start: 12px; background: var(--jo-acid); color: #151515; font: 700 .85rem/1 var(--font-display); padding: 7px 10px; border: 1px solid #151515; }
+.tkt-status { position: absolute; inset-block-start: 12px; inset-inline-end: 12px; background: #151515; color: var(--jo-paper); font: 500 .8rem/1 var(--font-mono); padding: 7px 10px; }
+.tkt.st-used .tkt-status { background: var(--jo-paper); color: #151515; border: 1px solid #151515; }
+.tkt.st-refunded .tkt-status { background: var(--jo-red); color: #151515; }
+.tkt-body { padding: 18px 20px 10px; display: grid; gap: 4px; }
+.tkt-artist { margin: 0; font: 500 .95rem var(--font); color: #55554f; }
+.tkt-title { margin: 0 0 8px; font: 800 1.7rem/1.1 var(--font-display); text-wrap: balance; color: #151515; }
+.tkt-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin: 4px 0 0; }
+.tkt-fields div { min-width: 0; }
+.tkt-fields .wide { grid-column: 1 / -1; }
+.tkt-fields dt { font: 500 .72rem/1.2 var(--font-mono); letter-spacing: .06em; color: #55554f; }
+.tkt-fields dd { margin: 2px 0 0; font-weight: 600; font-size: 1.02rem; overflow-wrap: anywhere; }
+.tkt-tear { height: 0; border-top: 2px dashed #151515; margin: 14px 0 0; position: relative; }
+.tkt-tear::before, .tkt-tear::after { content: ""; position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 50%; background: var(--paper); border: 1px solid #151515; }
+.tkt-tear::before { inset-inline-start: -12px; }
+.tkt-tear::after { inset-inline-end: -12px; }
+.tkt-stub { padding: 18px 20px 6px; text-align: center; background: #fff; }
+.tkt-stub .qr { margin: 0 auto 6px; width: min(230px, 66vw); }
+.tkt-stub .qr svg { width: 100%; height: auto; display: block; }
+.tkt-stub .qr.void { aspect-ratio: 1; background: repeating-linear-gradient(45deg, #e2e0d6 0 10px, transparent 10px 20px); }
+.tkt.st-used .tkt-stub .qr, .tkt.st-refunded .tkt-stub .qr { opacity: .3; }
+.tkt-id { margin: 6px 0 4px; font-weight: 600; font-size: .92rem; }
+.tkt-wallet { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 20px; background: #fff; }
+.wallet-btn { display: flex; align-items: center; justify-content: center; min-height: 46px; background: #151515; color: #fff; text-decoration: none; font-weight: 600; font-size: .9rem; border-radius: 10px; text-align: center; padding: 6px 10px; }
+.tkt-share { margin: 8px 20px 0; }
+.tkt-foot { display: flex; justify-content: space-between; margin: 0; padding: 10px 20px 14px; background: #fff; font: 700 .9rem var(--font-display); }
+.tkt-foot i { color: var(--jo-red); font-style: normal; }
+.ticket-list { gap: 28px; }
+.holders { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.door-holder { font: 800 1.6rem/1.1 var(--font-display); }

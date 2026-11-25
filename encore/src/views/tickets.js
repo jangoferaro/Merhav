@@ -40,6 +40,12 @@ export function checkoutPage(ctx, { c, inv, price, inviter = null, discount = 0,
     ${discount ? html`<p class="early-note">הנחה של ${money(discount)} לכרטיס מ${inviter?.name ?? "הג׳וקר"}</p>` : ""}
     <p class="note">${priceTag(c, price)} לכרטיס${fee ? ` + ${money(fee)} דמי שירות` : ". בלי דמי שירות"}.${inv.available <= 20 ? ` נשארו ${inv.available}.` : ""}</p>
     <label class="field">שם מלא<input name="name" required maxlength="80" autocomplete="name" value="${v.name ?? ""}"></label>
+    ${c.ticket_mode === "named"
+      ? html`<fieldset class="holders" data-holders><legend class="field">שם על כל כרטיס</legend>
+          <p class="hint">הכרטיסים שמיים: בכניסה מציגים תעודה מזהה עם אותו שם, ואי אפשר להעביר אותם.</p>
+          ${Array.from({ length: Math.max(max, 1) }, (_, i) => html`<label class="field" data-holder="${i + 1}" ${i + 1 > qty ? html`hidden` : ""}>כרטיס ${i + 1}${i === 0 ? " (השאירו ריק אם זה אותו שם)" : ""}<input name="holder_${i + 1}" maxlength="60" autocomplete="${i === 0 ? "name" : "off"}" value="${v[`holder_${i + 1}`] ?? ""}" ${i > 0 && i + 1 <= qty ? html`required` : ""}></label>`)}
+        </fieldset>`
+      : ""}
     <label class="field">מייל<input name="email" type="email" required autocomplete="email" dir="ltr" value="${v.email ?? ""}"><small class="hint">לכאן נשלחים הכרטיסים.</small></label>
     <label class="field">טלפון (לא חובה)<input name="phone" type="tel" autocomplete="tel" dir="ltr" maxlength="20" value="${v.phone ?? ""}"><small class="hint">${smsEnabled() ? "נשלח לשם גם את הכרטיסים ב-SMS. " : ""}ישמש רק אם תהיה הודעה על שינוי בהופעה.</small></label>
     <label class="check"><input type="checkbox" name="consent" ${v.consent === "on" ? html`checked` : ""}> אשמח ש${c.artist_name} יעדכנו אותי במייל על הופעות הבאות. אפשר לבטל בכל רגע.</label>
@@ -107,27 +113,18 @@ export function ticketsPage(ctx, { c, order, tickets, fresh, url, invite = null 
     ? html`<div class="card center"><h1>הכרטיסים אזלו בזמן התשלום</h1><p class="lead">מצטערים. כל הסכום (${money(order.total_agorot)}) מוחזר לאמצעי התשלום.</p></div>`
     : html`
   ${fresh ? html`<p class="flash good">שולם. ${order.qty > 1 ? "הכרטיסים נשלחו" : "הכרטיס נשלח"} גם ל-${order.buyer_email}.</p>` : ""}
-  <p class="eyebrow">${c.artist_name}</p>
-  <h1>${c.title}</h1>
-  <p class="meta big">${showDate(c.starts_at)}<br>${c.venue}${c.city ? `, ${c.city}` : ""}</p>
+  <h1 class="sr-only">הכרטיסים שלך: ${c.artist_name} · ${c.title}</h1>
   ${c.status === "cancelled" ? html`<p class="flash bad">ההופעה בוטלה. הכסף על הכרטיסים מוחזר לאמצעי התשלום.</p>` : ""}
   <p class="actions-row">
     <a class="btn ghost small" href="/tickets/${order.token}/calendar.ics">הוספה ליומן</a>
     <button type="button" class="btn ghost small" data-copy="${url}">העתקת הקישור לכרטיסים</button>
   </p>
   <div class="ticket-list">
-    ${tickets.map(
-      (t) => html`
-    <article class="ticket st-${t.status}">
-      <div class="ticket-head"><span>כרטיס ${t.seq} מתוך ${order.qty}</span><span>${{ valid: "בתוקף", used: "נכנס/ה", refunded: "הוחזר" }[t.status]}</span></div>
-      ${t.status === "refunded" ? html`<div class="qr void"></div>` : html`<div class="qr">${raw(t.qr)}</div>`}
-      <p class="ticket-code" dir="ltr">${fmtCode(t.code)}</p>
-      <p class="ticket-name">${order.buyer_name}</p>
-      ${t.shareUrl ? html`<button type="button" class="btn ghost small" data-copy="${t.shareUrl}" data-copied="הקישור הועתק. שלחו אותו לחבר/ה">העברת הכרטיס הזה לחבר/ה</button>` : ""}
-    </article>`
-    )}
+    ${tickets.map((t) => ticketCard(c, t, { total: order.qty, holder: t.holder_name || order.buyer_name, named: !!t.holder_name, walletBase: `/tickets/${order.token}/wallet/${t.seq}` }))}
   </div>
-  <p class="note center">בכניסה מציגים את הקוד מהטלפון. כל כרטיס נסרק פעם אחת. ${live.length > 1 ? "כל כרטיס אפשר להעביר לחבר/ה בקישור משלו." : ""}</p>`}
+  <p class="note center">${c.ticket_mode === "named"
+    ? "כרטיס שמי: בכניסה מציגים את הקוד ותעודה מזהה עם אותו שם. אי אפשר להעביר אותו."
+    : `בכניסה מציגים את הקוד מהטלפון. כל כרטיס נסרק פעם אחת.${live.length > 1 ? " כל כרטיס אפשר להעביר לחבר/ה בקישור משלו." : ""}`}</p>`}
 </section>
 ${invite
   ? html`
@@ -177,7 +174,8 @@ export function doorPage(ctx, { c, token, stats, last = null }) {
   ${last
     ? html`<div class="door-result ${tone}" role="status">
         <b>${label}</b>
-        ${last.t ? html`<span>${last.t.buyer_name} · כרטיס ${last.t.seq} מתוך ${last.t.qty}</span>` : ""}
+        ${last.t?.holder_name ? html`<span class="door-holder">${last.t.holder_name}</span><span>בדקו תעודה מזהה עם השם הזה</span>` : ""}
+        ${last.t ? html`<span>${last.t.holder_name ? "הזמנה של " : ""}${last.t.buyer_name} · כרטיס ${last.t.seq} מתוך ${last.t.qty}</span>` : ""}
         ${last.result === "used" && last.t?.used_at ? html`<small>נסרק ב-${showDate(last.t.used_at)}</small>` : ""}
         <small dir="ltr">${last.code}</small>
       </div>`
@@ -300,17 +298,57 @@ export function singleTicketPage(ctx, { c, t }, opts) {
     `כרטיס · ${c.title}`,
     html`
 <section class="narrow tickets-page">
-  <p class="eyebrow">${c.artist_name}</p>
-  <h1>${c.title}</h1>
-  <p class="meta big">${showDate(c.starts_at)}<br>${c.venue}${c.city ? `, ${c.city}` : ""}</p>
   ${c.status === "cancelled" ? html`<p class="flash bad">ההופעה בוטלה.</p>` : ""}
-  <article class="ticket st-${t.status}">
-    <div class="ticket-head"><span>כרטיס מ${t.buyer_name.split(" ")[0]}</span><span>${{ valid: "בתוקף", used: "נכנס/ה", refunded: "הוחזר" }[t.status]}</span></div>
-    ${t.status === "refunded" ? html`<div class="qr void"></div>` : html`<div class="qr">${raw(t.qr)}</div>`}
-    <p class="ticket-code" dir="ltr">${fmtCode(t.code)}</p>
-  </article>
+  ${ticketCard(c, t, { total: 0, holder: "", from: t.buyer_name.split(" ")[0], walletBase: `/t/${t.share_token}/wallet` })}
   <p class="note center">בכניסה מציגים את הקוד מהטלפון. הכרטיס נסרק פעם אחת.</p>
 </section>`,
     { ...opts, noindex: true }
   );
+}
+
+// ---------- הכרטיס עצמו ----------
+
+const STATUS_HE = { valid: "בתוקף", used: "נכנס/ה", refunded: "הוחזר" };
+const timeOnly = (iso) => new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+const dayOnly = (iso) => new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", weekday: "short", day: "numeric", month: "short" }).format(new Date(iso));
+
+/**
+ * כרטיס כמו כרטיס אמיתי: תמונת ההופעה, פרטים בשדות ברורים, קו קריעה, וספח עם ה-QR.
+ * shareUrl: קישור להעברה (רק בכרטיס פתוח). walletBase: קישורים ל-Apple ו-Google Wallet, אם מוגדרים.
+ */
+export function ticketCard(c, t, { total, holder, named = false, from = "", walletBase = "" }) {
+  return html`
+<article class="tkt st-${t.status}" aria-label="כרטיס ${t.seq}${total ? ` מתוך ${total}` : ""}">
+  <div class="tkt-top">
+    ${c.image_url ? html`<img src="${c.image_url}" alt="" referrerpolicy="no-referrer">` : ""}
+    <span class="tkt-badge">${named ? "כרטיס שמי" : "כניסה אחת"}</span>
+    <span class="tkt-status">${STATUS_HE[t.status]}</span>
+  </div>
+  <div class="tkt-body">
+    <p class="tkt-artist">${c.artist_name}</p>
+    <h2 class="tkt-title">${c.title}</h2>
+    <dl class="tkt-fields">
+      <div><dt>תאריך</dt><dd>${dayOnly(c.starts_at)}</dd></div>
+      <div><dt>שעה</dt><dd dir="ltr">${timeOnly(c.starts_at)}</dd></div>
+      <div class="wide"><dt>מקום</dt><dd>${c.venue}${c.city ? `, ${c.city}` : ""}</dd></div>
+      ${holder ? html`<div class="wide"><dt>${named ? "על שם" : "הוזמן על ידי"}</dt><dd>${holder}</dd></div>` : ""}
+      ${from ? html`<div class="wide"><dt>מאת</dt><dd>${from}</dd></div>` : ""}
+      ${total ? html`<div><dt>כרטיס</dt><dd dir="ltr">${t.seq} / ${total}</dd></div>` : ""}
+    </dl>
+  </div>
+  <div class="tkt-tear" aria-hidden="true"></div>
+  <div class="tkt-stub">
+    ${t.status === "refunded" ? html`<div class="qr void"></div>` : html`<div class="qr">${raw(t.qr)}</div>`}
+    <p class="ticket-code" dir="ltr">${fmtCode(t.code)}</p>
+    ${named ? html`<p class="tkt-id">בכניסה: תעודה מזהה על שם ${holder}</p>` : ""}
+  </div>
+  ${t.status === "valid" && (t.wallet?.apple || t.wallet?.google)
+    ? html`<div class="tkt-wallet">
+        ${t.wallet.apple ? html`<a class="wallet-btn apple" href="${walletBase}/apple.pkpass">הוספה ל-Apple Wallet</a>` : ""}
+        ${t.wallet.google ? html`<a class="wallet-btn google" href="${walletBase}/google" rel="noopener">שמירה ב-Google Wallet</a>` : ""}
+      </div>`
+    : ""}
+  ${t.shareUrl ? html`<button type="button" class="btn ghost small tkt-share" data-copy="${t.shareUrl}" data-copied="הקישור הועתק. שלחו אותו לחבר/ה">העברת הכרטיס הזה לחבר/ה</button>` : ""}
+  <p class="tkt-foot"><span dir="ltr">JoCares<i>.</i></span><span dir="ltr">Be Jo.</span></p>
+</article>`;
 }

@@ -25,3 +25,13 @@
 
 ## לפני הגשה לאישור (Meta, TikTok, Google)
 הספקים יבקשו מדיניות פרטיות ותנאי שימוש בכתובת קבועה (יש: `/terms`), סרטון שמראה את תהליך החיבור, והסבר למה כל הרשאה נחוצה. ההסבר לכל ההרשאות: "מציגים לג׳וקר ולאמנים שהוא בוחר מספר עוקבים מאומת, כדי להתאים בין אמנים לג׳וקרים שמקדמים הופעות. לא מפרסמים בשם המשתמש".
+
+## כרטיסים ב-Wallet
+
+| ספק | איפה | מה מכניסים ל-Railway | עלות |
+|---|---|---|---|
+| **Apple Wallet** | developer.apple.com → Identifiers → Pass Type IDs → יוצרים מזהה (למשל pass.com.jocares.ticket) → Create Certificate. מורידים גם את תעודת הביניים של Apple (WWDR G4) | `APPLE_PASS_TYPE_ID`, `APPLE_PASS_TEAM_ID`, `APPLE_PASS_CERT` ו-`APPLE_PASS_KEY` (התעודה והמפתח ב-PEM), `APPLE_WWDR_CERT` (PEM), ואם יש סיסמה למפתח: `APPLE_PASS_KEY_PASSWORD` | כלול במנוי Apple Developer (99$ לשנה), אותו מנוי של Apple Music |
+| **Google Wallet** | pay.google.com/business/console → Google Wallet API → חשבון מנפיק (Issuer). ב-Google Cloud: חשבון שירות עם הרשאה ל-Wallet API, ומפתח JSON | `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_SA_EMAIL`, `GOOGLE_WALLET_SA_KEY` (ה-private_key מקובץ ה-JSON) | חינם. לפני שימוש ציבורי Google מאשרת את חשבון המנפיק |
+
+את התעודה של Apple ממירים ל-PEM מקובץ ה-.p12 שמורידים:
+`openssl pkcs12 -in pass.p12 -clcerts -nokeys -out cert.pem` וגם `openssl pkcs12 -in pass.p12 -nocerts -nodes -out key.pem`

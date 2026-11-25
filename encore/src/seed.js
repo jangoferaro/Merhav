@@ -38,7 +38,7 @@ const shows = [
   [noa, { artist_name: "נועה ברק", title: "ערב אקוסטי באינטימי", venue: "הבארבי", city: "תל אביב", genre: "אינדי", starts_at: inDays(9), price: "89", reward: "20", description: "שירים מהאלבום החדש, גיטרה, פסנתר וכמה הפתעות.", image_url: img("blur"), ticketing: "jocares", capacity: "120" }],
   [band, { artist_name: "הקרוואן", title: "השקת אלבום", venue: "זאפה", city: "ירושלים", genre: "רוק", starts_at: inDays(16), price: "120", reward: "25", promo_limit: "100", image_url: img("rays"), ticketing: "jocares", capacity: "300", early_price: "90", early_qty: "60" }],
   [noa, { artist_name: "נועה ברק", title: "הופעה בצפון", venue: "האנגר 11", city: "חיפה", genre: "אינדי", starts_at: inDays(30), price: "75", reward: "15", image_url: img("rings"), ticketing: "jocares", capacity: "250" }],
-  [band, { artist_name: "שקד וחברים", title: "ג'אם ג'אז של חמישי", venue: "בית העם", city: "תל אביב", genre: "ג'אז", starts_at: inDays(4), price: "60", reward: "10", image_url: img("stripes"), ticketing: "jocares", capacity: "80" }],
+  [band, { artist_name: "שקד וחברים", title: "ג'אם ג'אז של חמישי", venue: "בית העם", city: "תל אביב", genre: "ג'אז", starts_at: inDays(4), price: "60", reward: "10", image_url: img("stripes"), ticketing: "jocares", capacity: "80", ticket_mode: "named" }],
   [band, { artist_name: "DJ Lila", title: "Lila All Night", venue: "הבלוק", city: "תל אביב", genre: "אלקטרוני", starts_at: inDays(22), price: "110", reward: "30", image_url: img("pixels"), ticketing: "jocares", capacity: "400" }],
 ];
 const ids = shows.map(([u, s]) => C.createCampaign(db, u, s));
