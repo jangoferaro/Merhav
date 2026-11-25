@@ -368,3 +368,11 @@ test("מסלול קופונים מקצה לקצה: האמן והג׳וקר לא 
   r = await artist.get(`/artist/c/${cid}`);
   assert.match(r.text, /<b>2<\/b><span>כרטיסים דרך ג׳וקרים/);
 });
+
+test("מצב תפעולי לסוכנים: ספירות בלבד, בלי מידע אישי", async () => {
+  const r = await (await fetch(base + "/ops/health")).json();
+  assert.equal(typeof r.ok, "boolean");
+  assert.ok(Array.isArray(r.problems));
+  assert.equal(typeof r.checks.reconciliation_issues, "number");
+  assert.doesNotMatch(JSON.stringify(r), /@|₪/);
+});

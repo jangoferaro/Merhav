@@ -12,9 +12,13 @@
     "dev": "node --no-warnings=ExperimentalWarning --watch src/server.js",
     "seed": "node --no-warnings=ExperimentalWarning src/seed.js",
     "test": "node --no-warnings=ExperimentalWarning --test test/*.test.js",
-    "start:staging": "node --no-warnings=ExperimentalWarning src/seed-if-empty.js && node --no-warnings=ExperimentalWarning src/server.js"
+    "start:staging": "node --no-warnings=ExperimentalWarning src/seed-if-empty.js && node --no-warnings=ExperimentalWarning src/server.js",
+    "ops:qa": "node --no-warnings=ExperimentalWarning ops/qa.mjs"
   },
   "dependencies": {
     "qrcode-generator": "2.0.4"
+  },
+  "devDependencies": {
+    "axe-core": "^4.10.2"
   }
 }

@@ -37,6 +37,55 @@ const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "pu
 const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png" };
 const REF_COOKIE_DAYS = config.attributionDays;
 
+// מצב תפעולי לסוכן התחזוקה: רק ספירות ודגלים, בלי מידע אישי ובלי סכומים
+export const ops = { started: Date.now(), errors: [], lastSettleAt: null, lastSettleError: null };
+
+export function opsHealth(db) {
+  const hourAgo = Date.now() - 3600_000;
+  ops.errors = ops.errors.filter((t) => t > hourAgo - 23 * 3600_000);
+  const n = (sql, ...a) => db.prepare(sql).get(...a).n;
+  let dbOk = true;
+  let issues = [];
+  try {
+    issues = M.reconciliationIssues(db);
+  } catch {
+    dbOk = false;
+  }
+  const now = clock.iso();
+  const checks = dbOk
+    ? {
+        reconciliation_issues: issues.length,
+        failed_refunds: n("SELECT COUNT(*) n FROM ticket_refunds WHERE status = 'failed'"),
+        pending_refunds_over_1h: n("SELECT COUNT(*) n FROM ticket_refunds WHERE status = 'pending' AND created_at < ?", new Date(Date.now() - 3600_000).toISOString()),
+        stale_pending_orders: n("SELECT COUNT(*) n FROM ticket_orders WHERE status = 'pending' AND expires_at < ?", new Date(Date.now() - 3600_000).toISOString()),
+        connection_errors: n("SELECT COUNT(*) n FROM connected_accounts WHERE status = 'error'"),
+        expired_connections: n("SELECT COUNT(*) n FROM connected_accounts WHERE status = 'expired'"),
+        payouts_waiting: n("SELECT COUNT(*) n FROM payouts WHERE status = 'requested'"),
+        open_disputes: n("SELECT COUNT(*) n FROM disputes WHERE status = 'open'"),
+        content_disputes: n("SELECT COUNT(*) n FROM service_orders WHERE status = 'disputed'"),
+        active_shows: n("SELECT COUNT(*) n FROM campaigns c JOIN events e ON e.id = c.event_id WHERE c.status IN ('active','paused','sold_out') AND e.starts_at > ?", now),
+        tickets_24h: n("SELECT COALESCE(SUM(qty), 0) n FROM ticket_orders WHERE status = 'paid' AND paid_at > ?", new Date(Date.now() - 86400_000).toISOString()),
+      }
+    : {};
+  const problems = Object.entries(checks).filter(([k, v]) => v > 0 && !["active_shows", "tickets_24h", "payouts_waiting", "expired_connections"].includes(k)).map(([k]) => k);
+  if (!dbOk) problems.push("database");
+  if (ops.errors.filter((t) => t > hourAgo).length > 5) problems.push("server_errors");
+  if (ops.lastSettleError) problems.push("settle_failed");
+  return {
+    ok: problems.length === 0,
+    problems,
+    version: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? "dev",
+    uptime_min: Math.round((Date.now() - ops.started) / 60000),
+    server_errors_1h: ops.errors.filter((t) => t > hourAgo).length,
+    server_errors_24h: ops.errors.length,
+    last_settle_at: ops.lastSettleAt,
+    mail: !!(process.env.BREVO_API_KEY || process.env.RESEND_API_KEY),
+    sms: !!process.env.TWILIO_ACCOUNT_SID,
+    payments: process.env.PAYMENT_GATEWAY || "sandbox",
+    checks,
+  };
+}
+
 export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fetch } = {}) {
   // הספק המדומה "שולח" webhooks לאותה נקודת קליטה שספק אמיתי ישתמש בה
   Sim.setSimDeliver((raw, headers) => I.ingestWebhook(db, "sim", raw, headers));
@@ -1246,7 +1295,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   // בוטים של תצוגה מקדימה עוברים לדפי הופעה ולתמונות, כדי שאפשר יהיה לבדוק שיתוף בוואטסאפ.
   const pilotPass = () => process.env.STAGING_PASSWORD;
   const pilotToken = () => hmac(pilotPass(), "pilot-access");
-  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health|data-deletion)$|^\/(static|media|webhooks|tickets|door|t|reminders|j)\//;
+  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health|data-deletion|ops\/health)$|^\/(static|media|webhooks|tickets|door|t|reminders|j)\//;
 
   function stagingGate(req, res, ctx) {
     if (!pilotPass()) return false;
@@ -1297,6 +1346,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
         return fs.createReadStream(file).pipe(res);
       }
       if (req.method === "GET" && ctx.url.pathname === "/health") return ctx.json({ ok: true });
+      if (req.method === "GET" && ctx.url.pathname === "/ops/health") return ctx.json(opsHealth(db));
       if (req.method === "GET" && ctx.url.pathname.startsWith("/media/")) {
         if (serveMedia(ctx.url.pathname.slice(7), res, req.headers.range)) return;
         throw new UserError("התמונה לא נמצאה", 404);
@@ -1320,6 +1370,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
         return ctx.send(P.errorPage(ctx, err.status, err.message, opts(ctx)), err.status);
       }
       console.error(err);
+      ops.errors.push(Date.now());
       ctx.send(P.errorPage(ctx, 500, "משהו השתבש אצלנו. נסו שוב בעוד רגע.", {}), 500);
     }
   };
@@ -1333,6 +1384,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const tick = () => {
     try {
       const r = M.settle(db);
+      ops.lastSettleAt = new Date().toISOString();
+      ops.lastSettleError = null;
       if (r.ended || r.released || r.content || r.expired) console.log(`[settle] ended=${r.ended} released=${r.released} content=${r.content} expired=${r.expired}`);
       T.processRefunds(db).then((n) => n && console.log(`[refunds] ${n}`), (e) => console.error("[refunds]", e));
       CN.syncDue(db).then((n) => n && console.log(`[connections] ${n}`), (e) => console.error("[connections]", e));
@@ -1353,6 +1406,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       ).then((n) => n && console.log(`[reminders] ${n}`), (e) => console.error("[reminders]", e));
     } catch (e) {
       console.error("[settle]", e);
+      ops.lastSettleError = String(e.message);
     }
   };
   tick();
