@@ -36,7 +36,7 @@ export default function Events({ session, home, onHome, onPick, onLogout }: { se
           <Text style={[rtl, { fontFamily: F.display, fontSize: 20, color: C.paper }]}>להתנתק מהמכשיר?</Text>
           <Text style={[rtl, { fontFamily: F.body, fontSize: 16, lineHeight: 23, color: C.muted }]}>המפתח האישי והרשימות יימחקו מהמכשיר. כדי לחזור צריך שוב את הקישור מהמארגן.</Text>
           <View style={[row, { gap: 10 }]}>
-            <Button kind="raised" label="התנתקות" onPress={onLogout} style={{ flex: 1 }} />
+            <Button kind="danger" label="התנתקות" onPress={onLogout} style={{ flex: 1 }} />
             <Button kind="ghost" label="ביטול" onPress={() => setConfirming(false)} style={{ flex: 1 }} />
           </View>
         </View>

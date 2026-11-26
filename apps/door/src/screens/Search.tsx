@@ -9,7 +9,7 @@ import { C, F, row, rtl } from "../theme";
 export default function Search({ door, onBack }: { door: Door; onBack: () => void }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<SearchRow[]>([]);
-  const [done, setDone] = useState<Record<number, boolean>>({});
+  const [done, setDone] = useState<Record<number, string>>({});
 
   useEffect(() => {
     const t = setTimeout(async () => setRows(await door.search(q)), 250);
@@ -18,7 +18,7 @@ export default function Search({ door, onBack }: { door: Door; onBack: () => voi
 
   const admit = async (r: SearchRow) => {
     await door.admitById(r.id);
-    setDone((d) => ({ ...d, [r.id]: true }));
+    setDone((d) => ({ ...d, [r.id]: new Date().toISOString() }));
   };
 
   return (
@@ -55,7 +55,7 @@ export default function Search({ door, onBack }: { door: Door; onBack: () => voi
                 <Text style={[rtl, { fontFamily: F.title, fontSize: 19, color: C.paper }]}>{r.name}</Text>
                 <Text style={[rtl, { fontFamily: F.body, fontSize: 14, color: C.muted }]}>{meta}</Text>
               </View>
-              {used ? <Text style={{ fontFamily: F.body, fontSize: 14, color: C.muted }}>{r.used_at ? `נכנס/ה ${new Date(r.used_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}` : "נכנס/ה"}</Text> : <Button label="הכנסה" onPress={() => admit(r)} style={{ minHeight: 48 }} accessibilityLabel={`הכנסה של ${r.name}`} />}
+              {used ? <Text style={{ fontFamily: F.body, fontSize: 14, color: C.muted }}>{r.used_at || done[r.id] ? `נכנס/ה ${new Date((r.used_at || done[r.id]) as string).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}` : "נכנס/ה"}</Text> : <Button label="הכנסה" onPress={() => admit(r)} style={{ minHeight: 48 }} accessibilityLabel={`הכנסה של ${r.name}`} />}
             </View>
           );
         }}

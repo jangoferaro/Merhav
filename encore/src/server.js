@@ -29,6 +29,7 @@ import { PROVIDERS, appleDeveloperToken, configured, missingEnv, providerOr404 }
 import * as JV from "./views/jokers.js";
 import * as T from "./domain/tickets.js";
 import * as W from "./wallet.js";
+import * as WS from "./wallet-service.js";
 import * as DR from "./domain/door.js";
 import * as DV from "./views/door.js";
 import { createRequire } from "node:module";
@@ -708,10 +709,16 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   });
 
   // ---------- Wallet ----------
-  const walletTicket = (ctx, t, c, order) => {
-    if (!t || t.status !== "valid") throw new UserError("הכרטיס לא בתוקף", 404);
+  // מה שמופיע בכרטיס זהה בהורדה ובעדכונים: שם רק בכרטיס שמי, בלי שם הקונה ובלי קישור להזמנה,
+  // כי כרטיס רגיל יכול לעבור לחבר
+  const passOpts = (ctx, t, c) => {
     const named = c.ticket_mode === "named" && !!t.holder_name;
-    return { holder: named ? t.holder_name : order?.buyer_name ?? "", named, url: order ? ticketsUrl(ctx, order) : "", origin: origin(ctx) };
+    const qty = db.prepare("SELECT qty FROM ticket_orders WHERE id = ?").get(t.order_id)?.qty ?? 1;
+    return { holder: named ? t.holder_name : "", named, qty, origin: origin(ctx) };
+  };
+  const walletTicket = (ctx, t, c) => {
+    if (!t || t.status !== "valid") throw new UserError("הכרטיס לא בתוקף", 404);
+    return passOpts(ctx, t, c);
   };
   const sendPass = (ctx, c, t, o) => {
     if (!W.walletEnabled().apple) throw new UserError("Apple Wallet עוד לא הוגדר", 404);
@@ -728,19 +735,63 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     if (!order || order.status !== "paid") throw new UserError("הכרטיס לא נמצא", 404);
     const t = T.ticketsOf(db, order.id).find((x) => x.seq === Number(ctx.params.seq));
     const c = C.getCampaign(db, order.campaign_id);
-    return { c, t, o: walletTicket(ctx, t, c, order) };
+    return { c, t, o: walletTicket(ctx, t, c) };
   };
   const sharedTicket = (ctx) => {
     const t = T.ticketByShare(db, ctx.params.token);
     if (!t || t.order_status !== "paid") throw new UserError("הכרטיס לא נמצא", 404);
     const c = C.getCampaign(db, t.campaign_id);
     if (c.ticket_mode === "named") throw new UserError("כרטיס שמי לא ניתן להעברה", 404);
-    return { c, t, o: { ...walletTicket(ctx, t, c, null), holder: "" } };
+    return { c, t, o: walletTicket(ctx, t, c) };
   };
   r.get("/tickets/:token/wallet/:seq/apple.pkpass", (ctx) => { const { c, t, o } = orderTicket(ctx); sendPass(ctx, c, t, o); });
   r.get("/tickets/:token/wallet/:seq/google", (ctx) => { const { c, t, o } = orderTicket(ctx); goGoogle(ctx, c, t, o); });
   r.get("/t/:token/wallet/apple.pkpass", (ctx) => { const { c, t, o } = sharedTicket(ctx); sendPass(ctx, c, t, o); });
   r.get("/t/:token/wallet/google", (ctx) => { const { c, t, o } = sharedTicket(ctx); goGoogle(ctx, c, t, o); });
+
+  // ---------- שירות העדכונים של Apple Wallet ----------
+  // הנתיבים לפי המפרט של Apple. ההזדהות: "ApplePass <token>" שנגזר מקוד הכרטיס
+  const ws = (method, path, fn) =>
+    r.add(method, `/wallet/apple/v1${path}`, (ctx) => {
+      rateLimit(`wallet:${ctx.ip}`, 600, 600_000);
+      if (ctx.params.ptype && ctx.params.ptype !== process.env.APPLE_PASS_TYPE_ID) return ctx.res.writeHead(404).end();
+      return fn(ctx);
+    }, { noCsrf: true });
+  const wsAuth = (ctx) => {
+    const t = WS.authorize(db, ctx.params.serial, ctx.req.headers.authorization);
+    if (!t) ctx.res.writeHead(401).end();
+    return t;
+  };
+  ws("POST", "/devices/:device/registrations/:ptype/:serial", async (ctx) => {
+    if (!wsAuth(ctx)) return;
+    let body = {};
+    try { body = JSON.parse((await readBody(ctx.req, 4096)) || "{}"); } catch {}
+    ctx.res.writeHead(WS.register(db, ctx.params.device, ctx.params.serial, body.pushToken)).end();
+  });
+  ws("DELETE", "/devices/:device/registrations/:ptype/:serial", (ctx) => {
+    if (!wsAuth(ctx)) return;
+    WS.unregister(db, ctx.params.device, ctx.params.serial);
+    ctx.res.writeHead(200).end();
+  });
+  ws("GET", "/devices/:device/registrations/:ptype", (ctx) => {
+    const r2 = WS.updatedSince(db, ctx.params.device, ctx.query.passesUpdatedSince);
+    if (!r2) return ctx.res.writeHead(204).end();
+    ctx.json(r2);
+  });
+  ws("GET", "/passes/:ptype/:serial", (ctx) => {
+    const t = wsAuth(ctx);
+    if (!t) return;
+    const mod = WS.lastModified(t);
+    const since = Date.parse(ctx.req.headers["if-modified-since"] ?? "");
+    if (since && Math.floor(mod.getTime() / 1000) <= Math.floor(since / 1000)) return ctx.res.writeHead(304).end();
+    const c = C.getCampaign(db, t.campaign_id);
+    ctx.res.writeHead(200, { "content-type": "application/vnd.apple.pkpass", "last-modified": mod.toUTCString(), "cache-control": "no-store" });
+    ctx.res.end(W.applePass(c, t, passOpts(ctx, t, c)));
+  });
+  ws("POST", "/log", async (ctx) => {
+    try { console.log("[wallet]", JSON.parse((await readBody(ctx.req, 16_384)) || "{}").logs?.slice(0, 5)); } catch {}
+    ctx.res.writeHead(200).end();
+  });
 
   r.get("/tickets/:token/calendar.ics", (ctx) => {
     const order = T.orderByToken(db, ctx.params.token);
@@ -1440,7 +1491,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   // בוטים של תצוגה מקדימה עוברים לדפי הופעה ולתמונות, כדי שאפשר יהיה לבדוק שיתוף בוואטסאפ.
   const pilotPass = () => process.env.STAGING_PASSWORD;
   const pilotToken = () => hmac(pilotPass(), "pilot-access");
-  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health|data-deletion|ops\/health)$|^\/(static|media|webhooks|tickets|door|t|reminders|j)\//;
+  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health|data-deletion|ops\/health)$|^\/(static|media|webhooks|tickets|door|t|reminders|j|wallet)\//;
 
   function stagingGate(req, res, ctx) {
     if (!pilotPass()) return false;
@@ -1530,6 +1581,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const db = openDb();
   const port = Number(process.env.PORT ?? 3000);
   http.createServer(createApp(db)).listen(port, () => console.log(`JoCares רץ על http://localhost:${port}`));
+  let pushApple = null;
   const tick = () => {
     try {
       const r = M.settle(db);
@@ -1538,6 +1590,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       if (r.ended || r.released || r.content || r.expired) console.log(`[settle] ended=${r.ended} released=${r.released} content=${r.content} expired=${r.expired}`);
       T.processRefunds(db).then((n) => n && console.log(`[refunds] ${n}`), (e) => console.error("[refunds]", e));
       CN.syncDue(db).then((n) => n && console.log(`[connections] ${n}`), (e) => console.error("[connections]", e));
+      if (W.walletEnabled().apple) WS.pushUpdates(db, (pushApple ??= WS.apnsSender())).then((n) => n && console.log(`[wallet] ${n}`), (e) => console.error("[wallet]", e));
       const base = (process.env.PUBLIC_URL || `http://localhost:${port}`).replace(/\/$/, "");
       T.processReminders(db, (rem, c, p) =>
         sendMail({

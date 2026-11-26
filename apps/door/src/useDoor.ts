@@ -28,7 +28,7 @@ const DETAILS: Record<string, string> = {
   unknown: "לא כרטיס של JoCares, או צילום פגום",
   wrong_show: "הכרטיס להופעה אחרת. הפנו לתור הנכון",
   undone: "הכרטיס שוב בתוקף, ואפשר לסרוק אותו מחדש",
-  queued: "נשמר במכשיר ויישלח כשהקליטה תחזור",
+  queued: "נשמר במכשיר ויישלח כשהחיבור יחזור",
 };
 const time = (iso?: string | null) => (iso ? new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }) : "");
 export const UNDO_MS = 5 * 60_000;

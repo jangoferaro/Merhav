@@ -12,17 +12,17 @@ export function Brand({ size = 20 }: { size?: number }) {
   );
 }
 
-type BtnProps = PressableProps & { label: string; kind?: "acid" | "ghost" | "raised"; style?: StyleProp<ViewStyle> };
+type BtnProps = PressableProps & { label: string; kind?: "acid" | "ghost" | "raised" | "danger"; style?: StyleProp<ViewStyle> };
 export function Button({ label, kind = "acid", style, ...p }: BtnProps) {
-  const bg = kind === "acid" ? C.acid : kind === "raised" ? C.raised : "transparent";
-  const fg = kind === "acid" ? C.ink : C.paper;
+  const bg = kind === "acid" ? C.acid : kind === "danger" ? C.red : kind === "raised" ? C.raised : "transparent";
+  const fg = kind === "acid" || kind === "danger" ? C.ink : C.paper;
   return (
     <Pressable
       accessibilityRole="button"
       {...p}
       style={({ pressed }) => [s.btn, { backgroundColor: bg, borderWidth: kind === "ghost" ? 1.5 : 0, opacity: pressed ? 0.75 : p.disabled ? 0.5 : 1 }, style]}
     >
-      <Text style={[s.btnText, { color: fg, fontFamily: kind === "acid" ? F.display : F.bodyBold }]}>{label}</Text>
+      <Text style={[s.btnText, { color: fg, fontFamily: kind === "acid" || kind === "danger" ? F.display : F.bodyBold }]}>{label}</Text>
     </Pressable>
   );
 }

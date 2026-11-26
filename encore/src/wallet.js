@@ -7,11 +7,14 @@
 //  Google — GOOGLE_WALLET_ISSUER_ID, GOOGLE_WALLET_SA_EMAIL ו-GOOGLE_WALLET_SA_KEY
 //           (חשבון שירות עם הרשאה ל-Google Wallet API, והמפתח הפרטי שלו ב-PEM).
 //
-// מגבלה ידועה: עדכון כרטיס שכבר נשמר ב-Wallet (למשל אחרי החזר) דורש שירות עדכונים של כל ספק,
-// שעוד לא נבנה. הכניסה בדלת בודקת תמיד מול המערכת, ולכן כרטיס שהוחזר לא ייכנס גם אם הוא עדיין ב-Wallet.
+// עדכונים: כרטיס ב-Apple Wallet נרשם לשירות העדכונים שלנו (wallet-service.js). כשהכרטיס נסרק, מוחזר,
+// או שההופעה זזה, נשלחת דחיפה ל-Apple והמכשיר מוריד את הכרטיס העדכני. ב-Google Wallet עוד אין עדכון.
+// הכניסה בדלת בודקת תמיד מול המערכת, ולכן כרטיס שהוחזר לא ייכנס גם אם הוא עדיין ב-Wallet.
 import crypto from "node:crypto";
+import fs from "node:fs";
 import forge from "node-forge";
-import { encodePng } from "./demo-images.js";
+import { stripImages } from "./wallet-strip.js";
+import { hmac } from "./util.js";
 
 const pem = (k) => (process.env[k] || "").replace(/\\n/g, "\n");
 const APPLE_KEYS = ["APPLE_PASS_TYPE_ID", "APPLE_PASS_TEAM_ID", "APPLE_PASS_CERT", "APPLE_PASS_KEY", "APPLE_WWDR_CERT"];
@@ -66,20 +69,35 @@ export function zipStore(files) {
   return Buffer.concat([...parts, cd, end]);
 }
 
-/** אייקון של המותג: ריבוע חומצה עם עיגול דיו (Apple דורש icon.png) */
-function brandIcon(size) {
-  const rgb = Buffer.alloc(size * size * 3);
-  const r = size * 0.28;
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const i = (y * size + x) * 3;
-    const inside = (x - size / 2) ** 2 + (y - size / 2) ** 2 < r * r;
-    rgb[i] = inside ? 0x15 : 0xdf; rgb[i + 1] = inside ? 0x15 : 0xff; rgb[i + 2] = inside ? 0x15 : 0x45;
-  }
-  return encodePng(size, size, rgb);
-}
+// לוגו ואייקון של המותג, מוכנים מראש (assets/wallet)
+const ASSETS = new URL("../assets/wallet/", import.meta.url);
+const brandFiles = (() => {
+  let files = null;
+  return () =>
+    (files ??= Object.fromEntries(
+      ["icon.png", "icon@2x.png", "icon@3x.png", "logo.png", "logo@2x.png", "logo@3x.png"].map((n) => [n, fs.readFileSync(new URL(n, ASSETS))])
+    ));
+})();
 
-export function passJson(c, t, { holder = "", named = false, url = "" }) {
+const hhmm = (iso) => new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" });
+
+/** הסיסמה שהמכשיר שולח לשירות העדכונים. נגזרת מהקוד ומהסוד של השרת, בלי לשמור אותה */
+export const passAuthToken = (t) => hmac(t.code, "apple-pass").slice(0, 32);
+
+/**
+ * תוכן הכרטיס. משתנה לפי מצב הכרטיס, וכך הכרטיס ב-Wallet מתעדכן לבד:
+ * בתוקף (עם QR), נכנס/ה בשעה (בלי QR), או בוטל (בלי QR).
+ */
+export function passJson(c, t, { holder = "", named = false, url = "", qty = 0, origin = "" }) {
   const end = new Date(new Date(c.starts_at).getTime() + 12 * 3600_000).toISOString();
+  const status = t.status ?? "valid";
+  const state =
+    status === "used" ? { value: `נכנס/ה ${t.used_at ? hhmm(t.used_at) : ""}`.trim(), msg: "נכנסת להופעה. ערב טוב!" }
+    : status === "refunded" ? { value: "בוטל", msg: "הכרטיס בוטל והכסף הוחזר" }
+    : { value: named ? "כרטיס שמי" : "כניסה אחת", msg: "" };
+  const live = status === "valid";
+  const barcode = { format: "PKBarcodeFormatQR", message: t.code, messageEncoding: "iso-8859-1", altText: fmtCode(t.code) };
+  const service = /^https:\/\//.test(origin) ? { webServiceURL: `${origin}/wallet/apple`, authenticationToken: passAuthToken(t) } : {};
   return {
     formatVersion: 1,
     passTypeIdentifier: process.env.APPLE_PASS_TYPE_ID,
@@ -87,27 +105,36 @@ export function passJson(c, t, { holder = "", named = false, url = "" }) {
     serialNumber: t.code,
     organizationName: "JoCares",
     description: `כרטיס: ${c.artist_name} · ${c.title}`,
-    logoText: "JoCares",
-    foregroundColor: "rgb(21, 21, 21)",
-    backgroundColor: "rgb(223, 255, 69)",
-    labelColor: "rgb(21, 21, 21)",
+    // כהה כמו האפליקציה, תוויות בחומצה. תמונת ההופעה ברצועה העליונה
+    foregroundColor: "rgb(237, 236, 228)",
+    backgroundColor: "rgb(21, 21, 21)",
+    labelColor: "rgb(223, 255, 69)",
     relevantDate: c.starts_at,
     expirationDate: end,
+    // כרטיס שמי לא עובר הלאה, גם לא ב-AirDrop או בהודעה. כרטיס רגיל מעבירים בקישור שלו
+    ...(named ? { sharingProhibited: true } : {}),
+    ...(live ? {} : { voided: true }),
+    ...service,
     eventTicket: {
+      headerFields: [{ key: "state", label: "מצב", value: state.value, ...(state.msg ? { changeMessage: state.msg } : {}) }],
       primaryFields: [{ key: "event", label: c.artist_name, value: c.title }],
       secondaryFields: [
-        { key: "date", label: "מתי", value: c.starts_at, dateStyle: "PKDateStyleMedium", timeStyle: "PKDateStyleShort" },
-        { key: "venue", label: "איפה", value: [c.venue, c.city].filter(Boolean).join(", ") },
+        { key: "date", label: "מתי", value: c.starts_at, dateStyle: "PKDateStyleMedium", timeStyle: "PKDateStyleShort", changeMessage: "ההופעה זזה: %@" },
+        { key: "venue", label: "איפה", value: [c.venue, c.city].filter(Boolean).join(", "), changeMessage: "מקום חדש: %@" },
       ],
-      auxiliaryFields: holder ? [{ key: "holder", label: named ? "על שם" : "הוזמן על ידי", value: holder }] : [],
+      auxiliaryFields: [
+        ...(holder ? [{ key: "holder", label: named ? "על שם" : "הוזמן על ידי", value: holder }] : []),
+        ...(qty > 1 ? [{ key: "seq", label: "כרטיס", value: `${t.seq} מתוך ${qty}` }] : []),
+        ...(named ? [{ key: "id", label: "בכניסה", value: "תעודה מזהה" }] : []),
+      ],
       backFields: [
         { key: "code", label: "קוד הכרטיס", value: fmtCode(t.code) },
         { key: "rules", label: "בכניסה", value: named ? `כרטיס שמי. מציגים את הקוד ותעודה מזהה על שם ${holder}. אי אפשר להעביר.` : "מציגים את הקוד. כל כרטיס נסרק פעם אחת." },
         ...(url ? [{ key: "link", label: "הכרטיסים שלך", value: url }] : []),
+        { key: "about", label: "JoCares", value: "כרטיסים שאוהדים מפיצים. jocares" },
       ],
     },
-    barcodes: [{ format: "PKBarcodeFormatQR", message: t.code, messageEncoding: "iso-8859-1", altText: fmtCode(t.code) }],
-    barcode: { format: "PKBarcodeFormatQR", message: t.code, messageEncoding: "iso-8859-1", altText: fmtCode(t.code) },
+    ...(live ? { barcodes: [barcode], barcode } : {}),
   };
 }
 
@@ -135,9 +162,8 @@ function signManifest(manifest) {
 export function applePass(c, t, opts) {
   const files = {
     "pass.json": Buffer.from(JSON.stringify(passJson(c, t, opts))),
-    "icon.png": brandIcon(29),
-    "icon@2x.png": brandIcon(58),
-    "icon@3x.png": brandIcon(87),
+    ...brandFiles(),
+    ...stripImages(c.image_url),
   };
   const manifest = Buffer.from(JSON.stringify(Object.fromEntries(Object.entries(files).map(([n, d]) => [n, crypto.createHash("sha1").update(d).digest("hex")]))));
   return zipStore({ ...files, "manifest.json": manifest, signature: signManifest(manifest) });

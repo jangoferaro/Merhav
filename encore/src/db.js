@@ -658,6 +658,30 @@ function migrate(db) {
   // סוג כרטיס: פתוח (אפשר להעביר) או שמי (בכניסה בודקים תעודה, אי אפשר להעביר)
   add("campaigns", "ticket_mode", "TEXT NOT NULL DEFAULT 'open'");
   add("tickets", "holder_name", "TEXT NOT NULL DEFAULT ''");
+  // Apple Wallet: מתי הכרטיס השתנה (נסרק, הוחזר, ההופעה זזה), ואילו מכשירים נרשמו לעדכונים שלו.
+  // הטריגרים מסמנים שינוי בכל מקום שמעדכן כרטיס או הופעה, בלי לגעת בכל נקודה בקוד
+  add("tickets", "pass_updated_at", "TEXT");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS wallet_registrations (
+      id          INTEGER PRIMARY KEY,
+      device      TEXT NOT NULL,
+      push_token  TEXT NOT NULL,
+      serial      TEXT NOT NULL,
+      created_at  TEXT NOT NULL,
+      notified_at TEXT,
+      UNIQUE (device, serial)
+    );
+    CREATE INDEX IF NOT EXISTS wallet_registrations_serial ON wallet_registrations(serial);
+    CREATE TRIGGER IF NOT EXISTS tickets_pass_touch AFTER UPDATE OF status, used_at, holder_name ON tickets
+    BEGIN
+      UPDATE tickets SET pass_updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = NEW.id;
+    END;
+    CREATE TRIGGER IF NOT EXISTS events_pass_touch AFTER UPDATE OF title, venue, city, starts_at, image_url ON events
+    BEGIN
+      UPDATE tickets SET pass_updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE campaign_id IN (SELECT id FROM campaigns WHERE event_id = NEW.id);
+    END;
+  `);
   add("ticket_orders", "holders", "TEXT");
   // פרטי האמן לקבלת הכסף ממכירות (מוצפן)
   add("artists", "payout_details_enc", "TEXT");
