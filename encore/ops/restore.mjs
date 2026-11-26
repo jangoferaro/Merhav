@@ -1,6 +1,6 @@
 // שחזור מגיבוי. שימוש:
 //   node ops/restore.mjs <קובץ גיבוי (.db או .db.enc)> <יעד, למשל data/encore.db>
-// קובץ מוצפן דורש BACKUP_ENCRYPTION_KEY בסביבה. לפני השחזור: לעצור את השרת. הקובץ הקיים נשמר בצד (.before-restore).
+// קובץ מוצפן דורש בסביבה את BACKUP_ENCRYPTION_KEY, או (אם לא הוגדר מפתח נפרד) את ENCORE_SECRET של השרת. לפני השחזור: לעצור את השרת. הקובץ הקיים נשמר בצד (.before-restore).
 import fs from "node:fs";
 import { decrypt, verifyBackup } from "../src/backup.js";
 

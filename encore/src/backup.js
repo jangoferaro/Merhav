@@ -8,16 +8,18 @@
 //   BACKUP_S3_ENDPOINT    למשל https://<account>.r2.cloudflarestorage.com
 //   BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY, BACKUP_S3_SECRET, BACKUP_S3_REGION (ברירת מחדל auto)
 //   BACKUP_S3_URL_STYLE   virtual לאחסון שבו שם ה-bucket הוא תת-דומיין (Railway Buckets, AWS). אחרת path
-//   BACKUP_ENCRYPTION_KEY מפתח ההצפנה לגיבוי מחוץ לשרת (חובה כשיש אחסון מרוחק). לשמור גם מחוץ ל-Railway!
+//   BACKUP_ENCRYPTION_KEY מפתח הצפנה נפרד לגיבוי (רשות). בלעדיו המפתח נגזר מ-ENCORE_SECRET.
+//   בכל מקרה: את המפתח (או את ENCORE_SECRET) שומרים גם מחוץ ל-Railway, אחרת אי אפשר לשחזר.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { config } from "./util.js";
 
 export const backupState = { lastLocal: null, lastLocalError: null, lastRemote: null, lastRemoteError: null, lastSize: 0 };
 
 export const backupDir = () => process.env.BACKUP_DIR || path.join(path.dirname(process.env.ENCORE_DB ?? "data/encore.db"), "backups");
-export const remoteEnabled = () => ["BACKUP_S3_ENDPOINT", "BACKUP_S3_BUCKET", "BACKUP_S3_ACCESS_KEY", "BACKUP_S3_SECRET", "BACKUP_ENCRYPTION_KEY"].every((k) => process.env[k]);
+export const remoteEnabled = () => ["BACKUP_S3_ENDPOINT", "BACKUP_S3_BUCKET", "BACKUP_S3_ACCESS_KEY", "BACKUP_S3_SECRET"].every((k) => process.env[k]);
 
 const stamp = (d = new Date()) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z"); // 20261126T101500Z
 
@@ -73,7 +75,10 @@ export function backupLocal(db, { dir = backupDir(), now = new Date() } = {}) {
 
 // ---------- הצפנה ----------
 
-const encKey = () => crypto.createHash("sha256").update(String(process.env.BACKUP_ENCRYPTION_KEY)).digest();
+const encKey = () =>
+  process.env.BACKUP_ENCRYPTION_KEY
+    ? crypto.createHash("sha256").update(String(process.env.BACKUP_ENCRYPTION_KEY)).digest()
+    : crypto.createHmac("sha256", config.secret).update("jocares-backup-v1").digest();
 /** פורמט: "JCB1" + iv(12) + tag(16) + נתונים */
 export function encrypt(buf, key = encKey()) {
   const iv = crypto.randomBytes(12);

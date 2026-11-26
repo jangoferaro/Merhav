@@ -185,7 +185,7 @@ test("גיבוי: עותק תקין ונבדק, מדיניות שמירה, הצ�
 
 test("גיבוי מרוחק: העלאה מוצפנת וחתומה לאחסון תואם S3", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bk-"));
-  Object.assign(process.env, { BACKUP_S3_ENDPOINT: "https://acc.r2.example", BACKUP_S3_BUCKET: "jc-backups", BACKUP_S3_ACCESS_KEY: "AK", BACKUP_S3_SECRET: "SK", BACKUP_ENCRYPTION_KEY: "k", BACKUP_DIR: dir });
+  Object.assign(process.env, { BACKUP_S3_ENDPOINT: "https://acc.r2.example", BACKUP_S3_BUCKET: "jc-backups", BACKUP_S3_ACCESS_KEY: "AK", BACKUP_S3_SECRET: "SK", BACKUP_DIR: dir });
   const calls = [];
   const fake = async (url, init) => (calls.push({ url, init }), { ok: true, text: async () => "" });
   const live = openDb(path.join(dir, "live.db"));
