@@ -7,6 +7,7 @@
 //   BACKUP_DIR            תיקיית הגיבויים המקומית (ברירת מחדל: backups ליד המסד)
 //   BACKUP_S3_ENDPOINT    למשל https://<account>.r2.cloudflarestorage.com
 //   BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY, BACKUP_S3_SECRET, BACKUP_S3_REGION (ברירת מחדל auto)
+//   BACKUP_S3_URL_STYLE   virtual לאחסון שבו שם ה-bucket הוא תת-דומיין (Railway Buckets, AWS). אחרת path
 //   BACKUP_ENCRYPTION_KEY מפתח ההצפנה לגיבוי מחוץ לשרת (חובה כשיש אחסון מרוחק). לשמור גם מחוץ ל-Railway!
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -107,10 +108,18 @@ export function signS3({ method, url, body, accessKey, secret, region, now = new
   return { ...headers, authorization: `AWS4-HMAC-SHA256 Credential=${accessKey}/${scope}, SignedHeaders=${signed.join(";")}, Signature=${sig}` };
 }
 
+/** כתובת האובייקט: path-style (ברירת מחדל, R2) או virtual-hosted (Railway Buckets, AWS): BACKUP_S3_URL_STYLE=virtual */
+export function objectUrl(key) {
+  const endpoint = new URL(process.env.BACKUP_S3_ENDPOINT);
+  const bucket = process.env.BACKUP_S3_BUCKET;
+  if (process.env.BACKUP_S3_URL_STYLE === "virtual") return `${endpoint.protocol}//${bucket}.${endpoint.host}/${key}`;
+  return `${endpoint.origin}/${bucket}/${key}`;
+}
+
 export async function uploadRemote(file, fetchImpl = fetch) {
   const body = encrypt(fs.readFileSync(file));
   const key = `jocares/${path.basename(file)}.enc`;
-  const url = `${process.env.BACKUP_S3_ENDPOINT.replace(/\/$/, "")}/${process.env.BACKUP_S3_BUCKET}/${key}`;
+  const url = objectUrl(key);
   const headers = signS3({ method: "PUT", url, body, accessKey: process.env.BACKUP_S3_ACCESS_KEY, secret: process.env.BACKUP_S3_SECRET, region: process.env.BACKUP_S3_REGION || "auto" });
   const res = await fetchImpl(url, { method: "PUT", headers: { ...headers, "content-type": "application/octet-stream" }, body, signal: AbortSignal.timeout(120_000) });
   if (!res.ok) throw new Error(`העלאת גיבוי נכשלה: ${res.status} ${(await res.text()).slice(0, 200)}`);

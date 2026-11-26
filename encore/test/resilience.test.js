@@ -195,7 +195,9 @@ test("גיבוי מרוחק: העלאה מוצפנת וחתומה לאחסון �
   assert.match(calls[0].init.headers.authorization, /^AWS4-HMAC-SHA256 Credential=AK\/\d{8}\/auto\/s3\/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/);
   assert.equal(calls[0].init.body.subarray(0, 4).toString(), "JCB1", "נשלח מוצפן");
   assert.equal(BK.backupHealth().backup_remote_age_min, 0);
-  for (const k of ["BACKUP_S3_ENDPOINT", "BACKUP_S3_BUCKET", "BACKUP_S3_ACCESS_KEY", "BACKUP_S3_SECRET", "BACKUP_ENCRYPTION_KEY", "BACKUP_DIR"]) delete process.env[k];
+  process.env.BACKUP_S3_URL_STYLE = "virtual";
+  assert.equal(BK.objectUrl("jocares/a.db.enc"), "https://jc-backups.acc.r2.example/jocares/a.db.enc");
+  for (const k of ["BACKUP_S3_ENDPOINT", "BACKUP_S3_BUCKET", "BACKUP_S3_ACCESS_KEY", "BACKUP_S3_SECRET", "BACKUP_ENCRYPTION_KEY", "BACKUP_DIR", "BACKUP_S3_URL_STYLE"]) delete process.env[k];
 });
 
 test("בריאות: /health בודק את המסד בפועל", async () => {
