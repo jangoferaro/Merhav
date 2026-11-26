@@ -78,7 +78,7 @@ try {
   await axe(q, "תשלום");
   await q.click("form button.btn.big");
   if (!/\/tickets\//.test(q.url())) fail("הקונה לא הגיע לכרטיסים");
-  const qrs = await q.$$(".ticket .qr svg");
+  const qrs = await q.$$(".tkt .qr svg");
   report.flows.buyer = { clicks: 3, tickets: qrs.length };
   if (!qrs.length) fail("אין QR בכרטיס");
   await axe(q, "כרטיסים");
@@ -99,7 +99,7 @@ try {
 
   // דפים פתוחים לכולם
   const o = await page();
-  for (const [name, url] of [["איך זה עובד", "/how"], ["תנאים", "/terms"], ["מחיקת מידע", "/data-deletion"], ["כניסה", "/login"]]) {
+  for (const [name, url] of [["איך זה עובד", "/how"], ["תנאים", "/terms"], ["מחיקת מידע", "/data-deletion"], ["עזרה", "/help"], ["נגישות", "/accessibility"], ["כניסה", "/login"]]) {
     await o.goto(B + url);
     await axe(o, name);
   }
