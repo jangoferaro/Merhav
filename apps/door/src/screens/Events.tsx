@@ -1,5 +1,5 @@
 // איזו הופעה: ההופעות של המארגן מאתמול ועד שבוע קדימה.
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { call, type EventSummary, type Home, type Session } from "../api";
 import { Bar, Brand, Button } from "../ui";
@@ -23,6 +23,10 @@ export default function Events({ session, home, onHome, onPick, onLogout }: { se
     try { onHome(await call<Home>(session, "/me")); } catch {}
     setRefreshing(false);
   };
+  // חזרה מהסורק: המספרים מתעדכנים לבד, בלי למשוך למטה
+  useEffect(() => {
+    call<Home>(session, "/me").then(onHome).catch(() => {});
+  }, []);
   return (
     <ScrollView contentContainerStyle={{ padding: 20, gap: 22, flexGrow: 1 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.acid} />}>
       <View style={[row, { justifyContent: "space-between" }]}>
