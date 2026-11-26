@@ -150,6 +150,7 @@ export function newForm(ctx, { v, found = [], error = "" }, opts) {
       <div class="stack">
         ${field("genre", "סגנון", "maxlength=40 list=genres", html`<datalist id="genres"><option>פופ</option><option>רוק</option><option>אינדי</option><option>ג'אז</option><option>היפ הופ</option><option>אלקטרוני</option><option>ים תיכוני</option><option>סטנדאפ</option></datalist>`)}
         <label class="field">תיאור<textarea name="description" rows="3" maxlength="2000">${v.description ?? ""}</textarea></label>
+        <label class="field">נגישות המקום (לא חובה)<input name="venue_access" maxlength="300" value="${v.venue_access ?? ""}" placeholder="למשל: כניסה ללא מדרגות, שירותי נכים, מקומות ישיבה"><small class="hint">מוצג בדף ההופעה, כדי שכל אחד יידע אם הוא יכול להגיע.</small></label>
         ${field("promo_limit", "מקסימום כרטיסים למכירה דרך מקדמים", "type=number min=1 inputmode=numeric")}
         <label class="field">משפט פתיחה להודעת השיתוף<textarea name="share_text" rows="2" maxlength="600" placeholder="למשל: ההופעה הכי מרגשת שלנו השנה">${v.share_text ?? ""}</textarea></label>
       </div>
@@ -298,6 +299,7 @@ ${["ended", "cancelled"].includes(c.status)
     ${csrfField(ctx)}
     <div class="field">תמונה${imageInput({ current: c.image_url })}</div>
     <label class="field">תיאור<textarea name="description" rows="3" maxlength="2000">${c.description}</textarea></label>
+    <label class="field">נגישות המקום<input name="venue_access" maxlength="300" value="${c.venue_access ?? ""}" placeholder="למשל: כניסה ללא מדרגות, שירותי נכים"></label>
     <label class="field">משפט פתיחה להודעת השיתוף<textarea name="share_text" rows="2" maxlength="600">${c.share_text}</textarea></label>
     <label class="field">מקסימום כרטיסים דרך מקדמים<input name="promo_limit" type="number" min="1" value="${c.promo_limit ?? ""}" placeholder="ללא הגבלה"></label>
     <button class="btn ghost">שמירה</button>

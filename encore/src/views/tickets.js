@@ -51,6 +51,7 @@ export function checkoutPage(ctx, { c, inv, price, inviter = null, discount = 0,
     <label class="check"><input type="checkbox" name="consent" ${v.consent === "on" ? html`checked` : ""}> אשמח ש${c.artist_name} יעדכנו אותי במייל על הופעות הבאות. אפשר לבטל בכל רגע.</label>
     <button class="btn big block acid">לתשלום</button>
     <p class="note center">התשלום בעמוד מאובטח של חברת הסליקה. פרטי הכרטיס לא עוברים דרכנו. <a href="/terms">תנאים</a></p>
+    <p class="note center">ביטול והחזר: אם ההופעה מתבטלת, הכסף חוזר אוטומטית לאמצעי התשלום. בקשה לבטל מסיבה אחרת שולחים דרך <a href="/help">העזרה</a>, וההחלטה אצל המארגן.</p>
   </form>`}
 </section>`,
     { ...opts, description: `כרטיסים ל${c.artist_name} · ${c.title}` }

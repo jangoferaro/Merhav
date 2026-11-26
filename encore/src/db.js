@@ -666,6 +666,8 @@ function migrate(db) {
   // Apple Wallet: מתי הכרטיס השתנה (נסרק, הוחזר, ההופעה זזה), ואילו מכשירים נרשמו לעדכונים שלו.
   // הטריגרים מסמנים שינוי בכל מקום שמעדכן כרטיס או הופעה, בלי לגעת בכל נקודה בקוד
   add("tickets", "pass_updated_at", "TEXT");
+  // נגישות המקום (מעלית, חניית נכים, מקומות ישיבה), כפי שהמארגן מתאר
+  add("events", "venue_access", "TEXT NOT NULL DEFAULT ''");
   migrateOutbox(db);
   migrateFunnel(db);
   db.exec(`

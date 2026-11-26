@@ -255,3 +255,17 @@ test("עזרה והצהרת נגישות פתוחות לכולם, גם כשהא�
     delete process.env.STAGING_PASSWORD;
   }
 });
+
+test("נגישות המקום נשמרת, מתעדכנת ומוצגת בדף ההופעה. הקופה מציגה מדיניות ביטול", async () => {
+  const c = C.getCampaign(db, C.createCampaign(db, artist, { ...SHOW, title: "נגיש", venue_access: "כניסה ללא מדרגות" }));
+  assert.equal(c.venue_access, "כניסה ללא מדרגות");
+  const u = C.updateCampaignDetails(db, artist, c.id, { image_url: c.image_url, venue_access: "כניסה ללא מדרגות, שירותי נכים" });
+  assert.equal(u.venue_access, "כניסה ללא מדרגות, שירותי נכים");
+  const { server, base } = await serve();
+  try {
+    assert.match(await (await fetch(`${base}/s/${c.id}`)).text(), /נגישות המקום:<\/b> כניסה ללא מדרגות, שירותי נכים/);
+    assert.match(await (await fetch(`${base}/checkout/${c.id}`)).text(), /ביטול והחזר/);
+  } finally {
+    server.close();
+  }
+});

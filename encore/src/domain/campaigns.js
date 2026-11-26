@@ -76,6 +76,7 @@ export function parseCampaignInput(input) {
     title: text(input.title, "שם ההופעה"),
     venue: text(input.venue, "מקום"),
     city: text(input.city, "עיר", { max: 40, required: false }),
+    venue_access: text(input.venue_access, "נגישות המקום", { max: 300, required: false }),
     genre: text(input.genre, "סגנון", { max: 40, required: false }),
     description: text(input.description, "תיאור", { max: 2000, required: false }),
     starts_at: startsAt,
@@ -140,7 +141,7 @@ export function createCampaign(db, user, input, { publish = true } = {}) {
       artist = { id, name: c.organizer_name };
     }
     const eventId = insert(db, "events", {
-      artist_id: artist.id, title: c.title, description: c.description, venue: c.venue, city: c.city,
+      artist_id: artist.id, title: c.title, description: c.description, venue: c.venue, city: c.city, venue_access: c.venue_access,
       genre: c.genre, starts_at: c.starts_at, image_url: c.image_url, source_url: c.source_url, capacity: c.capacity,
       performer: c.artist_name !== artist.name ? c.artist_name : "", created_at: now,
     });
@@ -165,7 +166,7 @@ export function createCampaign(db, user, input, { publish = true } = {}) {
 // ---------- שאילתות ----------
 
 const CAMPAIGN_SELECT = `
-  SELECT c.*, e.title, e.description, e.venue, e.city, e.genre, e.starts_at, e.image_url, e.source_url, e.capacity,
+  SELECT c.*, e.title, e.description, e.venue, e.city, e.venue_access, e.genre, e.starts_at, e.image_url, e.source_url, e.capacity,
          COALESCE(NULLIF(e.performer, ''), a.name) AS artist_name, a.name AS organizer_name, a.kind AS organizer_kind,
          t.id AS terms_id, t.version AS terms_version, t.reward_agorot, t.fee_bps
     FROM campaigns c
@@ -261,8 +262,9 @@ export function updateCampaignDetails(db, user, campaignId, input) {
     const image = validImageRef(input.image_url);
     if (!image) throw new UserError("צריך תמונה להופעה");
     db.prepare("UPDATE campaigns SET promo_limit = ?, share_text = ?, updated_at = ? WHERE id = ?").run(limit, share, clock.iso(), c.id);
-    db.prepare("UPDATE events SET image_url = ?, description = ? WHERE id = ?").run(
-      image, text(input.description, "תיאור", { max: 2000, required: false }), c.event_id
+    db.prepare("UPDATE events SET image_url = ?, description = ?, venue_access = ? WHERE id = ?").run(
+      image, text(input.description, "תיאור", { max: 2000, required: false }),
+      input.venue_access === undefined ? c.venue_access ?? "" : text(input.venue_access, "נגישות המקום", { max: 300, required: false }), c.event_id
     );
     audit(db, user.id, "campaign.updated", "campaign", c.id, { promo_limit: limit });
     return getCampaign(db, c.id);

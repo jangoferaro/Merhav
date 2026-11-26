@@ -107,6 +107,14 @@ export function terms(ctx, opts) {
     <li>לא ניגשים לאנשי הקשר שלכם, אף פעם.</li>
   </ul>
 
+  <h2>עוגיות</h2>
+  <ul>
+    <li><span dir="ltr">sid</span>: שומרת על החיבור לחשבון. נמחקת ביציאה.</li>
+    <li><span dir="ltr">vid</span>: מזהה אקראי של הדפדפן, להגנה על טפסים (csrf). נשמרת עד שנה. לא מזהה אותך אישית.</li>
+    <li><span dir="ltr">ref_*</span>: זוכרת דרך איזה לינק של ג׳וקר הגעת, כדי שהתגמול יגיע אליו. נשמרת 30 יום.</li>
+    <li>אין עוגיות פרסום ואין כלי מעקב של צד שלישי.</li>
+  </ul>
+
   <h2>גילוי נאות</h2>
   <p>ג׳וקרים מקבלים תגמול על רכישות דרך הלינק שלהם. ההודעה המוכנה לשיתוף כוללת גילוי נאות, ודף ההופעה מציג אותו לכל מי שהגיע דרך לינק של ג׳וקר. יוצרים שמפרסמים בתשלום בערוץ שלהם מסמנים "שיתוף פעולה בתשלום".</p>
 
@@ -199,6 +207,7 @@ ${inviter ? html`<div class="invite-top">${inviteBox(inviter)}</div>` : ""}
     <h1>${c.title}</h1>
     <p class="meta big">${showDate(c.starts_at)}<br>${c.venue}${c.city ? `, ${c.city}` : ""}</p>
     ${c.description ? html`<p class="desc">${c.description}</p>` : ""}
+    ${c.venue_access ? html`<p class="access-note"><b>נגישות המקום:</b> ${c.venue_access}</p>` : ""}
 
     <div class="buy-box">
       <div><span class="muted">כרטיס</span> ${priceTag(c, buyable ? price : null)}</div>
