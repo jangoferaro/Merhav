@@ -2,11 +2,15 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { migrateOutbox } from "./outbox.js";
 
 // כל הסכומים באגורות (INTEGER). כל הזמנים ב-ISO UTC (TEXT).
 const SCHEMA = `
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
+-- מחכים עד 5 שניות למנעול במקום להיכשל מיד (גיבוי או כתיבה ארוכה). NORMAL בטוח עם WAL ומהיר יותר
+PRAGMA busy_timeout = 5000;
+PRAGMA synchronous = NORMAL;
 
 -- ---------- זהות וגישה ----------
 CREATE TABLE IF NOT EXISTS users (
@@ -661,6 +665,7 @@ function migrate(db) {
   // Apple Wallet: מתי הכרטיס השתנה (נסרק, הוחזר, ההופעה זזה), ואילו מכשירים נרשמו לעדכונים שלו.
   // הטריגרים מסמנים שינוי בכל מקום שמעדכן כרטיס או הופעה, בלי לגעת בכל נקודה בקוד
   add("tickets", "pass_updated_at", "TEXT");
+  migrateOutbox(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS wallet_registrations (
       id          INTEGER PRIMARY KEY,

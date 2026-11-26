@@ -13,7 +13,9 @@
     "seed": "node --no-warnings=ExperimentalWarning src/seed.js",
     "test": "node --no-warnings=ExperimentalWarning --test test/*.test.js",
     "start:staging": "node --no-warnings=ExperimentalWarning src/seed-if-empty.js && node --no-warnings=ExperimentalWarning src/server.js",
-    "ops:qa": "node --no-warnings=ExperimentalWarning ops/qa.mjs"
+    "ops:qa": "node --no-warnings=ExperimentalWarning ops/qa.mjs",
+    "ops:load": "node --no-warnings=ExperimentalWarning ops/load.mjs",
+    "ops:restore": "node --no-warnings=ExperimentalWarning ops/restore.mjs"
   },
   "dependencies": {
     "jpeg-js": "0.4.4",

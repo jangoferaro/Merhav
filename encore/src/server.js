@@ -36,7 +36,10 @@ import { createRequire } from "node:module";
 import * as TV from "./views/tickets.js";
 import { gateway } from "./payments/index.js";
 import { sandboxPay, sandboxPayment } from "./payments/sandbox.js";
-import { sendLoginCode, sendMail, sendTickets } from "./mailer.js";
+import { sendLoginCode, sendMail, sendSms } from "./mailer.js";
+import * as OB from "./outbox.js";
+import * as JOBS from "./jobs.js";
+import * as BK from "./backup.js";
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json" };
@@ -72,12 +75,19 @@ export function opsHealth(db) {
         content_disputes: n("SELECT COUNT(*) n FROM service_orders WHERE status = 'disputed'"),
         active_shows: n("SELECT COUNT(*) n FROM campaigns c JOIN events e ON e.id = c.event_id WHERE c.status IN ('active','paused','sold_out') AND e.starts_at > ?", now),
         tickets_24h: n("SELECT COALESCE(SUM(qty), 0) n FROM ticket_orders WHERE status = 'paid' AND paid_at > ?", new Date(Date.now() - 86400_000).toISOString()),
+        ...OB.outboxStats(db),
       }
     : {};
-  const problems = Object.entries(checks).filter(([k, v]) => v > 0 && !["active_shows", "tickets_24h", "payouts_waiting", "expired_connections"].includes(k)).map(([k]) => k);
+  const INFO = ["active_shows", "tickets_24h", "payouts_waiting", "expired_connections", "outbox_pending", "outbox_retrying", "outbox_oldest_pending_min"];
+  const problems = Object.entries(checks).filter(([k, v]) => v > 0 && !INFO.includes(k)).map(([k]) => k);
   if (!dbOk) problems.push("database");
   if (ops.errors.filter((t) => t > hourAgo).length > 5) problems.push("server_errors");
-  if (ops.lastSettleError) problems.push("settle_failed");
+  // הודעה שמחכה יותר מ-30 דקות (כנראה ספק המייל למטה)
+  if ((checks.outbox_oldest_pending_min ?? 0) > 30) problems.push("outbox_stuck");
+  const jobs = JOBS.jobsHealth();
+  for (const j of jobs) if (!j.ok && j.last_ok !== undefined && JOBS.jobs.get(j.name)?.runs) problems.push(`job_${j.name}`);
+  const backup = BK.backupHealth();
+  if (JOBS.jobs.has("backup") && (backup.backup_error || backup.backup_local_age_min === null || backup.backup_local_age_min > 130)) problems.push("backup");
   return {
     ok: problems.length === 0,
     problems,
@@ -86,6 +96,10 @@ export function opsHealth(db) {
     server_errors_1h: ops.errors.filter((t) => t > hourAgo).length,
     server_errors_24h: ops.errors.length,
     last_settle_at: ops.lastSettleAt,
+    // הדף ציבורי: רק שם, תקין או לא, ומספר כישלונות. פרטי השגיאה ביומן של השרת
+    jobs: jobs.map(({ name, ok, failures }) => ({ name, ok, failures })),
+    ...backup,
+    backup_error: backup.backup_error ? true : false,
     mail: !!(process.env.BREVO_API_KEY || process.env.RESEND_API_KEY),
     sms: !!process.env.TWILIO_ACCOUNT_SID,
     payments: process.env.PAYMENT_GATEWAY || "sandbox",
@@ -618,12 +632,21 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     ctx.res.writeHead(303, { location: url });
     ctx.res.end();
   };
-  /** אחרי תשלום: הכרטיסים למייל. כישלון בשליחה לא מפיל את ההזמנה (הם גם על המסך). */
+  /**
+   * אחרי תשלום: הכרטיסים למייל וב-SMS, דרך תיבת היציאה. נשמרים במסד באותו רגע ונשלחים עם ניסיונות חוזרים,
+   * כך שתקלה אצל ספק המייל לא משאירה קונה בלי כרטיסים. המפתח לפי הזמנה מונע שליחה כפולה.
+   */
   const deliverTickets = (ctx, order) => {
     const c = C.getCampaign(db, order.campaign_id);
-    sendTickets(order.buyer_email, { name: order.buyer_name, show: `${c.artist_name} · ${c.title}`, url: ticketsUrl(ctx, order), qty: order.qty, phone: order.buyer_phone }).catch((e) =>
-      console.error("[tickets mail]", e.message)
-    );
+    const show = `${c.artist_name} · ${c.title}`;
+    const url = ticketsUrl(ctx, order);
+    const many = order.qty > 1;
+    OB.enqueue(db, {
+      to: order.buyer_email, subject: `הכרטיסים שלך: ${show}`, key: `tickets:${order.id}:mail`,
+      body: `היי ${order.buyer_name},\n\n${many ? `${order.qty} הכרטיסים שלך` : "הכרטיס שלך"} ל${show} מחכים כאן:\n${url}\n\nבכניסה מציגים את הקוד מהטלפון. אין צורך להדפיס.\n\nJoCares`,
+    });
+    if (order.buyer_phone) OB.enqueue(db, { kind: "sms", to: order.buyer_phone, key: `tickets:${order.id}:sms`, body: `${many ? "הכרטיסים שלך" : "הכרטיס שלך"} ל${show}: ${url}` });
+    JOBS.jobs.get("outbox")?.run(); // לא מחכים לסבב הבא
   };
 
   r.get("/checkout/:id", (ctx) => {
@@ -1545,7 +1568,15 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
         res.writeHead(200, { "content-type": type, "cache-control": config.isProd ? "public, max-age=86400" : "no-cache" });
         return fs.createReadStream(file).pipe(res);
       }
-      if (req.method === "GET" && ctx.url.pathname === "/health") return ctx.json({ ok: true });
+      if (req.method === "GET" && ctx.url.pathname === "/health") {
+        // בדיקה אמיתית: המסד עונה. אם לא, 503 ו-Railway יפעיל מחדש
+        try {
+          db.prepare("SELECT 1").get();
+          return ctx.json({ ok: true });
+        } catch {
+          return ctx.json({ ok: false }, 503);
+        }
+      }
       if (req.method === "GET" && ctx.url.pathname === "/ops/health") return ctx.json(opsHealth(db));
       if (req.method === "GET" && ctx.url.pathname.startsWith("/media/")) {
         if (serveMedia(ctx.url.pathname.slice(7), res, req.headers.range)) return;
@@ -1580,37 +1611,80 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const db = openDb();
   const port = Number(process.env.PORT ?? 3000);
-  http.createServer(createApp(db)).listen(port, () => console.log(`JoCares רץ על http://localhost:${port}`));
-  let pushApple = null;
-  const tick = () => {
-    try {
-      const r = M.settle(db);
-      ops.lastSettleAt = new Date().toISOString();
-      ops.lastSettleError = null;
-      if (r.ended || r.released || r.content || r.expired) console.log(`[settle] ended=${r.ended} released=${r.released} content=${r.content} expired=${r.expired}`);
-      T.processRefunds(db).then((n) => n && console.log(`[refunds] ${n}`), (e) => console.error("[refunds]", e));
-      CN.syncDue(db).then((n) => n && console.log(`[connections] ${n}`), (e) => console.error("[connections]", e));
-      if (W.walletEnabled().apple) WS.pushUpdates(db, (pushApple ??= WS.apnsSender())).then((n) => n && console.log(`[wallet] ${n}`), (e) => console.error("[wallet]", e));
-      const base = (process.env.PUBLIC_URL || `http://localhost:${port}`).replace(/\/$/, "");
-      T.processReminders(db, (rem, c, p) =>
-        sendMail({
-          to: rem.email,
-          subject: `תזכורת: ${c.artist_name} · ${c.title}`,
-          text: [
-            `ביקשת שנזכיר לך: ${c.artist_name} · ${c.title}`,
-            `${showDate(c.starts_at)} · ${c.venue}${c.city ? `, ${c.city}` : ""}`,
-            p.early ? `המחיר המוקדם (${money(p.price)}) נגמר בקרוב.` : "",
-            `כרטיסים: ${base}${rem.ref_code ? `/r/${rem.ref_code}` : `/s/${c.id}`}`,
-            "",
-            `לא רוצה תזכורות על ההופעה הזו? ${base}/reminders/${rem.token}/cancel`,
-          ].filter((l) => l !== null).join("\n"),
-        }).then((ok) => { if (!ok) console.log(`[dev] reminder for ${rem.email}: ${c.title}`); })
-      ).then((n) => n && console.log(`[reminders] ${n}`), (e) => console.error("[reminders]", e));
-    } catch (e) {
-      console.error("[settle]", e);
-      ops.lastSettleError = String(e.message);
-    }
+  const server = http.createServer(createApp(db));
+  // בקשה שנתקעת לא מחזיקה חיבור לנצח, וחיבורים לא נשארים פתוחים בלי סוף
+  server.requestTimeout = 30_000;
+  server.headersTimeout = 20_000;
+  server.keepAliveTimeout = 65_000;
+  server.listen(port, () => console.log(`JoCares רץ על http://localhost:${port}`));
+
+  // ---------- עבודות רקע ----------
+  const base = (process.env.PUBLIC_URL || `http://localhost:${port}`).replace(/\/$/, "");
+  const send = {
+    mail: async (m) => {
+      const ok = await sendMail({ to: m.to_addr, subject: m.subject, text: m.body });
+      if (!ok && (!config.isProd || config.isStaging)) console.log(`[dev] mail to ${m.to_addr}: ${m.subject}\n${m.body}`);
+      return ok;
+    },
+    sms: (m) => sendSms(m.to_addr, m.body),
   };
-  tick();
-  setInterval(tick, 10 * 60_000).unref();
+  let pushApple = null;
+  JOBS.schedule("settle", 60_000, () => {
+    const r = M.settle(db);
+    ops.lastSettleAt = new Date().toISOString();
+    return r.ended || r.released || r.content || r.expired ? r : null;
+  });
+  JOBS.schedule("outbox", 30_000, async () => (await OB.processOutbox(db, send)) || null);
+  JOBS.schedule("refunds", 60_000, async () => (await T.processRefunds(db)) || null);
+  JOBS.schedule("wallet", 60_000, async () => (W.walletEnabled().apple ? (await WS.pushUpdates(db, (pushApple ??= WS.apnsSender()))) || null : null));
+  JOBS.schedule("connections", 10 * 60_000, async () => (await CN.syncDue(db)) || null);
+  JOBS.schedule("reminders", 10 * 60_000, async () =>
+    (await T.processReminders(db, (rem, c, p) => {
+      OB.enqueue(db, {
+        to: rem.email, key: `reminder:${rem.id}`, subject: `תזכורת: ${c.artist_name} · ${c.title}`,
+        body: [
+          `ביקשת שנזכיר לך: ${c.artist_name} · ${c.title}`,
+          `${showDate(c.starts_at)} · ${c.venue}${c.city ? `, ${c.city}` : ""}`,
+          p.early ? `המחיר המוקדם (${money(p.price)}) נגמר בקרוב.` : "",
+          `כרטיסים: ${base}${rem.ref_code ? `/r/${rem.ref_code}` : `/s/${c.id}`}`,
+          "",
+          `לא רוצה תזכורות על ההופעה הזו? ${base}/reminders/${rem.token}/cancel`,
+        ].join("\n"),
+      });
+      return Promise.resolve(true);
+    })) || null
+  );
+  JOBS.schedule("backup", 60 * 60_000, async () => BK.runBackup(db));
+
+  // ---------- כיבוי מסודר ----------
+  // בפריסה Railway שולח SIGTERM: מפסיקים לקבל בקשות, נותנים לבקשות ולעבודות שרצות להסתיים, וסוגרים את המסד
+  let stopping = false;
+  const shutdown = async (signal, code = 0) => {
+    if (stopping) return;
+    stopping = true;
+    console.log(`[shutdown] ${signal}`);
+    JOBS.stopAll();
+    server.close();
+    server.closeIdleConnections?.();
+    const force = setTimeout(() => process.exit(code), 15_000);
+    force.unref();
+    await JOBS.drain(10_000);
+    try {
+      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+      db.close();
+    } catch {}
+    process.exit(code);
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  // שגיאה שלא נתפסה: נרשמת, ותהליך במצב לא ידוע נסגר כדי ש-Railway יפעיל אותו מחדש נקי
+  process.on("uncaughtException", (e) => {
+    console.error("[fatal]", e);
+    ops.errors.push(Date.now());
+    shutdown("uncaughtException", 1); // קוד שגיאה, כדי ש-Railway יפעיל מחדש
+  });
+  process.on("unhandledRejection", (e) => {
+    console.error("[unhandled]", e);
+    ops.errors.push(Date.now());
+  });
 }
