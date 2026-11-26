@@ -2521,7 +2521,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden && Clo
    Inserted into whatever text the device has, renumbers the chapters, rebuilds the table of contents,
    updates chapter numbers in the notes, and keeps chapter marks and illustrations on their chapters. */
 // packages of new material, applied once each, in order
-const ADDS = [].concat(window.MAGIHA_ADDITIONS || [], window.MAGIHA_ADDITIONS_2 || [], window.MAGIHA_ADDITIONS_3 || []);
+const ADDS = [].concat(window.MAGIHA_ADDITIONS || [], window.MAGIHA_ADDITIONS_2 || [], window.MAGIHA_ADDITIONS_3 || [], window.MAGIHA_FIXES || []);
 let merging = false;
 async function dropTableOfContents() {
   const KEY = "drop-toc-1";
@@ -2546,8 +2546,11 @@ async function maybeMergeAdditions() {
   merging = true;
   try {
     const cur = fullParas();
-    const firstCode = ADD.groups[0].chapters[0].code;
-    if (cur.some(p => p.id && p.id.startsWith(firstCode + "_"))) { S.book.applied.push(ADD.key); S.dirty = true; await saveNow(); merging = false; return maybeMergeAdditions(); }  // already merged (e.g. text came from the cloud)
+    const g0 = ADD.groups[0];
+    const alreadyDone = g0.chapters
+      ? cur.some(p => p.id && p.id.startsWith(g0.chapters[0].code + "_"))       // material already in the text
+      : !cur.some(p => (g0.remove || []).includes(p.id));                        // a fix whose paragraphs are already gone
+    if (alreadyDone) { S.book.applied.push(ADD.key); S.dirty = true; await saveNow(); merging = false; return maybeMergeAdditions(); }  // already merged (e.g. text came from the cloud)
     await createVersion("restore", ADD.versionNote || ("לפני הוספת " + ADD.count + " התרגומים" + (ADD.label ? " (" + ADD.label + ")" : "")));
     const res = mergeAdditionsInto(fullParas(), ADD);
     // move chapter marks and illustrations whose chapter now starts elsewhere
@@ -2588,6 +2591,12 @@ function mergeAdditionsInto(src, ADD) {
   //    after: right after a paragraph · before: before a chapter (its number) · afterChapter: at the end of a chapter
   //    inside: inside a chapter, before a paragraph · appendTo: at the end of a chapter, inside it
   for (const g of ADD.groups) {
+    if (g.remove || g.set) {   // a targeted fix: drop some paragraphs, rewrite others
+      const rm = new Set(g.remove || []);
+      ps = ps.filter(p => !rm.has(p.id));
+      for (const [id, h] of Object.entries(g.set || {})) { const i = idx(id); if (i >= 0) ps[i] = { ...ps[i], h }; }
+      continue;
+    }
     if (g.replaceBody) {   // replace the text of an existing chapter, keeping its number, title id, marks and illustration
       const h = idx(g.replaceBody); if (h < 0) continue;
       const c = computeChapters(ps).find(c => h >= c.start && h < c.end); if (!c) continue;
