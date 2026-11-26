@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { migrateOutbox } from "./outbox.js";
+import { migrateFunnel } from "./domain/funnel.js";
 
 // כל הסכומים באגורות (INTEGER). כל הזמנים ב-ISO UTC (TEXT).
 const SCHEMA = `
@@ -666,6 +667,7 @@ function migrate(db) {
   // הטריגרים מסמנים שינוי בכל מקום שמעדכן כרטיס או הופעה, בלי לגעת בכל נקודה בקוד
   add("tickets", "pass_updated_at", "TEXT");
   migrateOutbox(db);
+  migrateFunnel(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS wallet_registrations (
       id          INTEGER PRIMARY KEY,

@@ -40,6 +40,8 @@ import { sendLoginCode, sendMail, sendSms } from "./mailer.js";
 import * as OB from "./outbox.js";
 import * as JOBS from "./jobs.js";
 import * as BK from "./backup.js";
+import * as FN from "./domain/funnel.js";
+import { checkAlerts } from "./alerts.js";
 
 const STATIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const STATIC_TYPES = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json" };
@@ -150,6 +152,8 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   r.get("/data-deletion", (ctx) => ctx.send(P.dataDeletion(ctx, opts(ctx))));
 
   r.get("/terms", (ctx) => ctx.send(P.terms(ctx, opts(ctx))));
+  r.get("/help", (ctx) => ctx.send(P.help(ctx, opts(ctx))));
+  r.get("/accessibility", (ctx) => ctx.send(P.accessibility(ctx, opts(ctx))));
   // מדריך הסגנון הוא כלי פנימי של הצוות: רק למנהלים
   r.get("/design", (ctx) => {
     if (!requireUser(ctx)) return;
@@ -225,6 +229,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     const c = campaignOr404(ctx.params.id);
     if (c.status === "draft" && !ID.canManageArtist(db, ctx.user, c.artist_id)) throw new UserError("ההופעה לא נמצאה", 404);
     const ref = refFor(ctx, c.id);
+    if (!isCrawler(ctx.req)) FN.countView(db, c.id, "show", !!ref);
     const link = ctx.user ? db.prepare("SELECT * FROM referral_links WHERE campaign_id = ? AND promoter_id = ?").get(c.id, ctx.user.id) : null;
     ctx.send(
       P.showPage(
@@ -652,6 +657,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   r.get("/checkout/:id", (ctx) => {
     const c = jocaresCampaign(ctx.params.id);
     if (!T.salesOpen(c)) return ctx.redirect(`/s/${c.id}`, { ok: false, m: "המכירה להופעה הזו סגורה" });
+    if (!isCrawler(ctx.req)) FN.countView(db, c.id, "checkout", !!ctx.cookies[`ref_${c.id}`]);
     ctx.send(TV.checkoutPage(ctx, { ...checkoutData(ctx, c), v: { email: ctx.user?.email ?? "", name: ctx.user?.name ?? "" } }, opts(ctx)));
   });
 
@@ -1037,6 +1043,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
             ? {
                 s: T.salesSummary(db, c), orders: T.ordersOfCampaign(db, c.id), doorUrl: `${origin(ctx)}/door/${T.doorToken(db, c.id)}`, open: T.salesOpen(c),
                 price: T.priceNow(db, c), statement: M.showStatement(db, c.id), payoutReady: !!M.artistPayout(db, c.artist_id),
+                funnel: FN.funnel(db, c.id),
               }
             : null,
           assets: R.assetsOf(db, c.id),
@@ -1473,6 +1480,20 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
     K.setProfileStatus(db, ctx.user, Number(ctx.params.id), f.status);
     ctx.redirect("/admin?tab=content", "עודכן");
   });
+  // בקשות תשלום פתוחות לקובץ, להעברה מרוכזת בבנק או בביט. מוגבל למנהלים, ולא נשמר בדפדפן
+  r.get("/admin/payouts.csv", (ctx) => {
+    if (!requireUser(ctx)) return;
+    requireAdmin(ctx);
+    const rows = db.prepare("SELECT p.*, u.name, u.email, u.payout_details_enc FROM payouts p JOIN users u ON u.id = p.user_id WHERE p.status = 'requested' ORDER BY p.id").all();
+    const lines = [["בקשה", "שם", "מייל", "סכום", "אמצעי", "שם בחשבון", "טלפון", "בנק", "סניף", "חשבון"].join(",")];
+    for (const p of rows) {
+      const d = M.payoutDetails(p) ?? {};
+      lines.push([p.id, p.name, p.email, p.amount_agorot / 100, d.method === "bit" ? "ביט" : "בנק", d.full_name, d.phone, d.bank, d.branch, d.account].map(T.csvCell).join(","));
+    }
+    ID.audit(db, ctx.user.id, "payouts.export", "payout", 0, { count: rows.length });
+    ctx.res.writeHead(200, { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="payouts-${clock.iso().slice(0, 10)}.csv"`, "cache-control": "no-store" });
+    ctx.res.end("\ufeff" + lines.join("\r\n"));
+  });
   adminPost("/admin/payouts/:id", (ctx, f) => {
     M.decidePayout(db, ctx.user, ctx.params.id, f.outcome === "paid" ? "paid" : "failed", f.reference);
     ctx.redirect("/admin?tab=payouts", "עודכן");
@@ -1514,7 +1535,7 @@ export function createApp(db, { baseUrl = process.env.PUBLIC_URL, fetchImpl = fe
   // בוטים של תצוגה מקדימה עוברים לדפי הופעה ולתמונות, כדי שאפשר יהיה לבדוק שיתוף בוואטסאפ.
   const pilotPass = () => process.env.STAGING_PASSWORD;
   const pilotToken = () => hmac(pilotPass(), "pilot-access");
-  const PUBLIC_PATHS = /^\/(|how|terms|pilot|health|data-deletion|ops\/health)$|^\/(static|media|webhooks|tickets|door|t|reminders|j|wallet)\//;
+  const PUBLIC_PATHS = /^\/(|how|terms|help|accessibility|pilot|health|data-deletion|ops\/health)$|^\/(static|media|webhooks|tickets|door|t|reminders|j|wallet)\//;
 
   function stagingGate(req, res, ctx) {
     if (!pilotPass()) return false;
@@ -1655,6 +1676,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     })) || null
   );
   JOBS.schedule("backup", 60 * 60_000, async () => BK.runBackup(db));
+  // אחרי שהעבודות האחרות רצו פעם אחת, בודקים כל 5 דקות ומתריעים במייל
+  JOBS.schedule("alerts", 5 * 60_000, () => (checkAlerts(db, opsHealth(db), { base }) || null), { runNow: false });
 
   // ---------- כיבוי מסודר ----------
   // בפריסה Railway שולח SIGTERM: מפסיקים לקבל בקשות, נותנים לבקשות ולעבודות שרצות להסתיים, וסוגרים את המסד

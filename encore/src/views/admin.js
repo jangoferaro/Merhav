@@ -190,7 +190,7 @@ export function adminPayouts(ctx, { rows }, opts) {
   return shell(
     ctx,
     "payouts",
-    table(
+    html`${rows.some((p) => p.status === "requested") ? html`<p><a class="btn small ghost" href="/admin/payouts.csv">הורדת הבקשות הפתוחות לקובץ</a></p>` : ""}${table(
       ["#", "משתמש", "סכום", "לאן", "מצב", "פעולה"],
       rows.map(
         (p) => html`<tr><td>${p.id}</td><td>${p.name} <small dir="ltr">${p.email}</small></td><td><b>${money(p.amount_agorot)}</b></td>
@@ -203,7 +203,7 @@ export function adminPayouts(ctx, { rows }, opts) {
               <button class="btn small ghost" name="outcome" value="failed" formnovalidate>נכשל</button></form>`
           : ""}</td></tr>`
       )
-    ),
+    )}`,
     opts
   );
 }

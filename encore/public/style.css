@@ -774,3 +774,10 @@ body.door-app { margin: 0; background: #151515; color: #EDECE4; font-family: var
 .staff-qr summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
 .staff-qr .qr { background: #fff; width: 176px; padding: 8px; border-radius: 12px; }
 .staff-qr .qr svg { display: block; width: 160px; height: 160px; }
+.funnel { list-style: none; padding: 0; margin: 8px 0 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.funnel li { border: 1px solid var(--line, #d9d8cf); border-radius: 12px; padding: 12px; display: grid; gap: 4px; }
+.funnel b { font-size: 1.5rem; }
+.funnel span { font-size: .9rem; }
+.contact-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.prose details { border-bottom: 1px solid var(--line, #d9d8cf); padding: 10px 0; }
+.prose details summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }

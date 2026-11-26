@@ -353,7 +353,7 @@ export function setCapacity(db, actor, c, value) {
   audit(db, actor.id, "tickets.capacity", "campaign", c.id, { from: c.capacity, to: n });
 }
 
-const csvCell = (v) => {
+export const csvCell = (v) => {
   const s = String(v ?? "");
   // מונע הזרקת נוסחאות כשפותחים באקסל
   const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;

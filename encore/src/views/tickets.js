@@ -195,7 +195,7 @@ export function doorPage(ctx, { c, token, stats, last = null }) {
 
 // ---------- לאמן: מכירות ----------
 
-export function artistSales(ctx, { c, s, orders, doorUrl, open, price, statement = null, payoutReady = true }) {
+export function artistSales(ctx, { c, s, orders, doorUrl, open, price, statement = null, payoutReady = true, funnel = null }) {
   const pct = s.capacity ? Math.round((s.sold / s.capacity) * 100) : 0;
   return html`
 <section class="card sales">
@@ -207,6 +207,15 @@ export function artistSales(ctx, { c, s, orders, doorUrl, open, price, statement
     ${stat(s.inside, "נכנסו בדלת")}
   </div>
   <p class="note">${open ? "המכירה פתוחה עד תחילת ההופעה." : "המכירה סגורה."} השהיית הקידום לא עוצרת מכירות, רק תגמולים.</p>
+  ${funnel
+    ? html`<h3>מאיפה הקונים מגיעים</h3>
+  <ol class="funnel" aria-label="משפך המכירה">
+    <li><b>${funnel.views}</b><span>צפו בעמוד ההופעה${funnel.views_joker ? ` (${funnel.views_joker} דרך ג׳וקרים)` : ""}</span></li>
+    <li><b>${funnel.checkout}</b><span>נכנסו לקופה · ${funnel.to_checkout}% מהצופים</span></li>
+    <li><b>${funnel.paid}</b><span>שילמו · ${funnel.to_paid}% ממי שנכנס לקופה</span></li>
+    <li><b>${funnel.joker_share}%</b><span>מהקונים הגיעו דרך ג׳וקרים</span></li>
+  </ol>`
+    : ""}
   <div class="row2">
     <form method="post" action="/artist/c/${c.id}/capacity" class="inline">
       ${csrfField(ctx)}

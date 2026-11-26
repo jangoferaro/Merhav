@@ -208,3 +208,48 @@ test("בריאות: /health בודק את המסד בפועל", async () => {
     server.close();
   }
 });
+
+// ---------- משפך, התראות, עמודי עזרה ----------
+import * as FN from "../src/domain/funnel.js";
+import { checkAlerts } from "../src/alerts.js";
+
+test("משפך: צפיות וכניסות לקופה נספרות לפי מקור, בוטים לא נספרים, והאמן רואה את המשפך", async () => {
+  const { server, base } = await serve();
+  try {
+    await fetch(`${base}/s/${camp.id}`);
+    await fetch(`${base}/s/${camp.id}`);
+    await fetch(`${base}/s/${camp.id}`, { headers: { "user-agent": "facebookexternalhit/1.1" } });
+    await fetch(`${base}/checkout/${camp.id}`);
+    const f = FN.funnel(db, camp.id);
+    assert.equal(f.views, 2);
+    assert.equal(f.checkout, 1);
+    assert.equal(f.to_checkout, 50);
+  } finally {
+    server.close();
+  }
+});
+
+test("התראות: בעיה נשלחת למנהלים פעם אחת לכל 6 שעות, ובעיה חדשה נשלחת מיד", () => {
+  const now = new Date("2026-12-01T10:00:00Z");
+  const h = { ok: false, problems: ["backup"] };
+  assert.equal(checkAlerts(db, h, { emails: ["ops@x.com", " b@x.com "], now }), 2);
+  assert.equal(checkAlerts(db, h, { emails: ["ops@x.com"], now: new Date("2026-12-01T11:00:00Z") }), 0);
+  assert.equal(checkAlerts(db, { ok: false, problems: ["outbox_stuck"] }, { emails: ["ops@x.com"], now }), 1);
+  assert.equal(checkAlerts(db, { ok: true, problems: [] }, { emails: ["ops@x.com"], now }), 0);
+  assert.match(db.prepare("SELECT subject FROM outbox WHERE to_addr = 'b@x.com'").get().subject, /backup/);
+});
+
+test("עזרה והצהרת נגישות פתוחות לכולם, גם כשהאתר נעול בסיסמת פיילוט", async () => {
+  process.env.STAGING_PASSWORD = "pilot-test";
+  const { server, base } = await serve();
+  try {
+    for (const p of ["/help", "/accessibility"]) {
+      const r = await fetch(base + p, { redirect: "manual" });
+      assert.equal(r.status, 200, p);
+    }
+    assert.match(await (await fetch(`${base}/accessibility`)).text(), /הצהרת נגישות/);
+  } finally {
+    server.close();
+    delete process.env.STAGING_PASSWORD;
+  }
+});
