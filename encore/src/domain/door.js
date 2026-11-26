@@ -167,14 +167,19 @@ export function appHome(db, staff) {
   };
 }
 
-/** כמה נכנסו דרך כל איש צוות, וכמה נסרקו בלי קליטה. מספרים בלבד */
+/**
+ * כמה נכנסו דרך כל איש צוות. סופרים כרטיסים שנמצאים בפנים עכשיו, כל אחד לפי מי שהכניס אותו אחרון,
+ * כך שהסכום לא יכול לעבור את מספר הנכנסים (גם אחרי ביטולים, סריקות חוזרות או תיקונים ידניים)
+ */
 export function staffCounts(db, c) {
   return db
     .prepare(
-      `SELECT COALESCE(s.name, 'קישור ההופעה') name, SUM(CASE WHEN d.action = 'in' THEN 1 ELSE -1 END) n
-         FROM door_checkins d LEFT JOIN door_staff s ON s.id = d.staff_id
-        WHERE d.campaign_id = ? GROUP BY d.staff_id ORDER BY n DESC`
+      `SELECT COALESCE(s.name, 'קישור ההופעה') name, COUNT(*) n
+         FROM tickets t
+         JOIN door_checkins d ON d.id = (SELECT MAX(id) FROM door_checkins WHERE ticket_id = t.id AND action = 'in')
+         LEFT JOIN door_staff s ON s.id = d.staff_id
+        WHERE t.campaign_id = ? AND t.status = 'used'
+        GROUP BY d.staff_id ORDER BY n DESC`
     )
-    .all(c.id)
-    .filter((r) => r.n > 0);
+    .all(c.id);
 }

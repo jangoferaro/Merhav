@@ -181,3 +181,17 @@ test("API לאפליקציית הנייטיב: מפתח אישי בכותרת, �
     server.close();
   }
 });
+
+test("ספירה לפי איש צוות לא עוברת את מספר הנכנסים, גם אחרי ביטול וסריקה חוזרת", () => {
+  const [t1, t2] = buy(camp, { name: "דנה", email: "d@y.com", qty: 2 });
+  const tok = DR.addStaff(db, org, camp.artist_id, "יוסי");
+  const staff = DR.staffByToken(db, tok);
+  DR.admit(db, camp, { code: t1.code, staff });
+  DR.undo(db, camp, t1.id, { staff });
+  DR.admit(db, camp, { code: t1.code, staff });
+  DR.admit(db, camp, { code: t2.code });
+  db.prepare("UPDATE tickets SET status = 'valid', used_at = NULL WHERE id = ?").run(t2.id); // תיקון ידני במסד
+  const counts = DR.staffCounts(db, camp);
+  assert.deepEqual(counts.map((r) => ({ ...r })), [{ name: "יוסי", n: 1 }]);
+  assert.ok(counts.reduce((a, r) => a + r.n, 0) <= DR.stats(db, camp).inside);
+});
