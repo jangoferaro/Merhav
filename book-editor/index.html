@@ -2524,7 +2524,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden && Clo
    Inserted into whatever text the device has, renumbers the chapters, rebuilds the table of contents,
    updates chapter numbers in the notes, and keeps chapter marks and illustrations on their chapters. */
 // packages of new material, applied once each, in order
-const ADDS = [].concat(window.MAGIHA_ADDITIONS || [], window.MAGIHA_ADDITIONS_2 || [], window.MAGIHA_ADDITIONS_3 || [], window.MAGIHA_FIXES || []);
+const ADDS = [].concat(window.MAGIHA_ADDITIONS || [], window.MAGIHA_ADDITIONS_2 || [], window.MAGIHA_ADDITIONS_3 || [], window.MAGIHA_FIXES || [], window.MAGIHA_ADDITIONS_4 || []);
 let merging = false;
 async function dropTableOfContents() {
   const KEY = "drop-toc-1";
