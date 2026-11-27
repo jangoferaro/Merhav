@@ -649,7 +649,8 @@ const DB = {
 /* ---------------- text helpers ---------------- */
 const tmpl = document.createElement("template");
 function htmlToText(h) { tmpl.innerHTML = h || ""; return tmpl.content.textContent; }
-const pText = p => (p._t !== undefined ? p._t : (p._t = htmlToText(p.h)));
+// plain text of a paragraph, cached; the cache is tied to the exact html so a copied paragraph with new text never shows stale text
+const pText = p => (p._t !== undefined && p._th === p.h ? p._t : (p._th = p.h, p._t = htmlToText(p.h)));
 const WORD_RE = /[\p{L}\p{N}\p{M}]+(?:['"׳״\-־][\p{L}\p{N}\p{M}]+)*/gu;
 const countWords = s => (s.match(WORD_RE) || []).length;
 const NIQQUD_RE = /[֑-ׇ]/; // cantillation + vowel points (incl. maqaf ־ excluded below)
@@ -2524,7 +2525,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden && Clo
    Inserted into whatever text the device has, renumbers the chapters, rebuilds the table of contents,
    updates chapter numbers in the notes, and keeps chapter marks and illustrations on their chapters. */
 // packages of new material, applied once each, in order
-const ADDS = [].concat(window.MAGIHA_ADDITIONS || [], window.MAGIHA_ADDITIONS_2 || [], window.MAGIHA_ADDITIONS_3 || [], window.MAGIHA_FIXES || [], window.MAGIHA_ADDITIONS_4 || []);
+const ADDS = [].concat(window.MAGIHA_ADDITIONS || [], window.MAGIHA_ADDITIONS_2 || [], window.MAGIHA_ADDITIONS_3 || [], window.MAGIHA_FIXES || [], window.MAGIHA_ADDITIONS_4 || [], window.MAGIHA_ADDITIONS_5 || []);
 let merging = false;
 async function dropTableOfContents() {
   const KEY = "drop-toc-1";
