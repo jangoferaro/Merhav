@@ -1173,12 +1173,15 @@ function blockHtml(p) {
 }
 /* ---------------- chapters: the editor shows one chapter at a time ----------------
    S.full holds the whole book; the open chapter lives in the editor DOM and is merged back by fullParas(). */
-function computeChapters(paras) {
+function computeChapters(paras, opts) {
   const T = paras.map(pText), starts = [];
+  // a chapter takes in the label just above its heading: its number ("01") or a part label ("חלק א").
+  // (the legacy rule took any line up to 14 characters, which swallowed short closing lines of the previous chapter)
+  const isLabel = opts && opts.legacy ? (t => t.trim().length <= 14) : (t => /^(\d{1,3}|חלק\s+\S{1,3})$/.test(t.trim()));
   for (let i = 0; i < paras.length; i++) {
     if (paras[i].t !== "h") continue;
-    let s = i;   // pull in a short label just above the heading ("01", "חלק א")
-    while (s > 0 && paras[s - 1].t !== "h" && T[s - 1].trim().length <= 14 && (!starts.length || s - 1 > starts[starts.length - 1])) s--;
+    let s = i;
+    while (s > 0 && paras[s - 1].t !== "h" && isLabel(T[s - 1]) && (!starts.length || s - 1 > starts[starts.length - 1])) s--;
     if (!starts.length || s > starts[starts.length - 1]) starts.push(s);
   }
   if (!starts.length || starts[0] !== 0) starts.unshift(0);
@@ -2538,9 +2541,36 @@ async function dropTableOfContents() {
     toast("תוכן העניינים הוסר. פתח הדבר הוא עכשיו פרק נפרד.", 4500);
   } else { S.book.applied.push(KEY); S.dirty = true; await saveNow(); }
 }
+/* chapter starts changed when the label rule was tightened: move marks and illustrations kept under an old start */
+const MARK_KEYS = ["done", "refine", "final", "archived", "unsure", "scatter"];
+async function moveMarks(rm) {
+  if (!Object.keys(rm).length) return;
+  const mv = x => rm[x] !== undefined ? rm[x] : x;
+  for (const k of MARK_KEYS) if (S.book[k]) S.book[k] = S.book[k].map(mv);
+  if (S.book.images) {
+    const blobs = {};
+    for (const from of Object.keys(rm)) if (S.book.images[from]) { try { blobs[from] = await DB.get("pdfs", `img:${S.book.id}:${from}`); } catch (e) {} }
+    const imgs = {}; for (const [k, v] of Object.entries(S.book.images)) imgs[mv(k)] = v; S.book.images = imgs;
+    for (const from of Object.keys(blobs)) { try { await DB.del("pdfs", `img:${S.book.id}:${from}`); } catch (e) {} }
+    for (const [from, b] of Object.entries(blobs)) if (b) { try { await DB.put("pdfs", b, `img:${S.book.id}:${rm[from]}`); } catch (e) {} }
+  }
+}
+async function migrateChapterStarts() {
+  const KEY = "chapter-starts-v2";
+  if ((S.book.applied || []).includes(KEY)) return;
+  const ps = fullParas(), oldC = computeChapters(ps, { legacy: true }), newC = computeChapters(ps), rm = {};
+  for (const c of oldC) {
+    const n = newC.find(x => x.titleId === c.titleId && x.title === c.title);
+    if (n && ps[n.start].id !== ps[c.start].id) rm[ps[c.start].id] = ps[n.start].id;
+  }
+  await moveMarks(rm);
+  S.book.applied.push(KEY);
+  paintChapter(); S.dirty = true; S.contentChanged = Object.keys(rm).length > 0; await saveNow();
+}
 async function maybeMergeAdditions() {
   if (merging || !S.book || !S.chapters) return;
   S.book.applied = S.book.applied || [];
+  if (!S.book.applied.includes("chapter-starts-v2")) { merging = true; try { await migrateChapterStarts(); } catch (e) { console.warn(e); } merging = false; }
   const ADD = ADDS.find(a => !S.book.applied.includes(a.key));
   if (!ADD) return dropTableOfContents();
   merging = true;
